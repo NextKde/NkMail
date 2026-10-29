@@ -1,0 +1,616 @@
+NkMail mailio security/read-only compatibility patch
+Upstream: mailio tag 0.26.1
+Base-commit: f358b1f85f9a021f0bd814e285eb8ae102fc8f79
+Apply from third_party/mailio with: patch -p1 < ../../patches/mailio/0001-verified-tls-peek-timeouts.patch
+
+Purpose:
+- Per-connection Asio context, asynchronous DNS/connect/TLS, cancellation-safe
+  nonzero per-I/O deadlines (not a whole-operation deadline).
+- System trust roots plus optional ca_file, mandatory verify_peer, DNS/IP
+  hostname verification, DNS SNI, TLS >= 1.2. No plaintext fallback.
+- Add opt-in FETCH PEEK without changing existing FETCH overload behavior;
+  parse BODY sections and UID appearing after FLAGS/body; bound literals.
+- Fix empty quoted atoms, instance-local literal counters, and selectable
+  folder metadata so hierarchy parents marked Noselect are not opened.
+- Explicit SMTP 4xx/5xx rejection bit and strict final DATA status parsing;
+  malformed/transport failures during submission stay Unknown in adapter.
+- SMTP upstream already envelopes To/Cc/Bcc while message.format defaults
+  add_bcc_header=false; adapter/fixture verify Bcc never appears in DATA.
+
+Verification: independent Qt C++ probe plus Python loopback IMAP/SMTP/TLS
+fixture. No real credentials, external connections, mailbox writes or sends.
+30 scenarios passed including expired/untrusted/wrong-host certificates for
+both TLS modes/protocols, PEEK/header pagination/UIDVALIDITY, Chinese MIME,
+binary attachments, Bcc privacy, refusal/ambiguous disconnect and TLS timeout.
+
+Limits: folders currently requests STATUS serially for each selectable folder;
+headers are capped at 256 KiB each, full MIME at 25 MiB, attachments 15 MiB each.
+The adapter enforces post-parse MIME tree depth/part bounds; this is not a full
+upstream hostile-MIME parser audit. Timeout applies to individual I/O only.
+
+diff --git a/include/mailio/dialog.hpp b/include/mailio/dialog.hpp
+index 0fd591e..68a523a 100644
+--- a/include/mailio/dialog.hpp
++++ b/include/mailio/dialog.hpp
+@@ -176,7 +176,8 @@ protected:
+     /**
+     Asio input/output service.
+     **/
+-    static boost::asio::io_context ios_;
++    std::shared_ptr<boost::asio::io_context> ios_;
++    std::shared_ptr<boost::asio::ip::tcp::resolver> resolver_;
+ 
+     /**
+     Socket connection.
+@@ -233,6 +234,9 @@ public:
+         Peer verification bitmask supported by Asio.
+         **/
+         boost::asio::ssl::verify_mode verify_mode;
++
++        // Optional additional trust anchor. Verification is never disabled by this.
++        std::string ca_file;
+     };
+ 
+     /**
+diff --git a/include/mailio/imap.hpp b/include/mailio/imap.hpp
+index 0d99ac5..7f6b595 100644
+--- a/include/mailio/imap.hpp
++++ b/include/mailio/imap.hpp
+@@ -126,6 +126,7 @@ public:
+     struct mailbox_folder_t
+     {
+         std::map<std::string, mailbox_folder_t> folders;
++        bool selectable = false;
+     };
+ 
+ 
+@@ -223,7 +224,7 @@ public:
+     - IS_UID: consider unique message id instead of sequence id.
+     - FLAGS: ask message flags from server.
+     **/
+-    enum class fetch_options_t : uint8_t { DEFAULT = 0, HEADER_ONLY = 1, IS_UID = 2, FLAGS = 4 };
++    enum class fetch_options_t : uint8_t { DEFAULT = 0, HEADER_ONLY = 1, IS_UID = 2, FLAGS = 4, PEEK = 8 };
+ 
+ 
+     /**
+@@ -587,6 +588,9 @@ public:
+     **/
+     std::string folder_delimiter();
+ 
++    // Bound untrusted server literals before allocating their content.
++    void literal_limit(std::size_t bytes) { literal_limit_ = bytes; }
++
+ protected:
+ 
+     /**
+@@ -875,6 +879,8 @@ protected:
+     /**
+     SSL options to set.
+     **/
++    std::size_t literal_limit_ = 25 * 1024 * 1024;
++    std::size_t literal_bytes_read_ = 0;
+     std::optional<dialog_ssl::ssl_options_t> ssl_options_;
+ 
+     /**
+diff --git a/include/mailio/smtp.hpp b/include/mailio/smtp.hpp
+index 469a2f9..9c7a965 100644
+--- a/include/mailio/smtp.hpp
++++ b/include/mailio/smtp.hpp
+@@ -342,7 +342,7 @@ public:
+     @param msg     Error message.
+     @param details Detailed message.
+     **/
+-    smtp_error(const std::string& msg, const std::string& details);
++    smtp_error(const std::string& msg, const std::string& details, bool rejection = false);
+ 
+     /**
+     Calling the parent constructor.
+@@ -350,7 +350,10 @@ public:
+     @param msg     Error message.
+     @param details Detailed message.
+     **/
+-    smtp_error(const char* msg, const std::string& details);
++    smtp_error(const char* msg, const std::string& details, bool rejection = false);
++
++    // True only for a parsed, explicit 4xx/5xx response (not malformed input).
++    bool is_rejection() const noexcept { return rejection_; }
+ 
+     smtp_error(const smtp_error&) = default;
+ 
+@@ -361,6 +364,9 @@ public:
+     smtp_error& operator=(const smtp_error&) = default;
+ 
+     smtp_error& operator=(smtp_error&&) = default;
++
++private:
++    bool rejection_ = false;
+ };
+ 
+ 
+diff --git a/src/dialog.cpp b/src/dialog.cpp
+index 5c6be6c..52bbbb1 100644
+--- a/src/dialog.cpp
++++ b/src/dialog.cpp
+@@ -16,6 +16,8 @@ copy at http://www.freebsd.org/copyright/freebsd-license.html.
+ #include <boost/algorithm/string/trim.hpp>
+ #include <boost/algorithm/string/classification.hpp>
+ #include <mailio/dialog.hpp>
++#include <boost/asio/ssl/host_name_verification.hpp>
++#include <openssl/ssl.h>
+ 
+ 
+ using std::string;
+@@ -42,18 +44,16 @@ namespace mailio
+ {
+ 
+ 
+-boost::asio::io_context dialog::ios_;
+-
+-
+ dialog::dialog(const string& hostname, unsigned port, milliseconds timeout) : std::enable_shared_from_this<dialog>(),
+-    hostname_(hostname), port_(port), socket_(make_shared<tcp::socket>(ios_)), timer_(make_shared<steady_timer>(ios_)),
+-    timeout_(timeout), timer_expired_(false), strmbuf_(make_shared<streambuf>()), istrm_(make_shared<istream>(strmbuf_.get()))
++    hostname_(hostname), port_(port), ios_(make_shared<io_context>()), resolver_(make_shared<tcp::resolver>(*ios_)),
++    socket_(make_shared<tcp::socket>(*ios_)), timer_(make_shared<steady_timer>(*ios_)),
++    timeout_(timeout), timer_expired_(false), strmbuf_(make_shared<streambuf>(32 * 1024 * 1024)), istrm_(make_shared<istream>(strmbuf_.get()))
+ {
+ }
+ 
+ 
+ dialog::dialog(const dialog& other) : std::enable_shared_from_this<dialog>(),
+-    hostname_(move(other.hostname_)), port_(other.port_), socket_(other.socket_), timer_(other.timer_),
++    hostname_(other.hostname_), port_(other.port_), ios_(other.ios_), resolver_(other.resolver_), socket_(other.socket_), timer_(other.timer_),
+     timeout_(other.timeout_), timer_expired_(other.timer_expired_), strmbuf_(other.strmbuf_), istrm_(other.istrm_)
+ {
+ }
+@@ -65,7 +65,7 @@ void dialog::connect()
+     {
+         if (timeout_.count() == 0)
+         {
+-            tcp::resolver res(ios_);
++            tcp::resolver res(*ios_);
+             boost::asio::connect(*socket_, res.resolve(hostname_, to_string(port_)));
+         }
+         else
+@@ -133,19 +133,16 @@ string dialog::receive_sync(Socket& socket, bool raw)
+ 
+ void dialog::connect_async()
+ {
+-    tcp::resolver res(ios_);
+     check_timeout();
+-
+     bool has_connected{false}, connect_error{false};
+     error_code errc;
+-    async_connect(*socket_, res.resolve(hostname_, to_string(port_)),
+-        [&has_connected, &connect_error, &errc](const error_code& error, const boost::asio::ip::tcp::endpoint&)
++    resolver_->async_resolve(hostname_, to_string(port_),
++        [this, &has_connected, &connect_error, &errc](const error_code& error, tcp::resolver::results_type endpoints)
+         {
+-            if (!error)
+-                has_connected = true;
+-            else
+-                connect_error = true;
+-            errc = error;
++            if (error) { connect_error = true; errc = error; return; }
++            async_connect(*socket_, endpoints,
++                [&has_connected, &connect_error, &errc](const error_code& ec, const tcp::endpoint&)
++                { has_connected = !ec; connect_error = !!ec; errc = ec; });
+         });
+     wait_async(has_connected, connect_error, "Network connecting timed out.", "Network connecting failed.", errc);
+ }
+@@ -199,31 +196,37 @@ string dialog::receive_async(Socket& socket, bool raw)
+ 
+ void dialog::wait_async(const bool& has_op, const bool& op_error, const char* expired_msg, const char* op_msg, const error_code& error)
+ {
+-    do
+-    {
+-        if (timer_expired_)
+-            throw dialog_error(expired_msg, error.message());
+-        if (op_error)
+-            throw dialog_error(op_msg, error.message());
+-        ios_.run_one();
+-    }
+-    while (!has_op);
++    while (!has_op && !op_error)
++        ios_->run_one();
++    timer_->cancel();
++    // Complete cancellation callbacks before any stack-captured state disappears.
++    ios_->poll();
++    if (timer_expired_)
++        throw dialog_error(expired_msg, error.message());
++    if (op_error)
++        throw dialog_error(op_msg, error.message());
+ }
+ 
+ 
+ void dialog::check_timeout()
+ {
++    ios_->restart();
+     // Expiring automatically cancels the timer, per documentation.
+     timer_->expires_after(timeout_);
+     timer_expired_ = false;
+-    timer_->async_wait(bind(&dialog::timeout_handler, shared_from_this(), std::placeholders::_1));
++    timer_->async_wait([this](const error_code& error) { timeout_handler(error); });
+ }
+ 
+ 
+ void dialog::timeout_handler(const error_code& error)
+ {
+     if (!error)
++    {
+         timer_expired_ = true;
++        resolver_->cancel();
++        error_code ignored;
++        socket_->close(ignored);
++    }
+ }
+ 
+ 
+@@ -234,13 +237,35 @@ dialog_ssl::dialog_ssl(const string& hostname, unsigned port, milliseconds timeo
+ }
+ 
+ 
+-dialog_ssl::dialog_ssl(const dialog& other, const ssl_options_t& options) : dialog(other), context_(make_shared<context>(options.method)),
++dialog_ssl::dialog_ssl(const dialog& other, const ssl_options_t& options) : dialog(other), ssl_(false), context_(make_shared<context>(options.method)),
+     ssl_socket_(make_shared<boost::asio::ssl::stream<tcp::socket&>>(*socket_, *context_))
+ {
+     try
+     {
+-        ssl_socket_->set_verify_mode(options.verify_mode);
+-        ssl_socket_->handshake(boost::asio::ssl::stream_base::client);
++        context_->set_default_verify_paths();
++        if (!options.ca_file.empty())
++            context_->load_verify_file(options.ca_file);
++        // TLS is fail-closed even if an old caller supplies verify_none.
++        ssl_socket_->set_verify_mode(boost::asio::ssl::verify_peer);
++        ssl_socket_->set_verify_callback(boost::asio::ssl::host_name_verification(hostname_));
++        error_code address_error;
++        boost::asio::ip::make_address(hostname_, address_error);
++        if (address_error && !SSL_set_tlsext_host_name(ssl_socket_->native_handle(), hostname_.c_str()))
++            throw dialog_error("Setting TLS server name failed.", "");
++        if (SSL_set_min_proto_version(ssl_socket_->native_handle(), TLS1_2_VERSION) != 1)
++            throw dialog_error("Setting TLS minimum version failed.", "");
++        if (timeout_.count() == 0)
++            ssl_socket_->handshake(boost::asio::ssl::stream_base::client);
++        else
++        {
++            check_timeout();
++            bool complete = false, failed = false;
++            error_code ec;
++            ssl_socket_->async_handshake(boost::asio::ssl::stream_base::client,
++                [&complete, &failed, &ec](const error_code& error)
++                { complete = !error; failed = !!error; ec = error; });
++            wait_async(complete, failed, "TLS handshake timed out.", "TLS handshake failed.", ec);
++        }
+         ssl_ = true;
+     }
+     catch (const system_error& exc)
+diff --git a/src/imap.cpp b/src/imap.cpp
+index 0234679..2fb700b 100644
+--- a/src/imap.cpp
++++ b/src/imap.cpp
+@@ -399,7 +399,9 @@ imap::fetch(const list<messages_range_t>& messages_range, fetch_options_t option
+     if (messages_range.empty())
+         throw imap_error("Empty messages range.", "");
+ 
++    const bool peek = (static_cast<uint8_t>(options) & static_cast<uint8_t>(fetch_options_t::PEEK));
+     const string RFC822_TOKEN = string("RFC822") + (header_only ? ".HEADER" : "");
++    const string fetch_token = peek ? (header_only ? "BODY.PEEK[HEADER]" : "BODY.PEEK[]") : RFC822_TOKEN;
+     const string message_ids = messages_range_list_to_string(messages_range);
+ 
+     string cmd;
+@@ -407,9 +409,9 @@ imap::fetch(const list<messages_range_t>& messages_range, fetch_options_t option
+         cmd.append("UID ");
+     // TODO: Else branch also to put the RFC822 within parenthesis?
+     if (is_flags)
+-        cmd.append("FETCH " + message_ids + TOKEN_SEPARATOR_STR + "(FLAGS " +  RFC822_TOKEN + ")");
++        cmd.append("FETCH " + message_ids + TOKEN_SEPARATOR_STR + "(FLAGS " + fetch_token + ")");
+     else
+-        cmd.append("FETCH " + message_ids + TOKEN_SEPARATOR_STR + RFC822_TOKEN);
++        cmd.append("FETCH " + message_ids + TOKEN_SEPARATOR_STR + fetch_token);
+     dlg_->send(format(cmd));
+ 
+     // Store messages as strings indexed by the messages number.
+@@ -443,7 +445,6 @@ imap::fetch(const list<messages_range_t>& messages_range, fetch_options_t option
+     if (mandatory_part_.size() == 0)
+         return found_messages;
+ 
+-    unsigned long uid_no = 0;
+     for (auto mand_part = mandatory_part_.begin(); mand_part != mandatory_part_.end(); mand_part++)
+     {
+         unsigned long sequence_no = stoul((*mand_part)->atom);
+@@ -455,6 +456,20 @@ imap::fetch(const list<messages_range_t>& messages_range, fetch_options_t option
+         if ((*mand_part)->token_type == grammar_token_t::token_type_t::LIST)
+         {
+             auto data_list = (*mand_part);
++            unsigned long uid_no = 0;
++            // RFC allows UID after FLAGS/BODY. Resolve identity before extraction.
++            if (is_uid)
++            {
++                for (auto it = data_list->parenthesized_list.begin(); it != data_list->parenthesized_list.end(); ++it)
++                    if (iequals((*it)->atom, "UID"))
++                    {
++                        if (++it == data_list->parenthesized_list.end())
++                            throw imap_error("Missing UID.", "");
++                        uid_no = stoul((*it)->atom);
++                        break;
++                    }
++                if (!uid_no) throw imap_error("Missing UID.", "");
++            }
+             for (auto token = data_list->parenthesized_list.begin(); token != data_list->parenthesized_list.end(); token++)
+             {
+                 if ((*token)->token_type == grammar_token_t::token_type_t::ATOM)
+@@ -480,7 +495,8 @@ imap::fetch(const list<messages_range_t>& messages_range, fetch_options_t option
+                             for (auto fetch_list = (*token)->parenthesized_list.begin(); fetch_list != (*token)->parenthesized_list.end(); fetch_list++)
+                                 std::get<1>(msg_str[is_uid ? uid_no : sequence_no]).push_back((*fetch_list)->atom);
+                     }
+-                    else if (iequals((*token)->atom, RFC822_TOKEN))
++                    else if (iequals((*token)->atom, RFC822_TOKEN) ||
++                        (peek && iequals((*token)->atom, header_only ? "BODY[HEADER]" : "BODY[]")))
+                     {
+                         token++;
+                         if ((*token)->token_type != grammar_token_t::token_type_t::LITERAL)
+@@ -844,14 +860,20 @@ auto imap::list_folders(const string& folder_name) -> mailbox_folder_t
+                     vector<string> folders_hierarchy;
+                     // TODO: May `delim` contain more than one character?
+                     split(folders_hierarchy, (*found_folder)->atom, is_any_of(delim));
++                    bool selectable = true;
++                    for (const auto& flag : mandatory_part_.front()->parenthesized_list)
++                        if (iequals(flag->atom, "\\Noselect")) selectable = false;
+                     map<string, mailbox_folder_t>* mbox = &mailboxes.folders;
++                    mailbox_folder_t* leaf = nullptr;
+                     for (auto f : folders_hierarchy)
+                     {
+                         auto fit = find_if(mbox->begin(), mbox->end(), [&f](const std::pair<string, mailbox_folder_t>& mf){ return mf.first == f; });
+                         if (fit == mbox->end())
+                             mbox->insert(std::make_pair(f, mailbox_folder_t{}));
+-                        mbox = &(mbox->at(f).folders);
++                        leaf = &mbox->at(f);
++                        mbox = &leaf->folders;
+                     }
++                    if (leaf) leaf->selectable = selectable;
+                 }
+                 else
+                     throw imap_error("Parsing failure.", "Line=`" + line + "`.");
+@@ -1153,6 +1175,12 @@ void imap::parse_grammar(const string& imap_string)
+     list<shared_ptr<imap::grammar_token_t>>* token_list;
+     shared_ptr<grammar_token_t> cur_token;
+     auto cur_char = imap_string.cbegin();
++    if (cur_char == imap_string.cend())
++    {
++        if (literal_state_ == string_literal_state_t::READING)
++            parse_string_literal(imap_string.cend(), cur_char);
++        return;
++    }
+     do
+     {
+         if (literal_state_ == string_literal_state_t::READING)
+@@ -1170,6 +1198,15 @@ void imap::parse_grammar(const string& imap_string)
+             {
+                 if (atom_state_ == atom_state_t::QUOTED)
+                     cur_token->atom += *cur_char;
++                else if (atom_state_ == atom_state_t::PLAIN && cur_token && iequals(cur_token->atom, "BODY"))
++                {
++                    // FETCH section names are atoms, not response-code brackets.
++                    do { cur_token->atom += *cur_char; }
++                    while (++cur_char != imap_string.cend() && *cur_char != OPTIONAL_END);
++                    if (cur_char == imap_string.cend())
++                        throw imap_error("Unterminated FETCH section.", "");
++                    cur_token->atom += *cur_char;
++                }
+                 else
+                 {
+                     if (optional_part_state_)
+@@ -1260,7 +1297,7 @@ void imap::parse_grammar(const string& imap_string)
+                 else if (atom_state_ == atom_state_t::QUOTED)
+                 {
+                     // The backslash and a double quote within an atom is the double quote only.
+-                    if (token_list->back()->atom.back() != codec::BACKSLASH_CHAR)
++                    if (token_list->back()->atom.empty() || token_list->back()->atom.back() != codec::BACKSLASH_CHAR)
+                         atom_state_ = atom_state_t::NONE;
+                     else
+                         token_list->back()->atom.back() = *cur_char;
+@@ -1271,7 +1308,7 @@ void imap::parse_grammar(const string& imap_string)
+             default:
+             {
+                 // Double backslash in an atom is translated to the single backslash.
+-                if (*cur_char == codec::BACKSLASH_CHAR && atom_state_ == atom_state_t::QUOTED && token_list->back()->atom.back() == codec::BACKSLASH_CHAR)
++                if (*cur_char == codec::BACKSLASH_CHAR && atom_state_ == atom_state_t::QUOTED && !token_list->back()->atom.empty() && token_list->back()->atom.back() == codec::BACKSLASH_CHAR)
+                     break;
+ 
+                 if (literal_state_ != string_literal_state_t::NONE)
+@@ -1303,6 +1340,7 @@ void imap::reset_grammar_parser()
+     atom_state_ = atom_state_t::NONE;
+     parenthesis_list_counter_ = 0;
+     literal_state_ = string_literal_state_t::NONE;
++    literal_bytes_read_ = 0;
+     eols_no_ = 2;
+ }
+ 
+@@ -1340,8 +1378,7 @@ string imap::folder_tree_to_string(const list<string>& folder_tree, string delim
+ 
+ void imap::parse_string_literal(string::const_iterator imap_string_end, string::const_iterator& cur_char)
+ {
+-    // Number of bytes read so far while parsing a string literal.
+-    static string::size_type literal_bytes_read = 0;
++    auto& literal_bytes_read = literal_bytes_read_;
+     auto token_list = optional_part_state_ ? find_last_token_list(optional_part_) : find_last_token_list(mandatory_part_);
+ 
+     // The string is about to start, parse its length.
+@@ -1363,6 +1400,10 @@ void imap::parse_string_literal(string::const_iterator imap_string_end, string::
+                 cur_token->literal_size += *cur_char;
+             cur_char++;
+         }
++        if (cur_char == imap_string_end || cur_token->literal_size.empty() ||
++            cur_token->literal_size.size() > 9 || stoul(cur_token->literal_size) > literal_limit_)
++            throw imap_error("IMAP literal exceeds safety limit.", "");
++        literal_bytes_read = 0;
+     }
+     // The literal is being read, it can be spread over multiple lines.
+     else if (literal_state_ == string_literal_state_t::READING)
+diff --git a/src/smtp.cpp b/src/smtp.cpp
+index bbeed6c..37ae329 100644
+--- a/src/smtp.cpp
++++ b/src/smtp.cpp
+@@ -97,7 +97,7 @@ string smtp::submit(const message& msg)
+     string line = dlg_->receive();
+     tuple<int, bool, string> tokens = parse_line(line);
+     if (std::get<1>(tokens) && !positive_completion(std::get<0>(tokens)))
+-        throw smtp_error("Mail sender rejection.", std::get<2>(tokens));
++        throw smtp_error("Mail sender rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+ 
+     for (const auto& rcpt : msg.recipients().addresses)
+     {
+@@ -105,7 +105,7 @@ string smtp::submit(const message& msg)
+         line = dlg_->receive();
+         tokens = parse_line(line);
+         if (!positive_completion(std::get<0>(tokens)))
+-            throw smtp_error("Mail recipient rejection.", std::get<2>(tokens));
++            throw smtp_error("Mail recipient rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+     }
+ 
+     for (const auto& rcpt : msg.recipients().groups)
+@@ -114,7 +114,7 @@ string smtp::submit(const message& msg)
+         line = dlg_->receive();
+         tokens = parse_line(line);
+         if (!positive_completion(std::get<0>(tokens)))
+-            throw smtp_error("Mail group recipient rejection.", std::get<2>(tokens));
++            throw smtp_error("Mail group recipient rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+     }
+ 
+     for (const auto& rcpt : msg.cc_recipients().addresses)
+@@ -123,7 +123,7 @@ string smtp::submit(const message& msg)
+         line = dlg_->receive();
+         tokens = parse_line(line);
+         if (!positive_completion(std::get<0>(tokens)))
+-            throw smtp_error("Mail cc recipient rejection.", std::get<2>(tokens));
++            throw smtp_error("Mail cc recipient rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+     }
+ 
+     for (const auto& rcpt : msg.cc_recipients().groups)
+@@ -132,7 +132,7 @@ string smtp::submit(const message& msg)
+         line = dlg_->receive();
+         tokens = parse_line(line);
+         if (!positive_completion(std::get<0>(tokens)))
+-            throw smtp_error("Mail group cc recipient rejection.", std::get<2>(tokens));
++            throw smtp_error("Mail group cc recipient rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+     }
+ 
+     for (const auto& rcpt : msg.bcc_recipients().addresses)
+@@ -141,7 +141,7 @@ string smtp::submit(const message& msg)
+         line = dlg_->receive();
+         tokens = parse_line(line);
+         if (!positive_completion(std::get<0>(tokens)))
+-            throw smtp_error("Mail bcc recipient rejection.", std::get<2>(tokens));
++            throw smtp_error("Mail bcc recipient rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+     }
+ 
+     for (const auto& rcpt : msg.bcc_recipients().groups)
+@@ -150,22 +150,22 @@ string smtp::submit(const message& msg)
+         line = dlg_->receive();
+         tokens = parse_line(line);
+         if (!positive_completion(std::get<0>(tokens)))
+-            throw smtp_error("Mail group bcc recipient rejection.", std::get<2>(tokens));
++            throw smtp_error("Mail group bcc recipient rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+     }
+ 
+     dlg_->send("DATA");
+     line = dlg_->receive();
+     tokens = parse_line(line);
+-    if (!positive_intermediate(std::get<0>(tokens)))
+-        throw smtp_error("Mail message rejection.", std::get<2>(tokens));
++    if (!std::get<1>(tokens) || std::get<0>(tokens) != 354)
++        throw smtp_error("Mail message rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+ 
+     string msg_str;
+     msg.format(msg_str, {/*dot_escape*/true});
+     dlg_->send(msg_str + codec::END_OF_LINE + codec::END_OF_MESSAGE);
+     line = dlg_->receive();
+     tokens = parse_line(line);
+-    if (!positive_completion(std::get<0>(tokens)))
+-        throw smtp_error("Mail message rejection.", std::get<2>(tokens));
++    if (!std::get<1>(tokens) || std::get<0>(tokens) != 250)
++        throw smtp_error("Mail message rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+     return std::get<2>(tokens);
+ }
+ 
+@@ -206,7 +206,7 @@ string smtp::connect()
+         tokens = parse_line(line);
+     }
+     if (std::get<0>(tokens) != SERVICE_READY_STATUS)
+-        throw smtp_error("Connection rejection.", std::get<2>(tokens));
++        throw smtp_error("Connection rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+     greeting += std::get<2>(tokens);
+     return greeting;
+ }
+@@ -218,7 +218,7 @@ void smtp::auth_login(const string& username, const string& password)
+     string line = dlg_->receive();
+     tuple<int, bool, string> tokens = parse_line(line);
+     if (std::get<1>(tokens) && !positive_intermediate(std::get<0>(tokens)))
+-        throw smtp_error("Authentication rejection.", std::get<2>(tokens));
++        throw smtp_error("Authentication rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+ 
+     // TODO: Use static encode from the Base64 codec.
+     base64 b64(static_cast<string::size_type>(codec::line_len_policy_t::MANDATORY), static_cast<string::size_type>(codec::line_len_policy_t::MANDATORY));
+@@ -228,7 +228,7 @@ void smtp::auth_login(const string& username, const string& password)
+     line = dlg_->receive();
+     tokens = parse_line(line);
+     if (std::get<1>(tokens) && !positive_intermediate(std::get<0>(tokens)))
+-        throw smtp_error("Username rejection.", std::get<2>(tokens));
++        throw smtp_error("Username rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+ 
+     auto pass_v = b64.encode(password);
+     cmd = pass_v.empty() ? "" : pass_v[0];
+@@ -236,7 +236,7 @@ void smtp::auth_login(const string& username, const string& password)
+     line = dlg_->receive();
+     tokens = parse_line(line);
+     if (std::get<1>(tokens) && !positive_completion(std::get<0>(tokens)))
+-        throw smtp_error("Password rejection.", std::get<2>(tokens));
++        throw smtp_error("Password rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+ }
+ 
+ 
+@@ -263,7 +263,7 @@ void smtp::ehlo()
+             tokens = parse_line(line);
+         }
+         if (!positive_completion(std::get<0>(tokens)))
+-            throw smtp_error("Initial message rejection.", std::get<2>(tokens));
++            throw smtp_error("Initial message rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+     }
+ }
+ 
+@@ -287,7 +287,7 @@ void smtp::switch_tls()
+     string line = dlg_->receive();
+     tuple<int, bool, string> tokens = parse_line(line);
+     if (std::get<1>(tokens) && std::get<0>(tokens) != SERVICE_READY_STATUS)
+-        throw smtp_error("Start tls refused by server.", std::get<2>(tokens));
++        throw smtp_error("Start tls refused by server.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
+ 
+     dlg_ = dialog_ssl::to_ssl(dlg_, *ssl_options_);
+ }
+@@ -297,6 +297,10 @@ tuple<int, bool, string> smtp::parse_line(const string& line)
+ {
+     try
+     {
++        if (line.size() < 4 || line[0] < '2' || line[0] > '5' ||
++            line[1] < '0' || line[1] > '9' || line[2] < '0' || line[2] > '9' ||
++            (line[3] != ' ' && line[3] != '-'))
++            throw smtp_error("Parsing server failure.", "");
+         return make_tuple(stoi(line.substr(0, 3)), (line.at(3) == '-' ? false : true), line.substr(4));
+     }
+     catch (out_of_range&)
+@@ -374,12 +378,12 @@ void smtps::ssl_options(const dialog_ssl::ssl_options_t& options)
+ }
+ 
+ 
+-smtp_error::smtp_error(const string& msg, const string& details) : dialog_error(msg, details)
++smtp_error::smtp_error(const string& msg, const string& details, bool rejection) : dialog_error(msg, details), rejection_(rejection)
+ {
+ }
+ 
+ 
+-smtp_error::smtp_error(const char* msg, const string& details) : dialog_error(msg, details)
++smtp_error::smtp_error(const char* msg, const string& details, bool rejection) : dialog_error(msg, details), rejection_(rejection)
+ {
+ }
+ 

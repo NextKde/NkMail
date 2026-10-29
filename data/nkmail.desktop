@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=NkMail
+GenericName=Email Client
+Comment=A thoughtful, read-only mailbox with safe local drafts
+Exec=nkmail
+Icon=nkmail
+Terminal=false
+Categories=Network;Email;Qt;
+StartupNotify=true
+StartupWMClass=nkmail

@@ -1,0 +1,41 @@
+# NkMail local delivery goal
+
+## Contract
+Build a working single-account Qt Quick mail client in this directory. Reuse canonical Kos.Ui from the sibling nextkdeAppDemo project; use mailio for IMAP/SMTP/MIME. Follow KMusic application patterns and calendar's dialog/popover interactions, with macOS Mail as a visual reference. No server-side flag editing, move or delete in the first release.
+
+The user authorized local builds, GUI and isolated automated testing, installation of the missing Boost development package, and milestone commits/pushes with synthetic screenshots to the public NextKde/NkMail repository. A specific enterprise test account was subsequently supplied for local read-only provider verification, after TLS/PEEK acceptance. Its details and credentials must never enter this repository or public output. No existing mail-client access, external sending, mailbox mutation, default-client registration or reference-project modification.
+
+This file is a recoverable work ledger, not a native Codex Goal. Work requires an active session. The session-only progress timer cannot run after the session exits.
+
+## Acceptance checklist
+- [x] Independent CMake build with canonical Kos.Ui and pinned mailio.
+- [x] Reviewed TLS verification and side-effect-free PEEK patch, with negative tests.
+- [x] Actual loopback IMAP/SMTP integration and MIME/attachment tests.
+- [ ] Single account, secure credentials, folders, paginated summaries and on-demand content: implemented; controller/provider integration still to validate.
+- [x] Offline cache and cached-only search; UIDVALIDITY-safe identity (core regression).
+- [ ] Compose/reply/reply-all/forward, attachments and restart-safe drafts: implemented; full workflow regression still pending.
+- [x] Send accepted/rejected/ambiguous states, no automatic retransmission (protocol and persistence regression).
+- [ ] Three-pane UI, dark/light/narrow layouts, canonical dialogs/popovers and keyboard use: rendered and behavior-tested; resizing/persistence and final keyboard review pending.
+- [x] Automated behavior regression plus real GPU screenshots using synthetic data.
+- [ ] Public milestone reports and screenshots, no personal data or credentials: reviewed artifacts prepared; mark complete only after successful push.
+
+## Verified facts · 2026-10-29
+- Public repository cloned; main created locally; GitHub access and commit identity available.
+- Authorized Boost development installation completed successfully.
+- mailio pinned to 0.26.1, commit `f358b1f85f9a021f0bd814e285eb8ae102fc8f79`; complete local security/read-only patch retained in patches/mailio/ and reverse-apply checked against vendor source.
+- Kos.Ui sibling source HEAD: `54fd5f14a5bc50132d524d053b373b1dc1189935`, with existing local component changes. Those changes are consumed as-is, not altered or copied; HEAD alone does not reproduce this workspace.
+- Actual application and test builds succeeded on Qt 6.12.0. Final integrated CTest: **3/3 passed**, 20.46 seconds; core QtTest 16 pass, UI QuickTest 9 pass (including init/cleanup), protocol fixture 30 scenarios.
+- Actual GPU app screenshots checked: inbox light/dark, compose, account, details, narrow. All synthetic, sending disabled. Curated artifacts in docs/progress/.
+- Fixed initial read-only TextEdit implicitHeight QML error and preview theme initialization. Final UI tests have no QML warnings; upstream C++ and CMake tooling warnings remain.
+- Draft state transitions use authoritative database CAS, interrupted sending becomes unknown on restart, and data-directory QLockFile prevents concurrent app instances from reinterpreting a live send.
+- Neither actual provider compatibility nor external delivery is verified. No real SMTP submission or mailbox mutation has occurred.
+
+## Remaining work / known limits
+- Controlled provider read-only verification after the now-passing TLS/PEEK suite; never publish account data or raw output, never cycle password alternatives automatically.
+- Add controller-level workflow regression and review refresh/pagination/recipient edge cases.
+- Column resizing, window geometry persistence and final keyboard/focus checks.
+- No server Sent APPEND; no remote flags/move/delete/OAuth/IDLE/multiaccount.
+- Folder statistics currently use sequential STATUS; network deadlines are per-I/O, not whole-operation limits. MIME tree bounds are checked after mailio parsing, not a complete upstream parser audit.
+
+## Current milestone
+First runnable UI/protocol milestone is built and locally verified. Publish the reviewed source, tests, licenses, progress report and six synthetic screenshots, then continue the remaining acceptance work. Do not report the whole first release complete yet.

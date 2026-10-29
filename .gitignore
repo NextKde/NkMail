@@ -1,0 +1,5 @@
+/build*/
+/tmp/
+/third_party/mailio/.git/
+*.user
+__pycache__/
