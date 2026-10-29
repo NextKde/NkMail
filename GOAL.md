@@ -13,11 +13,11 @@ This file is a recoverable work ledger, not a native Codex Goal. Work requires a
 - [x] Actual loopback IMAP/SMTP integration and MIME/attachment tests.
 - [ ] Single account, secure credentials, folders, paginated summaries and on-demand content: implemented; controller/provider integration still to validate.
 - [x] Offline cache and cached-only search; UIDVALIDITY-safe identity (core regression).
-- [ ] Compose/reply/reply-all/forward, attachments and restart-safe drafts: implemented; full workflow regression still pending.
+- [x] Compose/reply/reply-all/forward, attachment copy/save/discard and restart-safe drafts: actual controller integration regression. Unsupported complex recipient formats fail closed for automatic replies; manual composition remains available.
 - [x] Send accepted/rejected/ambiguous states, no automatic retransmission (protocol and persistence regression).
-- [ ] Three-pane UI, dark/light/narrow layouts, canonical dialogs/popovers and keyboard use: rendered and behavior-tested; resizing/persistence and final keyboard review pending.
+- [x] Three-pane UI, dark/light/narrow layouts, canonical dialogs/popovers and keyboard use: rendered, behavior-tested, resizable columns and per-profile geometry persistence; actual two-start window restore checked.
 - [x] Automated behavior regression plus real GPU screenshots using synthetic data.
-- [ ] Public milestone reports and screenshots, no personal data or credentials: reviewed artifacts prepared; mark complete only after successful push.
+- [x] Public milestone reports and six synthetic screenshots published to main after staged privacy checks.
 
 ## Verified facts · 2026-10-29
 - Public repository cloned; main created locally; GitHub access and commit identity available.
@@ -28,14 +28,18 @@ This file is a recoverable work ledger, not a native Codex Goal. Work requires a
 - Actual GPU app screenshots checked: inbox light/dark, compose, account, details, narrow. All synthetic, sending disabled. Curated artifacts in docs/progress/.
 - Fixed initial read-only TextEdit implicitHeight QML error and preview theme initialization. Final UI tests have no QML warnings; upstream C++ and CMake tooling warnings remain.
 - Draft state transitions use authoritative database CAS, interrupted sending becomes unknown on restart, and data-directory QLockFile prevents concurrent app instances from reinterpreting a live send.
-- Neither actual provider compatibility nor external delivery is verified. No real SMTP submission or mailbox mutation has occurred.
+- First public milestone successfully pushed: `4e4dfea7b51690e01b7ecf8be3c823c0b079529b`, including six reviewed synthetic screenshots.
+- A single controlled read-only provider attempt failed before the header/content slice completed; no alternate password was tried. A separate no-login connection verified system CA/hostname TLS and an IMAP greeting, but fixed backend diagnostics do not identify the failed authenticated phase, so this is not proof of an authentication failure. Provider compatibility remains unverified. No real SMTP submission or mailbox mutation has occurred.
 
 ## Remaining work / known limits
 - Controlled provider read-only verification after the now-passing TLS/PEEK suite; never publish account data or raw output, never cycle password alternatives automatically.
-- Add controller-level workflow regression and review refresh/pagination/recipient edge cases.
-- Column resizing, window geometry persistence and final keyboard/focus checks.
+- Controller-level workflow regression added: 23 passed including init/cleanup; reproduced and fixed offline paging, UIDVALIDITY append reset, stale attachments, visible cache on transport change, profile keychain isolation and reply recipient handling.
+- Column resizing, window geometry persistence and keyboard/focus checks implemented; pointer-test scene-coordinate issue fixed with unchanged strict assertions, three consecutive UI runs passed.
+- Additional backend-only defensive review was interrupted before handback; it is not a completed audit or acceptance result.
 - No server Sent APPEND; no remote flags/move/delete/OAuth/IDLE/multiaccount.
 - Folder statistics currently use sequential STATUS; network deadlines are per-I/O, not whole-operation limits. MIME tree bounds are checked after mailio parsing, not a complete upstream parser audit.
 
 ## Current milestone
-First runnable UI/protocol milestone is built and locally verified. Publish the reviewed source, tests, licenses, progress report and six synthetic screenshots, then continue the remaining acceptance work. Do not report the whole first release complete yet.
+First runnable milestone published. Second workflow/window milestone verified: final Debug build **5/5 CTest passed, 27.96 seconds**, core 16 / controller 23 / UI 14 pass (Qt tests include init/cleanup), CLI 3 process cases, protocol 32 loopback scenarios. A clean Release build also passed 5/5 before the final small address-metadata/test-stability fixes. Second report and two reviewed synthetic screenshots are prepared for publication.
+
+The scoped local implementation is substantially complete, but real-provider read-only verification is blocked at an unidentified authenticated phase. Do not report the whole first release or real-account compatibility complete. Next useful work is credential-free phase diagnostics and controlled resolution with account-owner input, not repeated password attempts or arbitrary UI expansion.

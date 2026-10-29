@@ -89,9 +89,13 @@ QString addressList(const mailio::mailboxes &boxes)
 {
     QStringList result;
     auto add = [&](const mailio::mail_address &a) {
-        const QString name = unicode(a.name);
+        QString name = unicode(a.name);
         const QString address = unicode(a.address);
-        result << (name.isEmpty() ? address : name + QStringLiteral(" <") + address + u'>');
+        // A decoded display name is data, not an RFC 5322 phrase. Quote it so
+        // commas cannot become extra recipients, escaping quoted-pair bytes.
+        name.replace(u'\\', QStringLiteral("\\\\"));
+        name.replace(u'"', QStringLiteral("\\\""));
+        result << (name.isEmpty() ? address : u'"' + name + QStringLiteral("\" <") + address + u'>');
     };
     for (const auto &a : boxes.addresses) add(a);
     for (const auto &g : boxes.groups) for (const auto &a : g.members) add(a);

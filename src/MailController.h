@@ -76,8 +76,10 @@ private:
     void fetchPage(bool append);
     void setStatus(const QString &status, const QString &error = {});
     void present(const Content &content);
+    QString credentialKey() const;
     void run(std::function<void()> task);
     bool m_demo = false, m_busy = false, m_sending = false, m_restorePending = false, m_hasMore = false;
+    bool m_cachedOnly = true; // Until a successful header fetch, paging stays local.
     QString m_root, m_folder = QStringLiteral("INBOX"), m_status, m_error, m_search, m_selectedUid;
     int m_offset = 0;
     quint64 m_generation = 0, m_selectionGeneration = 0;

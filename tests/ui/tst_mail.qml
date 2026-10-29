@@ -72,6 +72,93 @@ TestCase {
         app = null
         wait(30)
     }
+    function activateApp() {
+        app.requestActivate()
+        wait(40)
+    }
+    function test_column_widths_are_adjustable_and_clamped() {
+        const sidebarDivider = findChild(app, "sidebarDivider")
+        const listDivider = findChild(app, "messageDivider")
+        compare(app.sidebarWidth, 236)
+        compare(app.listWidth, 320)
+        sidebarDivider.resizeTo(290)
+        listDivider.resizeTo(410)
+        compare(app.sidebarPreferredWidth, 290)
+        compare(app.listPreferredWidth, 410)
+        sidebarDivider.resizeTo(900)
+        compare(app.sidebarPreferredWidth, 340)
+        listDivider.resizeTo(1)
+        compare(app.listPreferredWidth, 260)
+        app.width = 820
+        verify(app.listWidth <= app.width - 300)
+        compare(app.sidebarPreferredWidth, 340)
+        app.width = 1280
+        compare(app.sidebarWidth, 340)
+    }
+    function test_column_divider_pointer_drag() {
+        const divider = findChild(app, "sidebarDivider")
+        const scene = findChild(app, "mailScene")
+        // mouseDrag remaps every intermediate point through its target item.
+        // The divider itself moves while resizing, so inject into the stable
+        // scene coordinate space instead of accidentally chasing the handle.
+        const start = divider.mapToItem(scene, divider.width / 2, 120)
+        mouseDrag(scene, start.x, start.y, 40, 0)
+        compare(app.sidebarPreferredWidth, 276)
+        tryCompare(divider, "x", 272)
+        const next = divider.mapToItem(scene, divider.width / 2, 120)
+        mouseDrag(scene, next.x, next.y, -40, 0)
+        compare(app.sidebarPreferredWidth, 236)
+    }
+    function test_column_divider_keyboard_and_double_click() {
+        activateApp()
+        const divider = findChild(app, "messageDivider")
+        divider.forceActiveFocus()
+        keyClick(Qt.Key_Right)
+        compare(app.listPreferredWidth, 330)
+        keyClick(Qt.Key_Left)
+        compare(app.listPreferredWidth, 320)
+        divider.resizeTo(410)
+        mouseDoubleClickSequence(divider, divider.width / 2, 120)
+        compare(app.listPreferredWidth, 320)
+    }
+    function test_search_shortcut_and_tab_focus() {
+        activateApp()
+        app.draftsVisible = true
+        keyClick(Qt.Key_F, Qt.ControlModifier)
+        const search = findChild(app, "searchField")
+        tryCompare(search, "activeFocus", true)
+        compare(app.draftsVisible, false)
+        for (const character of "example") keyClick(character)
+        tryCompare(mock, "search", "example")
+        keyClick(Qt.Key_Escape)
+        compare(search.text, "")
+        compare(mock.search, "")
+        keyClick(Qt.Key_Tab)
+        compare(search.activeFocus, false)
+        verify(app.activeFocusItem !== null)
+    }
+    function test_escape_preserves_failed_draft_and_returns_from_narrow_reader() {
+        activateApp()
+        keyClick(Qt.Key_N, Qt.ControlModifier)
+        const dialog = findChild(app, "composerDialog")
+        tryCompare(dialog, "visible", true)
+        const body = findChild(app, "composerBody")
+        body.text = "Do not discard on Escape."
+        body.forceActiveFocus()
+        mock.failSave = true
+        keyClick(Qt.Key_Escape)
+        compare(dialog.visible, true)
+        compare(body.text, "Do not discard on Escape.")
+        mock.failSave = false
+        keyClick(Qt.Key_Escape)
+        tryCompare(dialog, "visible", false)
+        compare(mock.lastSaved.body, "Do not discard on Escape.")
+        app.width = 650
+        app.readerVisible = true
+        wait(30)
+        keyClick(Qt.Key_Escape)
+        compare(app.readerVisible, false)
+    }
     function test_three_pane_reader_is_plain_text() {
         const body = findChild(app, "messageBody")
         verify(body !== null)

@@ -3,6 +3,7 @@
 #include "storage/MailDatabase.h"
 #include "storage/CredentialStore.h"
 #include "mail/backend.h"
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -10,6 +11,8 @@
 #include <QPointer>
 #include <QSaveFile>
 #include <QSettings>
+#include <QRegularExpression>
+#include <QSet>
 #include <QTimer>
 #include <QUrl>
 #include <QUuid>
@@ -26,6 +29,57 @@ QString localPath(const QString &url) {
 QString cleanSubject(const QString &prefix, const QString &subject) {
     return subject.startsWith(prefix, Qt::CaseInsensitive) ? subject : prefix + subject;
 }
+// Deliberately bounded mailbox-list subset for automatic reply generation. We
+// extract addr-specs, never display-name fragments. Unsupported RFC groups,
+// comments, quoted local parts and malformed input fail closed for manual review.
+bool replyAddresses(const QString &field, QStringList *addresses) {
+    addresses->clear();
+    if (field.trimmed().isEmpty()) return true;
+    QStringList tokens;
+    QString token;
+    bool quoted = false, escaped = false, angle = false;
+    for (const QChar ch : field) {
+        if (ch.unicode() < 0x20 || ch.unicode() == 0x7f) return false;
+        if (quoted) {
+            token += ch;
+            if (escaped) escaped = false;
+            else if (ch == QLatin1Char('\\')) escaped = true;
+            else if (ch == QLatin1Char('"')) quoted = false;
+            continue;
+        }
+        if (ch == QLatin1Char('"')) quoted = true;
+        else if (ch == QLatin1Char('<')) { if (angle) return false; angle = true; }
+        else if (ch == QLatin1Char('>')) { if (!angle) return false; angle = false; }
+        else if (ch == QLatin1Char(',') && !angle) {
+            if (token.trimmed().isEmpty()) return false;
+            tokens.append(token.trimmed()); token.clear(); continue;
+        }
+        else if (ch == QLatin1Char(':') || ch == QLatin1Char(';')
+                 || ch == QLatin1Char('(') || ch == QLatin1Char(')') || ch == QLatin1Char('\\')) return false;
+        token += ch;
+    }
+    if (quoted || escaped || angle || token.trimmed().isEmpty()) return false;
+    tokens.append(token.trimmed());
+    static const QRegularExpression atom(QStringLiteral("^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+$"));
+    static const QRegularExpression label(QStringLiteral("^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$"));
+    for (const auto &value : tokens) {
+        QString address = value;
+        const int opening = value.indexOf('<');
+        if (opening >= 0) {
+            if (!value.endsWith('>') || value.count('<') != 1 || value.count('>') != 1) return false;
+            address = value.mid(opening + 1, value.size() - opening - 2).trimmed();
+        } else if (value.contains('>')) return false;
+        if (address.size() > 254 || address.count('@') != 1) return false;
+        const auto parts = address.split('@');
+        if (parts.first().isEmpty() || parts.first().size() > 64 || parts.last().isEmpty()) return false;
+        for (const auto &part : parts.first().split('.'))
+            if (!atom.match(part).hasMatch()) return false;
+        for (const auto &part : parts.last().split('.'))
+            if (part.size() > 63 || !label.match(part).hasMatch()) return false;
+        addresses->append(address);
+    }
+    return true;
+}
 }
 MailController::MailController(bool demo, const QString &dataRoot, QObject *parent)
     : QObject(parent), m_demo(demo), m_root(dataRoot), m_database(std::make_unique<MailDatabase>()),
@@ -33,7 +87,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     m_pool.setMaxThreadCount(1);
     m_pool.setExpiryTimeout(-1);
     connect(m_credentials, &CredentialStore::passwordReady, this, [this](const QString &id, const QString &password) {
-        if (id != m_account.id || m_demo || !m_restorePending || !m_account.password.isEmpty()) return;
+        if (id != credentialKey() || m_demo || !m_restorePending || !m_account.password.isEmpty()) return;
         m_restorePending = false;
         m_account.password = password;
         setStatus(tr("Saved credentials restored. Refresh to connect."));
@@ -61,6 +115,15 @@ QVariantList MailController::drafts() const {
 void MailController::setStatus(const QString &status, const QString &error) {
     m_status = status; m_error = error; emit statusChanged();
 }
+QString MailController::credentialKey() const {
+    // Account id is "default" in every profile. Scope secrets to this explicit
+    // data root; never probe the legacy global key shared by unrelated profiles.
+    const QFileInfo root(m_root);
+    QString path = root.canonicalFilePath();
+    if (path.isEmpty()) path = root.absoluteFilePath();
+    const QByteArray scope = path.toUtf8() + '\0' + m_account.id.toUtf8();
+    return QStringLiteral("profile-") + QString::fromLatin1(QCryptographicHash::hash(scope, QCryptographicHash::Sha256).toHex());
+}
 void MailController::run(std::function<void()> task) { (void)QtConcurrent::run(&m_pool, std::move(task)); }
 void MailController::initialize() {
     if (!m_database->open(m_root)) { setStatus(tr("Storage unavailable"), m_database->error()); return; }
@@ -73,7 +136,7 @@ void MailController::initialize() {
     QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
     if (configured() && settings.value("restoreAllowed", false).toBool()) {
         m_restorePending = true;
-        m_credentials->read(m_account.id);
+        m_credentials->read(credentialKey());
     }
 }
 void MailController::seedDemo() {
@@ -122,14 +185,22 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
     }
     next.password = password.isEmpty() ? m_account.password : password;
     next.id = QStringLiteral("default");
+    const bool changedMailbox = m_account.id != next.id || m_account.address != next.address
+        || m_account.username != next.username || m_account.imapHost != next.imapHost
+        || m_account.imapPort != next.imapPort || m_account.imapStartTls != next.imapStartTls;
     if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return; }
     m_restorePending = false;
     m_account = next; ++m_generation; ++m_selectionGeneration;
+    if (changedMailbox) {
+        m_cachedOnly = true; m_offset = 0; m_hasMore = false;
+        m_messages->clear(); m_folders.clear(); m_selected.clear(); m_selectedUid.clear(); m_content = {};
+        emit foldersChanged(); emit selectionChanged();
+    }
     emit accountChanged();
     QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
     settings.setValue("restoreAllowed", remember && !m_account.password.isEmpty()); settings.sync();
-    if (remember && !m_account.password.isEmpty()) m_credentials->write(m_account.id, m_account.password);
-    else m_credentials->remove(m_account.id);
+    if (remember && !m_account.password.isEmpty()) m_credentials->write(credentialKey(), m_account.password);
+    else m_credentials->remove(credentialKey());
     setStatus(tr("Account saved. Refresh to connect."));
 }
 void MailController::refresh() {
@@ -154,7 +225,8 @@ void MailController::refresh() {
             const QString error = QString::fromUtf8(e.what());
             if (self) QMetaObject::invokeMethod(self, [self, error, generation] {
                 if (!self || generation != self->m_generation) return;
-                self->m_busy = false; self->setStatus(self->tr("Offline · cached mail"), error);
+                self->m_busy = false; self->m_cachedOnly = true;
+                self->loadCached(); self->setStatus(self->tr("Offline · cached mail"), error);
             }, Qt::QueuedConnection);
         }
     });
@@ -179,7 +251,7 @@ void MailController::setSearch(const QString &query) {
 }
 void MailController::loadMore() {
     if (m_busy || !m_hasMore) return;
-    if (m_demo || !m_search.isEmpty() || m_account.password.isEmpty()) loadCached(true);
+    if (m_demo || m_cachedOnly || !m_search.isEmpty() || m_account.password.isEmpty()) loadCached(true);
     else fetchPage(true);
 }
 void MailController::fetchPage(bool append) {
@@ -200,19 +272,28 @@ void MailController::fetchPage(bool append) {
                     && self->m_content.summary.uidValidity != page.uidValidity;
                 const bool listChangedValidity = self->m_messages->count() > 0
                     && self->m_messages->get(0).value("uidValidity").toString() != page.uidValidity;
-                if (changedValidity) {
+                if (changedValidity || listChangedValidity) {
                     ++self->m_selectionGeneration; self->m_selected.clear(); self->m_selectedUid.clear(); self->m_content = {};
                     emit self->selectionChanged();
                 }
-                if (append && !listChangedValidity) self->m_messages->append(page.messages); else self->m_messages->replace(page.messages);
+                if (append && listChangedValidity) {
+                    // Offsets refer to the old mailbox generation. The returned
+                    // tail cannot substitute for the new generation's first page.
+                    self->m_messages->clear(); self->m_offset = 0; self->m_hasMore = false;
+                    self->fetchPage(false);
+                    return;
+                }
+                if (append) self->m_messages->append(page.messages); else self->m_messages->replace(page.messages);
+                self->m_cachedOnly = false;
                 self->m_offset = page.nextOffset; self->m_hasMore = page.hasMore;
                 self->setStatus(self->tr("Up to date · headers cached · server flags are read-only"));
             }, Qt::QueuedConnection);
         } catch (const std::exception &e) {
             const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, error] {
+            if (self) QMetaObject::invokeMethod(self, [self, generation, error, append] {
                 if (!self || generation != self->m_generation) return;
-                self->m_busy = false; self->setStatus(self->tr("Offline · cached mail"), error);
+                self->m_busy = false; self->m_cachedOnly = true;
+                self->loadCached(append); self->setStatus(self->tr("Offline · cached mail"), error);
             }, Qt::QueuedConnection);
         }
     });
@@ -224,7 +305,7 @@ void MailController::present(const Content &content) {
 void MailController::openMessage(const QString &uid, const QString &validity) {
     const auto selectionGeneration = ++m_selectionGeneration;
     if (auto cached = m_database->content(m_folder, validity, uid)) { present(*cached); return; }
-    m_selectedUid = uid; m_selected.clear(); emit selectionChanged();
+    m_selectedUid = uid; m_selected.clear(); m_content = {}; emit selectionChanged();
     if (m_demo || m_account.password.isEmpty()) { setStatus(tr("This message is not cached"), tr("Connect to download its content.")); return; }
     const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
     setStatus(tr("Loading message without changing server flags…")); QPointer<MailController> self(this);
@@ -245,18 +326,48 @@ void MailController::openMessage(const QString &uid, const QString &validity) {
     });
 }
 QVariantMap MailController::newDraft(const QString &mode) {
+    if (mode != "new" && mode != "reply" && mode != "replyAll" && mode != "forward") {
+        setStatus(tr("Could not create draft"), tr("Choose new, reply, reply all or forward.")); return {};
+    }
+    if (mode != "new" && m_selected.isEmpty()) {
+        setStatus(tr("Could not create draft"), tr("Select a message before replying or forwarding.")); return {};
+    }
     Draft draft; draft.id = QUuid::createUuid().toString(QUuid::WithoutBraces); draft.updated = QDateTime::currentDateTimeUtc();
-    if (mode != "new" && !m_selected.isEmpty()) {
+    if (mode != "new") {
         const auto &s = m_content.summary;
         draft.subject = cleanSubject(mode == "forward" ? "Fwd: " : "Re: ", s.subject);
         if (mode != "forward") {
-            draft.to = m_content.replyTo.isEmpty() ? s.senderAddress : m_content.replyTo;
+            QStringList primary;
+            if (!replyAddresses(m_content.replyTo.isEmpty() ? s.senderAddress : m_content.replyTo, &primary) || primary.isEmpty()) {
+                setStatus(tr("Could not create reply"), tr("This message has an unsupported recipient format. Create a new draft and enter recipients manually.")); return {};
+            }
+            QSet<QString> seen;
+            QStringList recipients;
+            for (const auto &address : primary) {
+                const auto key = address.toCaseFolded();
+                if (!seen.contains(key)) { seen.insert(key); recipients.append(address); }
+            }
+            draft.to = recipients.join(", ");
             if (mode == "replyAll") {
+                const QString self = m_account.address.trimmed().toCaseFolded();
+                recipients.removeIf([&self](const QString &address) { return address.toCaseFolded() == self; });
+                draft.to = recipients.join(", ");
+                seen.insert(self);
                 QStringList others;
-                for (const auto &field : {m_content.to, m_content.cc}) for (const auto &recipient : field.split(',', Qt::SkipEmptyParts)) {
-                    if (!recipient.contains(m_account.address, Qt::CaseInsensitive) && !draft.to.contains(recipient.trimmed(), Qt::CaseInsensitive)) others.append(recipient.trimmed());
+                for (const auto &field : {m_content.to, m_content.cc}) {
+                    QStringList parsed;
+                    if (!replyAddresses(field, &parsed)) {
+                        setStatus(tr("Could not create reply all"), tr("This message has an unsupported recipient format. Create a new draft and enter recipients manually.")); return {};
+                    }
+                    for (const auto &address : parsed) {
+                        const auto key = address.toCaseFolded();
+                        if (!seen.contains(key)) { seen.insert(key); others.append(address); }
+                    }
                 }
-                others.removeDuplicates(); draft.cc = others.join(", ");
+                if (recipients.isEmpty() && !others.isEmpty()) {
+                    draft.to = others.takeFirst();
+                }
+                draft.cc = others.join(", ");
             }
             draft.inReplyTo = m_content.messageId; draft.references = m_content.messageId;
         }
@@ -346,7 +457,7 @@ void MailController::sendDraft(const QVariantMap &map) {
 void MailController::clearError() { m_error.clear(); emit statusChanged(); }
 void MailController::disconnectAccount() {
     if (m_sending) return;
-    ++m_generation; ++m_selectionGeneration; m_pool.clear(); m_account.password.clear(); m_busy = false; m_restorePending = false;
+    ++m_generation; ++m_selectionGeneration; m_pool.clear(); m_account.password.clear(); m_busy = false; m_restorePending = false; m_cachedOnly = true;
     QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
     settings.setValue("restoreAllowed", false); settings.sync();
     setStatus(tr("Disconnected · cached mail available"));

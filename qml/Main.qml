@@ -24,6 +24,14 @@ ApplicationWindow {
     property bool sidebarExpanded: false
     property bool readerVisible: false
     property bool draftsVisible: false
+    // Preferred widths survive temporary narrow layouts; actual widths always
+    // leave space for the reader and never squeeze the list below its minimum.
+    property int sidebarPreferredWidth: 236
+    property int listPreferredWidth: 320
+    readonly property int sidebarWidth: Math.max(190, Math.min(340, sidebarPreferredWidth,
+        width - (narrow ? 260 : 560)))
+    readonly property int listWidth: Math.max(260, Math.min(520, listPreferredWidth,
+        width - (sidebarVisible ? sidebarWidth : 0) - 300))
     readonly property bool sidebarVisible: width >= 1080 || sidebarExpanded
     readonly property var message: mail.selectedMessage || ({})
     readonly property bool hasMessage: String(mail.selectedUid || "").length > 0
@@ -127,7 +135,9 @@ ApplicationWindow {
             Rectangle {
                 id: sidebar
                 visible: window.sidebarVisible
-                Layout.preferredWidth: 236
+                Layout.preferredWidth: window.sidebarWidth
+                Layout.minimumWidth: window.sidebarWidth
+                Layout.maximumWidth: window.sidebarWidth
                 Layout.fillHeight: true
                 color: window.sidebarColor
                 ColumnLayout {
@@ -220,8 +230,9 @@ ApplicationWindow {
             Rectangle {
                 id: messagePane
                 visible: !window.narrow || !window.readerVisible
-                Layout.preferredWidth: 320
-                Layout.minimumWidth: 250
+                Layout.preferredWidth: window.listWidth
+                Layout.minimumWidth: window.narrow ? 260 : window.listWidth
+                Layout.maximumWidth: window.narrow ? -1 : window.listWidth
                 Layout.fillWidth: window.narrow
                 Layout.fillHeight: true
                 color: AppTheme.contentBackground
@@ -433,6 +444,62 @@ ApplicationWindow {
                 }
             }
         }
+        // Generous invisible hit targets keep the one-pixel column rules quiet.
+        // Focused dividers are also adjustable with the arrow keys.
+        component ColumnDivider: MouseArea {
+            id: divider
+            required property bool sidebarHandle
+            property real pressSceneX: 0
+            property int startWidth: 0
+            width: 8
+            y: chrome.height
+            height: statusStrip.y - y
+            z: 4
+            cursorShape: Qt.SplitHCursor
+            hoverEnabled: true
+            activeFocusOnTab: true
+            preventStealing: true
+            Accessible.role: Accessible.Slider
+            Accessible.name: sidebarHandle ? qsTr("Mailbox column width") : qsTr("Message column width")
+            Accessible.description: qsTr("Drag or use Left and Right to resize. Double-click to reset.")
+            function resizeTo(value) {
+                if (sidebarHandle) window.sidebarPreferredWidth = Math.round(Math.max(190, Math.min(340, value, window.width - 560)))
+                else window.listPreferredWidth = Math.round(Math.max(260, Math.min(520, value,
+                    window.width - (window.sidebarVisible ? window.sidebarWidth : 0) - 300)))
+            }
+            onPressed: mouse => {
+                pressSceneX = mapToItem(mailScene, mouse.x, mouse.y).x
+                startWidth = sidebarHandle ? window.sidebarWidth : window.listWidth
+                forceActiveFocus()
+            }
+            onPositionChanged: mouse => {
+                if (pressed) resizeTo(startWidth + mapToItem(mailScene, mouse.x, mouse.y).x - pressSceneX)
+            }
+            onDoubleClicked: {
+                if (sidebarHandle) window.sidebarPreferredWidth = 236
+                else window.listPreferredWidth = 320
+            }
+            Keys.onLeftPressed: resizeTo((sidebarHandle ? window.sidebarWidth : window.listWidth) - 10)
+            Keys.onRightPressed: resizeTo((sidebarHandle ? window.sidebarWidth : window.listWidth) + 10)
+            Rectangle {
+                anchors.centerIn: parent; width: 2; height: parent.height
+                color: AppTheme.accent
+                opacity: divider.pressed || divider.activeFocus ? 0.8 : divider.containsMouse ? 0.35 : 0
+            }
+        }
+        ColumnDivider {
+            objectName: "sidebarDivider"
+            sidebarHandle: true
+            visible: window.sidebarVisible && !window.narrow
+            x: sidebar.width - width / 2
+        }
+        ColumnDivider {
+            objectName: "messageDivider"
+            sidebarHandle: false
+            visible: !window.narrow
+            x: (window.sidebarVisible ? sidebar.width : 0) + messagePane.width - width / 2
+        }
+
         Rectangle {
             id: statusStrip
             anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
@@ -501,6 +568,15 @@ ApplicationWindow {
         onAccepted: mail.saveAttachment(attachmentIndex, selectedFile.toString())
     }
     Shortcut { sequence: "Ctrl+N"; enabled: !composer.visible && !accountDialog.visible && (mail.configured || mail.demo); onActivated: window.compose("new") }
-    Shortcut { sequence: "Ctrl+F"; enabled: !composer.visible && !accountDialog.visible; onActivated: { window.readerVisible = false; searchField.forceActiveFocus() } }
+    Shortcut { sequence: "Ctrl+F"; enabled: !composer.visible && !accountDialog.visible; onActivated: { window.draftsVisible = false; window.readerVisible = false; searchField.forceActiveFocus() } }
+    Shortcut {
+        sequence: "Escape"
+        enabled: !composer.visible && !accountDialog.visible && !details.visible && !moreMenu.visible
+        onActivated: {
+            if (window.sidebarExpanded) window.sidebarExpanded = false
+            else if (window.narrow && window.readerVisible) window.readerVisible = false
+            else if (searchField.activeFocus && searchField.text.length) { searchField.text = ""; mail.search = "" }
+        }
+    }
     Shortcut { sequence: "Ctrl+R"; enabled: !composer.visible && !accountDialog.visible && !mail.busy; onActivated: mail.refresh() }
 }

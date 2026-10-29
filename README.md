@@ -8,7 +8,7 @@ A native Qt Quick mail client for NextKde. The interface takes cues from macOS M
 
 Single-account application-password authentication, folders, paginated headers, on-demand safe text reading, attachments, cached-only search, local durable drafts, compose/reply/reply-all/forward and SMTP submission. No OAuth, remote flag editing, move/delete, IDLE or background daemon. Server acceptance is not delivery; uncertain sends are not retried automatically.
 
-Mailio is a protocol/MIME library, not a complete application backend. NkMail supplies the application state, cache, credentials, UI and workflows. The pinned dependency requires a reviewed TLS verification and PEEK patch before any real server acceptance.
+Mailio is a protocol/MIME library, not a complete application backend. NkMail supplies the application state, cache, credentials, UI and workflows. The vendored dependency includes the documented [TLS verification and PEEK patch](patches/mailio/0001-verified-tls-peek-timeouts.patch); its loopback acceptance tests do not by themselves prove real-provider compatibility.
 
 ## Dependencies
 
@@ -36,6 +36,18 @@ Use `./build/nkmail --data-dir /a/private/directory` for a separate persistent m
 ```
 
 Screenshot export is intentionally blocked outside synthetic preview mode. Public progress images must never expose a personal account, real mail or credentials. Test SMTP services bind only loopback and do not relay.
+
+## Local regression tests
+
+Tests additionally require Qt Test / QuickTest, Python 3 and the `openssl` executable (for short-lived loopback certificates). They do not need a real account. Core/controller tests use temporary data directories; protocol services bind only `127.0.0.1`; UI tests run offscreen with synthetic state.
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DNKMAIL_BUILD_TESTS=ON
+cmake --build build --parallel 4
+ctest --test-dir build --output-on-failure
+```
+
+For visual review, run the actual app rather than treating offscreen tests as a GPU/material check. See the [testing guide](docs/TESTING.md) for suite boundaries and manual acceptance, and the [progress reports](docs/progress/README.md) for exact verified results and known gaps.
 
 ## Privacy and safety
 

@@ -28,6 +28,19 @@ MESSAGE = (b"From: =?UTF-8?B?5rWL6K+V?= <author@fixture.invalid>\r\n"
            b"Content-Transfer-Encoding: base64\r\n\r\n" + base64.b64encode(b"fixture\x00attachment") +
            b"\r\n--fixture--\r\n")
 HEADERS = MESSAGE.split(b"\r\n\r\n", 1)[0] + b"\r\n\r\n"
+QUOTED_TO = 'Doe, Jane'
+QUOTED_CC = 'Jane "JJ" Doe \\ Team'
+
+
+def encoded_name(name):
+    # Legal encoded-word display names also exercise quotation after decoding.
+    return b'=?UTF-8?B?' + base64.b64encode(name.encode()) + b'?='
+
+
+QUOTED_MESSAGE = MESSAGE.replace(
+    b'To: to@fixture.invalid\r\n',
+    b'To: "Doe, Jane" <to@fixture.invalid>\r\nCc: ' + encoded_name(QUOTED_CC) +
+    b' <cc@fixture.invalid>\r\nReply-To: ' + encoded_name('Reply, "Desk" \\ Team') + b' <reply@fixture.invalid>\r\n')
 
 class Server:
     def __init__(self, protocol, context, starttls=False, scenario="normal"):
@@ -92,7 +105,8 @@ class Server:
             elif upper.startswith(b"UID FETCH "):
                 assert b"BODY.PEEK[" in upper, upper
                 header = b"BODY.PEEK[HEADER]" in upper
-                body = HEADERS if header else MESSAGE
+                source = QUOTED_MESSAGE if self.scenario == "quoted-names" else MESSAGE
+                body = source.split(b"\r\n\r\n", 1)[0] + b"\r\n\r\n" if header else source
                 section = b"BODY[HEADER]" if header else b"BODY[]"
                 if self.scenario == "oversize":
                     self.write(b"* 2 FETCH (UID 102 " + section + b" {999999999}\r\n")
@@ -201,6 +215,18 @@ def main():
             assert "bad-script" not in content["text"] and "bad-style" not in content["text"], content
             assert content["attachments"] == [{"name": "evil.txt", "bytes": base64.b64encode(b"fixture\x00attachment").decode(), "path": ""}], content
             assert any("BODY.PEEK[]" in cmd for cmd in server.commands)
+            passed += 1
+            quoted, server = invoke("imap", good, ca, "content", starttls, "quoted-names")
+            assert quoted["ok"], quoted
+            assert quoted["to"] == '"Doe, Jane" <to@fixture.invalid>', quoted
+            assert quoted["cc"] == '"Jane \\"JJ\\" Doe \\\\ Team" <cc@fixture.invalid>', quoted
+            assert quoted["replyTo"] == "reply@fixture.invalid", quoted
+            reparsed = email.message_from_string(
+                'To: ' + quoted["to"] + '\r\nCc: ' + quoted["cc"] + '\r\n', policy=email.policy.default)
+            for field, name, address in (("To", QUOTED_TO, "to@fixture.invalid"), ("Cc", QUOTED_CC, "cc@fixture.invalid")):
+                assert not reparsed[field].defects, reparsed[field].defects
+                addresses = reparsed[field].addresses
+                assert len(addresses) == 1 and addresses[0].display_name == name and addresses[0].addr_spec == address, addresses
             passed += 1
             sent, server = invoke("smtp", good, ca, "send", starttls)
             assert sent["ok"] and sent["state"] == 0, sent
