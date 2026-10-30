@@ -1,7 +1,7 @@
 import QtQuick
 import QtTest
 import Kos.Ui
-import "../../qml" as App
+import NextKde.Mail.TestViews 1.0 as App
 
 TestCase {
     id: testCase
@@ -29,6 +29,7 @@ TestCase {
         property bool hasMore: false
         property string search: ""
         property bool failSave: false
+        property int refreshCount: 0
         property int saveCount: 0
         property var lastSaved: ({})
         signal selectionChanged()
@@ -38,7 +39,7 @@ TestCase {
             ListElement { uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false }
         }
         function configureAccount(config, password, remember) {}
-        function refresh() {}
+        function refresh() { refreshCount++ }
         function selectFolder(folder) { currentFolder = folder }
         function loadMore() {}
         function openMessage(uid, validity) { selectedUid = uid }
@@ -61,7 +62,9 @@ TestCase {
     function init() {
         AppTheme.reduceMotion = true
         AppTheme.appearanceMode = "light"
+        failOnWarning(/.*/)
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
+        mock.refreshCount = 0; mock.search = ""
         mock.sending = false; mock.demo = true; mock.error = ""
         app = createTemporaryObject(appComponent, testCase, {mail: mock})
         verify(app !== null)
@@ -76,6 +79,148 @@ TestCase {
         app.requestActivate()
         wait(40)
     }
+    function test_shell_planes_and_window_chrome_are_stable() {
+        const planes = findChild(app, "chromePlanes")
+        const sidebarPlane = findChild(app, "sidebarPlane")
+        const contentPlane = findChild(app, "contentPlane")
+        const backdrop = findChild(app, "chromeBackdrop")
+        const chrome = findChild(app, "windowChrome")
+        const controls = findChild(app, "windowControls")
+        verify(planes !== null)
+        verify(sidebarPlane !== null)
+        verify(contentPlane !== null)
+        verify(backdrop !== null)
+        verify(chrome !== null)
+        verify(controls !== null)
+        compare(backdrop.sourceItem, planes)
+        verify(backdrop.sourceItem !== findChild(app, "mailScene"))
+        compare(App.MailStyle.shellHeaderHeight, 68)
+        compare(App.MailStyle.toolbarButtonHeight, 26)
+        compare(chrome.height, 68)
+        compare(chrome.width, app.width)
+        verify(chrome.visible)
+        verify(controls.width > 0 && controls.height > 0)
+        compare(sidebarPlane.width, app.sidebarWidth)
+        compare(contentPlane.x, app.sidebarWidth)
+        verify(contentPlane.width > 0)
+        const header = findChild(app, "floatingHeader")
+        const sidebar = findChild(app, "sidebarBody")
+        const content = findChild(app, "contentScene")
+        const scene = findChild(app, "mailScene")
+        compare(header.parent, scene)
+        compare(sidebar.parent, scene)
+        compare(content.parent, scene)
+        compare(header.y, 0)
+        compare(header.height, 68)
+        compare(sidebar.y, 68)
+        compare(content.y, 68)
+        verify(sidebar.height > 0 && content.height > 0)
+        for (const name of ["sidebarComposeButton", "searchField", "replyButton", "detailsButton", "moreButton"]) {
+            let item = findChild(app, name)
+            verify(item !== null)
+            while (item && item !== header) item = item.parent
+            compare(item, header, name + " must belong to the header")
+        }
+        compare(findChild(app, "messageList").mapToItem(scene, 0, 0).y, 68)
+        compare(findChild(app, "readerScroll").mapToItem(scene, 0, 0).y, 68)
+    }
+
+    function test_shell_geometry_at_width_boundaries() {
+        const scene = findChild(app, "mailScene")
+        const content = findChild(app, "contentScene")
+        const header = findChild(app, "floatingHeader")
+        const sidebar = findChild(app, "sidebarBody")
+        const list = findChild(app, "messagePane")
+        const reader = findChild(app, "messageReader")
+        const controls = findChild(app, "windowControls")
+        const listHeader = findChild(app, "listHeader")
+        const readerHeader = findChild(app, "readerHeader")
+        const status = findChild(app, "statusStrip")
+        for (const width of [580, 650, 799, 800, 820, 1079, 1080, 1280]) {
+            for (const expanded of [false, true]) {
+                for (const reading of [false, true]) {
+                    app.width = width
+                    app.sidebarExpanded = expanded
+                    app.sidebarPreferredWidth = 340
+                    app.readerVisible = reading
+                    wait(25)
+                    compare(header.width, width)
+                    compare(content.x, app.sidebarVisible ? app.sidebarWidth : 0)
+                    compare(content.y, 68)
+                    compare(content.y + content.height, status.y)
+                    compare(sidebar.y + sidebar.height, status.y)
+                    compare(list.visible, !app.narrow || !reading)
+                    compare(reader.visible, !app.narrow || reading)
+                    compare(listHeader.visible, list.visible)
+                    compare(readerHeader.visible, reader.visible)
+                    for (const pair of [[listHeader, list], [readerHeader, reader]]) {
+                        if (!pair[0].visible) continue
+                        compare(pair[0].x, pair[1].mapToItem(scene, 0, 0).x)
+                        compare(pair[0].width, pair[1].width)
+                        verify(pair[0].width >= 260)
+                    }
+                    const controlTop = controls.mapToItem(scene, 0, 0)
+                    verify(controlTop.x >= 0 && controlTop.x + controls.width <= width)
+                    for (const name of ["sidebarComposeButton", "sidebarToggleButton", "refreshButton", "headerComposeButton", "searchField", "readerBackButton", "replyButton", "forwardButton", "detailsButton", "moreButton"]) {
+                        const item = findChild(app, name)
+                        if (!item.visible) continue
+                        const top = item.mapToItem(scene, 0, 0)
+                        verify(item.width > 0 && item.height > 0, name)
+                        verify(top.x >= 0 && top.x + item.width <= width, name + " outside window")
+                        verify(top.y >= 0 && top.y + item.height <= 68, name + " outside header")
+                        verify(top.y >= controlTop.y + controls.height
+                            || top.x + item.width <= controlTop.x, name + " overlaps window controls")
+                    }
+                    for (const name of ["sidebarDivider", "messageDivider"]) {
+                        const divider = findChild(app, name)
+                        if (!divider.visible) continue
+                        compare(divider.y, 68)
+                        compare(divider.y + divider.height, status.y)
+                    }
+                }
+            }
+        }
+    }
+
+    function test_compact_reader_details_anchor_and_search_return() {
+        activateApp()
+        app.width = 580
+        app.sidebarExpanded = true
+        app.sidebarPreferredWidth = 340
+        app.readerVisible = true
+        wait(30)
+        compare(findChild(app, "detailsButton").visible, false)
+        app.showReview("details")
+        const details = findChild(app, "messageDetailsPopover")
+        tryCompare(details, "visible", true)
+        compare(details.anchorItem, findChild(app, "moreButton"))
+        details.close()
+        keyClick(Qt.Key_F, Qt.ControlModifier)
+        compare(app.readerVisible, false)
+        const search = findChild(app, "searchField")
+        tryCompare(search, "activeFocus", true)
+        compare(search.visible, true)
+    }
+
+    function test_header_controls_receive_pointer_input() {
+        activateApp()
+        const scene = findChild(app, "mailScene")
+        const refresh = findChild(app, "refreshButton")
+        const point = refresh.mapToItem(scene, refresh.width / 2, refresh.height / 2)
+        mouseClick(scene, point.x, point.y)
+        compare(mock.refreshCount, 1)
+        const search = findChild(app, "searchField")
+        const input = search.mapToItem(scene, search.width / 2, search.height / 2)
+        mouseClick(scene, input.x, input.y)
+        tryCompare(search, "activeFocus", true)
+        keyClick(Qt.Key_A)
+        tryCompare(mock, "search", "a")
+        const compose = findChild(app, "sidebarComposeButton")
+        const composePoint = compose.mapToItem(scene, compose.width / 2, compose.height / 2)
+        mouseClick(scene, composePoint.x, composePoint.y)
+        tryCompare(findChild(app, "composerDialog"), "visible", true)
+    }
+
     function test_column_widths_are_adjustable_and_clamped() {
         const sidebarDivider = findChild(app, "sidebarDivider")
         const listDivider = findChild(app, "messageDivider")

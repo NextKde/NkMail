@@ -18,13 +18,13 @@ LiquidDialog {
     objectName: "composerDialog"
     parent: Overlay.overlay
     width: Math.min(760, hostWindow.width - 32)
-    height: Math.min(690, hostWindow.height - 54)
-    x: (hostWindow.width - width) / 2
-    y: (hostWindow.height - height) / 2
+    height: Math.min(690, hostWindow.height - 32)
+    anchors.centerIn: parent
     title: qsTr("New message")
     closePolicy: Popup.NoAutoClose
     focus: true
-    padding: 20
+    padding: 24
+    materialOpacity: 0.99
 
     function copy(map) { return JSON.parse(JSON.stringify(map || {})) }
     function editDraft(value) {
@@ -104,45 +104,52 @@ LiquidDialog {
         spacing: 0
         RowLayout {
             Layout.fillWidth: true; Layout.bottomMargin: 10
-            Text { text: qsTr("From"); color: AppTheme.mutedText; font.pixelSize: 12; Layout.preferredWidth: 54 }
-            Text { text: String(root.mail.account.address || qsTr("Example account")); color: AppTheme.text; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
-            MailAction { text: qsTr("Cc"); checkable: true; checked: root.showCc; enabled: !root.mail.sending; onClicked: root.showCc = !root.showCc }
-            MailAction { text: qsTr("Bcc"); checkable: true; checked: root.showBcc; enabled: !root.mail.sending; onClicked: root.showBcc = !root.showBcc }
+            Text { text: qsTr("From"); color: AppTheme.mutedText; font.pixelSize: AppTheme.compactControlFontSize; Layout.preferredWidth: 56 }
+            Text { text: String(root.mail.account.address || qsTr("Example account")); color: AppTheme.text; font.pixelSize: AppTheme.compactControlFontSize; Layout.fillWidth: true; elide: Text.ElideRight; Accessible.name: qsTr("From address") }
+            MailAction { text: qsTr("Cc"); toolbarAction: false; checkable: true; checked: root.showCc; enabled: !root.mail.sending; Accessible.name: qsTr("Show carbon copy field"); onToggled: root.showCc = checked }
+            MailAction { text: qsTr("Bcc"); toolbarAction: false; checkable: true; checked: root.showBcc; enabled: !root.mail.sending; Accessible.name: qsTr("Show blind carbon copy field"); onToggled: root.showBcc = checked }
         }
         GridLayout {
             Layout.fillWidth: true
             columns: 2; columnSpacing: 10; rowSpacing: 8
             enabled: !root.mail.sending
             Text { text: qsTr("To"); color: AppTheme.mutedText; font.pixelSize: 12; Layout.preferredWidth: 54 }
-            KosTextField { id: toField; objectName: "composerTo"; Layout.fillWidth: true; implicitHeight: 30; placeholderText: qsTr("Recipient address"); onTextChanged: root.changed() }
+            KosTextField { id: toField; objectName: "composerTo"; Layout.fillWidth: true; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; Accessible.name: qsTr("To"); placeholderText: qsTr("Recipient address"); onTextChanged: root.changed() }
             Text { visible: root.showCc; text: qsTr("Cc"); color: AppTheme.mutedText; font.pixelSize: 12 }
-            KosTextField { id: ccField; visible: root.showCc; Layout.fillWidth: true; implicitHeight: 30; onTextChanged: root.changed() }
+            KosTextField { id: ccField; visible: root.showCc; Layout.fillWidth: true; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; Accessible.name: qsTr("Cc"); onTextChanged: root.changed() }
             Text { visible: root.showBcc; text: qsTr("Bcc"); color: AppTheme.mutedText; font.pixelSize: 12 }
-            KosTextField { id: bccField; visible: root.showBcc; Layout.fillWidth: true; implicitHeight: 30; onTextChanged: root.changed() }
+            KosTextField { id: bccField; visible: root.showBcc; Layout.fillWidth: true; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; Accessible.name: qsTr("Bcc"); onTextChanged: root.changed() }
             Text { text: qsTr("Subject"); color: AppTheme.mutedText; font.pixelSize: 12 }
-            KosTextField { id: subjectField; objectName: "composerSubject"; Layout.fillWidth: true; implicitHeight: 30; placeholderText: qsTr("Subject"); onTextChanged: root.changed() }
+            KosTextField { id: subjectField; objectName: "composerSubject"; Layout.fillWidth: true; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; Accessible.name: qsTr("Subject"); placeholderText: qsTr("Subject"); onTextChanged: root.changed() }
         }
-        Rectangle {
+        Item {
             Layout.fillWidth: true; Layout.fillHeight: true; Layout.topMargin: 14; Layout.bottomMargin: 10
-            radius: 6
-            color: AppTheme.contentBackground
-            border.width: 1; border.color: AppTheme.border
+            KosCard {
+                anchors.fill: parent
+                padding: 12
+                background: KosSurface {
+                    radius: AppTheme.smallRadius
+                    fillColor: AppTheme.controlBackground
+                    strokeColor: AppTheme.border
+                    strokeWidth: 1
+                    elevation: 0
+                }
+            }
             ScrollView {
                 anchors.fill: parent; anchors.margins: 12
                 contentWidth: availableWidth
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                TextArea {
+                KosTextArea {
                     id: bodyField
                     objectName: "composerBody"
                     width: parent.width
                     enabled: !root.mail.sending
-                    color: AppTheme.text
                     placeholderText: qsTr("Write something thoughtful…")
-                    placeholderTextColor: AppTheme.mutedText
                     font.pixelSize: 14
                     wrapMode: TextEdit.Wrap
                     textFormat: TextEdit.PlainText
                     selectByMouse: true
+                    Accessible.name: qsTr("Message body")
                     padding: 0
                     background: null
                     onTextChanged: root.changed()
@@ -190,7 +197,7 @@ LiquidDialog {
         }
     }
     footer: Item {
-        implicitHeight: 62
+        implicitHeight: MailStyle.footerHeight
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 12; anchors.bottomMargin: 20

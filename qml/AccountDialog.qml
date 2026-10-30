@@ -9,12 +9,13 @@ LiquidDialog {
     required property var hostWindow
     objectName: "accountDialog"
     parent: Overlay.overlay
-    width: Math.min(610, hostWindow.width - 32)
-    height: Math.min(730, hostWindow.height - 54)
-    x: (hostWindow.width - width) / 2
-    y: (hostWindow.height - height) / 2
+    width: Math.min(580, hostWindow.width - 32)
+    height: Math.min(730, hostWindow.height - 32)
+    anchors.centerIn: parent
     title: qsTr("Mail account")
-    padding: 16
+    padding: 24
+    materialOpacity: 0.99
+    closePolicy: root.submitting ? Popup.NoAutoClose : Popup.CloseOnEscape
     property var original: ({})
     property bool submitting: false
 
@@ -73,12 +74,15 @@ LiquidDialog {
     }
 
     contentItem: ScrollView {
+        id: accountScroll
         contentWidth: availableWidth
         clip: true
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+        ScrollBar.vertical.interactive: true
         ColumnLayout {
-            width: parent.width
-            spacing: 16
+            width: accountScroll.availableWidth
+            spacing: AppTheme.spacing
             Text {
                 text: root.mail.demo ? qsTr("Example account · synthetic data only. Account changes and sending are disabled in demo mode.")
                     : qsTr("Connect one account with an application password. TLS certificate verification is always enabled.")
@@ -86,41 +90,41 @@ LiquidDialog {
             }
             SettingsGroup {
                 title: qsTr("Identity")
-                SettingsItem { title: qsTr("Name"); KosTextField { id: nameField; objectName: "accountName"; implicitWidth: 265; implicitHeight: 28; enabled: !root.mail.demo && !root.submitting } }
-                SettingsItem { title: qsTr("Email"); KosTextField { id: addressField; implicitWidth: 265; implicitHeight: 28; enabled: !root.mail.demo && !root.submitting; placeholderText: "you@example.invalid" } }
-                SettingsItem { title: qsTr("Username"); KosTextField { id: usernameField; implicitWidth: 265; implicitHeight: 28; enabled: !root.mail.demo && !root.submitting } }
+                SettingsItem { title: qsTr("Name"); KosTextField { id: nameField; objectName: "accountName"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Name") } }
+                SettingsItem { title: qsTr("Email"); KosTextField { id: addressField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Email"); placeholderText: "you@example.invalid" } }
+                SettingsItem { title: qsTr("Username"); KosTextField { id: usernameField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Username") } }
                 SettingsItem {
                     title: qsTr("App password"); description: qsTr("Stored passwords are never displayed.")
-                    KosTextField { id: passwordField; objectName: "accountPassword"; implicitWidth: 265; implicitHeight: 28; echoMode: TextInput.Password; enabled: !root.mail.demo && !root.submitting; placeholderText: qsTr("Enter application password") }
+                    KosTextField { id: passwordField; objectName: "accountPassword"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; echoMode: TextInput.Password; enabled: !root.mail.demo && !root.submitting; Accessible.name: qsTr("Application password"); placeholderText: qsTr("Enter application password") }
                 }
                 SettingsItem {
                     title: qsTr("Remember password"); description: qsTr("Use the system keychain; no plaintext fallback.")
-                    LiquidCheckBox { id: rememberPassword; enabled: !root.mail.demo && !root.submitting }
+                    KosCheckBox { id: rememberPassword; enabled: !root.mail.demo && !root.submitting }
                 }
             }
             SettingsGroup {
                 title: qsTr("Incoming · IMAP")
-                SettingsItem { title: qsTr("Server"); KosTextField { id: imapField; implicitWidth: 265; implicitHeight: 28; enabled: !root.mail.demo && !root.submitting; placeholderText: "imap.example.invalid" } }
-                SettingsItem { title: qsTr("Port"); KosTextField { id: imapPortField; implicitWidth: 90; implicitHeight: 28; enabled: !root.mail.demo && !root.submitting; validator: IntValidator { bottom: 1; top: 65535 } } }
+                SettingsItem { title: qsTr("Server"); KosTextField { id: imapField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("IMAP server"); placeholderText: "imap.example.invalid" } }
+                SettingsItem { title: qsTr("Port"); KosTextField { id: imapPortField; implicitWidth: 90; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("IMAP port"); validator: IntValidator { bottom: 1; top: 65535 } } }
                 SettingsItem {
                     title: qsTr("STARTTLS"); description: qsTr("Off uses implicit TLS, not plaintext.")
-                    LiquidCheckBox { id: imapTls; enabled: !root.mail.demo && !root.submitting; onToggled: imapPortField.text = checked ? "143" : "993" }
+                    KosCheckBox { id: imapTls; enabled: !root.mail.demo && !root.submitting; onToggled: imapPortField.text = checked ? "143" : "993" }
                 }
             }
             SettingsGroup {
                 title: qsTr("Outgoing · SMTP")
-                SettingsItem { title: qsTr("Server"); KosTextField { id: smtpField; implicitWidth: 265; implicitHeight: 28; enabled: !root.mail.demo && !root.submitting; placeholderText: "smtp.example.invalid" } }
-                SettingsItem { title: qsTr("Port"); KosTextField { id: smtpPortField; implicitWidth: 90; implicitHeight: 28; enabled: !root.mail.demo && !root.submitting; validator: IntValidator { bottom: 1; top: 65535 } } }
+                SettingsItem { title: qsTr("Server"); KosTextField { id: smtpField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("SMTP server"); placeholderText: "smtp.example.invalid" } }
+                SettingsItem { title: qsTr("Port"); KosTextField { id: smtpPortField; implicitWidth: 90; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("SMTP port"); validator: IntValidator { bottom: 1; top: 65535 } } }
                 SettingsItem {
                     title: qsTr("STARTTLS"); description: qsTr("Off uses implicit TLS, not plaintext.")
-                    LiquidCheckBox { id: smtpTls; enabled: !root.mail.demo && !root.submitting; onToggled: smtpPortField.text = checked ? "587" : "465" }
+                    KosCheckBox { id: smtpTls; enabled: !root.mail.demo && !root.submitting; onToggled: smtpPortField.text = checked ? "587" : "465" }
                 }
             }
             SettingsGroup {
                 title: qsTr("Trust")
                 SettingsItem {
                     title: qsTr("CA file"); description: qsTr("Optional PEM path; blank uses system trust.")
-                    KosTextField { id: caField; implicitWidth: 265; implicitHeight: 28; enabled: !root.mail.demo && !root.submitting; placeholderText: qsTr("System certificates") }
+                    KosTextField { id: caField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("CA file"); placeholderText: qsTr("System certificates") }
                 }
             }
             Text { visible: !!root.mail.error; text: root.mail.error; color: AppTheme.destructive; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap }
@@ -128,12 +132,12 @@ LiquidDialog {
         }
     }
     footer: Item {
-        implicitHeight: 62
+        implicitHeight: MailStyle.footerHeight
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 12; anchors.bottomMargin: 20
             spacing: 8
-            LiquidDialogButton { text: qsTr("Disconnect"); visible: root.mail.configured && !root.mail.demo; enabled: !root.submitting && !root.mail.sending; onClicked: { root.mail.disconnectAccount(); root.close() } }
+            LiquidDialogButton { text: qsTr("Disconnect"); destructive: true; visible: root.mail.configured && !root.mail.demo; enabled: !root.submitting && !root.mail.sending; onClicked: { root.mail.disconnectAccount(); root.close() } }
             Item { Layout.fillWidth: true }
             LiquidDialogButton { text: root.mail.demo ? qsTr("Done") : qsTr("Cancel"); enabled: !root.submitting; onClicked: root.close() }
             LiquidDialogButton {
