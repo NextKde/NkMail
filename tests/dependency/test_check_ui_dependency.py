@@ -78,6 +78,16 @@ class LocalGateTests(unittest.TestCase):
         (self.module / "forgotten.qml").write_text("new\n")
         self.rejects("uncommitted/untracked")
 
+    def test_assume_unchanged_cannot_hide_changes(self):
+        git(self.module, "update-index", "--assume-unchanged", "control.qml")
+        (self.module / "control.qml").write_text("hidden change\n")
+        self.rejects("index hides files")
+
+    def test_skip_worktree_cannot_hide_changes(self):
+        git(self.module, "update-index", "--skip-worktree", "control.qml")
+        (self.module / "control.qml").write_text("hidden change\n")
+        self.rejects("index hides files")
+
     def test_head_differs_from_pin(self):
         git(self.module, "commit", "--allow-empty", "-qm", "unpublished")
         self.rejects("HEAD differs")

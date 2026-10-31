@@ -72,6 +72,9 @@ def local_dependency(root):
         raise GateError("UI path is not an initialized independent Git submodule.")
     if git(module, "rev-parse", "HEAD") != sha:
         raise GateError("UI HEAD differs from the staged release pin; check out the chosen release and stage the gitlink.")
+    flags = git(module, "ls-files", "-v").splitlines()
+    if any(line and (line[0].islower() or line[0] == "S") for line in flags):
+        raise GateError("UI index hides files with assume-unchanged/skip-worktree; clear those flags before release verification.")
     if git(module, "status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none"):
         raise GateError("UI submodule has uncommitted/untracked changes. Commit, push and release shared changes upstream first.")
     return tag, sha
