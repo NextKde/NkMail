@@ -30,6 +30,14 @@ ApplicationWindow {
     property bool readerVisible: false
     property bool draftsVisible: false
     property bool showSummary: true
+    property bool groupThreads: true
+    property var collapsedThreads: ({})
+    function toggleThread(key) {
+        const next = Object.assign({}, collapsedThreads)
+        if (next[key]) delete next[key]
+        else next[key] = true
+        collapsedThreads = next
+    }
     onDraftsVisibleChanged: {
         listOptions.close()
         if (draftsVisible) readerHeader.closeSearch()
@@ -426,6 +434,13 @@ ApplicationWindow {
                                 VectorIcon {
                                     x: 8; anchors.verticalCenter: parent.verticalCenter
                                     name: "search"; size: 14; color: searchField.textColor
+                                    opacity: mail.busy ? 0 : 1
+                                }
+                                BusyIndicator {
+                                    x: 5; anchors.verticalCenter: parent.verticalCenter
+                                    width: 20; height: 20
+                                    visible: mail.busy
+                                    running: visible
                                 }
                                 Timer { id: searchDelay; interval: 200; onTriggered: mail.search = searchField.text }
                                 onActiveFocusChanged: {
@@ -611,11 +626,48 @@ MailAction {
                             required property bool unread
                             required property bool flagged
                             required property bool hasAttachments
-                            width: ListView.view.width; height: MailStyle.messageRowHeight
+                            required property string threadKey
+                            required property int threadCount
+                            required property bool threadFirst
+                            readonly property bool hiddenByThread: window.groupThreads && !threadFirst && window.collapsedThreads[threadKey] === true
+                            width: ListView.view.width
+                            visible: !hiddenByThread
+                            height: visible ? MailStyle.messageRowHeight : 0
+                            implicitHeight: visible ? MailStyle.messageRowHeight : 0
                             hoverEnabled: true
                             readonly property bool selected: mail.selectedUid === uid
+                            readonly property int messageIndex: mail.messages.indexOf(mail.currentFolder, uidValidity, uid)
+                            function selectRow() { mail.openMessage(uid, uidValidity); window.readerVisible = true }
+                            function openRow() {
+                                selectRow()
+                                if (unread) mail.setMessageRead(messageIndex, true)
+                            }
                             Accessible.name: sender + ". " + subject + (window.showSummary ? ". " + preview : "")
-                            onClicked: { mail.openMessage(uid, uidValidity); window.readerVisible = true }
+                            onClicked: openRow()
+                            TapHandler {
+                                acceptedButtons: Qt.RightButton
+                                onTapped: { messageRow.selectRow(); rowMenu.openAtAnchor() }
+                            }
+                            LiquidPopover {
+                                id: rowMenu
+                                objectName: "messageRowMenu"
+                                sourceItem: chromePlanes
+                                anchorItem: messageRow
+                                closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
+                                LiquidPopoverItem { text: qsTr("打开"); iconName: "reminder"; onTriggered: messageRow.openRow() }
+                                LiquidPopoverItem {
+                                    text: messageRow.unread ? qsTr("标为已读") : qsTr("标为未读")
+                                    iconName: messageRow.unread ? "envelopeOpen" : "envelope"
+                                    onTriggered: mail.setMessageRead(messageRow.messageIndex, messageRow.unread)
+                                }
+                                LiquidPopoverItem {
+                                    text: messageRow.flagged ? qsTr("移除旗标") : qsTr("添加旗标")
+                                    iconName: "flag"
+                                    onTriggered: mail.toggleFlagged(messageRow.messageIndex)
+                                }
+                                LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; onTriggered: mail.archiveMessage(messageRow.messageIndex) }
+                                LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; onTriggered: mail.deleteMessage(messageRow.messageIndex) }
+                            }
                             background: Rectangle {
                                 color: messageRow.selected ? window.selectedSurface : messageRow.hovered ? window.hoverSurface : "transparent"
                                 border.width: messageRow.activeFocus ? 1 : 0
@@ -630,6 +682,27 @@ MailAction {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text { text: messageRow.sender || messageRow.senderAddress; color: window.ink; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
+                                        Rectangle {
+                                            id: threadBadge
+                                            visible: window.groupThreads && messageRow.threadFirst && messageRow.threadCount > 1
+                                            implicitWidth: threadBadgeRow.implicitWidth + 12
+                                            implicitHeight: 18
+                                            radius: 9
+                                            color: window.hoverSurface
+                                            border.width: 1
+                                            border.color: window.rule
+                                            RowLayout {
+                                                id: threadBadgeRow
+                                                anchors.centerIn: parent
+                                                spacing: 3
+                                                Text { text: messageRow.threadCount; color: window.muted; font.pixelSize: 10 }
+                                                VectorIcon { name: "chevronsUpDown"; size: 12; color: window.muted }
+                                            }
+                                            TapHandler {
+                                                grabPermissions: PointerHandler.CanTakeOverFromAnything
+                                                onTapped: window.toggleThread(messageRow.threadKey)
+                                            }
+                                        }
                                         Text { text: window.dateLabel(messageRow.date); color: window.muted; font.pixelSize: AppTheme.compactControlFontSize }
                                     }
                                     RowLayout {
@@ -883,6 +956,20 @@ MailAction {
                 onToggled: mail.unreadOnly = checked
             }
             LiquidCheckBox {
+                objectName: "groupThreadsCheck"
+                Layout.fillWidth: true
+                text: qsTr("按会话聚合")
+                checked: window.groupThreads
+                onToggled: window.groupThreads = checked
+            }
+            LiquidCheckBox {
+                objectName: "notifyCheck"
+                Layout.fillWidth: true
+                text: qsTr("新邮件通知")
+                checked: mail.notifyEnabled
+                onToggled: mail.notifyEnabled = checked
+            }
+            LiquidCheckBox {
                 objectName: "summaryCheck"
                 Layout.fillWidth: true
                 text: qsTr("Show message summaries")
@@ -996,4 +1083,29 @@ MailAction {
         }
     }
     Shortcut { sequence: "Ctrl+R"; enabled: !composer.visible && !accountDialog.visible && !mail.busy; onActivated: mail.refresh() }
+    Shortcut {
+        sequence: "Delete"
+        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        onActivated: mail.deleteMessage(window.selectedIndex())
+    }
+    Shortcut {
+        sequence: "Ctrl+Backspace"
+        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        onActivated: mail.deleteMessage(window.selectedIndex())
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+U"
+        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        onActivated: mail.setMessageRead(window.selectedIndex(), !!window.message.unread)
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+L"
+        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        onActivated: mail.toggleFlagged(window.selectedIndex())
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+A"
+        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        onActivated: mail.archiveMessage(window.selectedIndex())
+    }
 }
