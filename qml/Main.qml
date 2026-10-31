@@ -11,7 +11,7 @@ ApplicationWindow {
     objectName: "mailWindow"
     width: 1280
     height: 820
-    minimumWidth: 580
+    minimumWidth: 900
     minimumHeight: 520
     visible: true
     title: qsTr("NkMail")
@@ -21,7 +21,7 @@ ApplicationWindow {
     font.family: "sans-serif"
     font.pixelSize: AppTheme.compactControlFontSize
 
-    readonly property bool narrow: width < 800
+    readonly property bool narrow: false // Narrow layout removed; minimum width is 900.
     readonly property bool liquidControls: AppTheme.materialMode !== "solid"
         && !AppTheme.reduceTransparency
         && GraphicsInfo.api !== GraphicsInfo.Software
@@ -51,7 +51,7 @@ ApplicationWindow {
         width - (narrow ? 260 : 560)))
     readonly property int listWidth: Math.max(260, Math.min(520, listPreferredWidth,
         width - (sidebarVisible ? sidebarWidth : 0) - 300))
-    readonly property bool sidebarVisible: width >= 1080 ? !sidebarCollapsed : sidebarExpanded
+    readonly property bool sidebarVisible: width >= 900 ? !sidebarCollapsed : sidebarExpanded
     readonly property var message: mail.selectedMessage || ({})
     readonly property color selectedSurface: AppTheme.withAlpha(AppTheme.accent, AppTheme.dark ? 0.18 : 0.10)
     readonly property color hoverSurface: AppTheme.cardHover
@@ -66,6 +66,10 @@ ApplicationWindow {
         else sidebarExpanded = !sidebarExpanded
     }
     function value(map, key) { return map && map[key] !== undefined ? String(map[key]) : "" }
+    function selectedIndex() {
+        if (!hasMessage) return -1
+        return mail.messages.indexOf(mail.currentFolder, window.value(message, "uidValidity"), mail.selectedUid)
+    }
     function mailboxTitle(folder) {
         if (String(folder.id).toUpperCase() === "INBOX") return qsTr("Inbox")
         const title = String(folder.title || folder.id || "")
@@ -139,11 +143,6 @@ ApplicationWindow {
             composer.forceActiveFocus()
         }
     }
-    Connections {
-        target: mail
-        function onSelectionChanged() { if (window.narrow && window.hasMessage) window.readerVisible = true }
-    }
-
     Item {
         id: mailScene
         objectName: "mailScene"
@@ -225,12 +224,39 @@ ApplicationWindow {
                     objectName: "folderTitle"
                     x: listHeader.leadingInset
                     y: windowChrome.controlsCenterY - height / 2
-                    width: window.narrow ? readerHeader.titleWidth : Math.max(0, parent.width - x - 14)
+                    width: window.narrow ? readerHeader.titleWidth : Math.max(0, parent.width - x - 14 - (unreadFilterButton.visible ? unreadFilterButton.width + 8 : 0))
                     height: MailStyle.toolbarButtonHeight
                     text: mail.unreadOnly && !window.draftsVisible ? qsTr("%1 · Unread (cached)").arg(window.folderTitle()) : window.folderTitle()
                     color: window.ink; font.pixelSize: 19; font.weight: Font.Bold
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight; textFormat: Text.PlainText
+                }
+                MailAction {
+                    id: unreadFilterButton
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    y: (44 - height) / 2
+                    implicitHeight: 38 // MailAction defaults to the compact toolbar height.
+                    objectName: "unreadFilterButton"
+                    visible: messagePane.visible && !window.draftsVisible
+                    stacked: true
+                    stackedText: qsTr("筛选")
+                    iconName: "filter"
+                    checkable: true
+                    checked: mail.unreadOnly
+                    highlighted: mail.unreadOnly
+                    accessibleText: mail.unreadOnly ? qsTr("Show all cached messages") : qsTr("Show unread cached messages")
+                    floatingAction: true; shellBackdrop: chromeBackdrop
+                    focusPolicy: Qt.TabFocus
+                    onClicked: mail.unreadOnly = !mail.unreadOnly
+                    onVisibleChanged: { if (!visible && activeFocus) listOptionsButton.forceActiveFocus() }
+                }
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: 1
+                    color: window.rule
                 }
             }
 
@@ -238,23 +264,27 @@ ApplicationWindow {
                 id: readerHeader
                 objectName: "readerHeader"
                 x: contentScene.x + (window.narrow ? 0 : reader.x)
-                width: window.narrow ? contentScene.width : reader.width
+                // 右侧让出窗口控制区，避免 stacked 按钮与红黄绿重叠
+                width: (window.narrow ? contentScene.width : reader.width) - windowChrome.controlsReservedWidth
                 height: parent.height
                 readonly property real leadingInset: window.narrow && !window.sidebarVisible ? 48 : 14
                 readonly property real trailingEdge: Math.floor(Math.min(width - 14, windowChrome.controlsLeft - x - 12))
                 readonly property real rowWidth: Math.max(0, trailingEdge - leadingInset)
-                readonly property real titleWidth: window.narrow && !window.readerVisible ? Math.min(120, Math.max(48, Math.floor(rowWidth * 0.25))) : 0
+                readonly property real titleWidth: 0
                 readonly property real actionLeft: leadingInset + titleWidth + (titleWidth > 0 ? 8 : 0)
                 readonly property real actionWidth: Math.max(0, trailingEdge - actionLeft)
                 readonly property bool messageActions: (!window.narrow || window.readerVisible) && !window.draftsVisible
-                readonly property bool backVisible: window.narrow && window.readerVisible
+                readonly property bool backVisible: false
                 readonly property real baselineWidth: window.draftsVisible ? 52 : 60 + (messageActions ? 34 : 0) + (backVisible ? 34 : 0)
                 readonly property bool compactActions: !window.draftsVisible && actionWidth < baselineWidth + 60
                 readonly property bool showReplyGroup: messageActions && actionWidth >= baselineWidth + 120
                 readonly property bool fullReplyGroup: messageActions && actionWidth >= baselineWidth + 146
                 readonly property bool directDetails: messageActions && actionWidth >= baselineWidth + 180
                 readonly property bool directFilter: !window.draftsVisible && actionWidth >= baselineWidth + 60 + (messageActions ? 120 : 0) + 34
-                readonly property bool searching: toolbarSearch.active || toolbarSearch.width > 0
+                readonly property bool searching: false
+                // 宽度够就把搜索做成常显输入框，不够就退化成搜索按钮
+                readonly property bool wideSearch: window.width >= 1180
+                property bool searchOpen: false
                 onCompactActionsChanged: {
                     if (window.focusWithin(mailboxActions)) listOptionsButton.forceActiveFocus()
                     if (listOptions.visible) listOptions.close()
@@ -287,7 +317,7 @@ ApplicationWindow {
                         Layout.rightMargin: 8
                         objectName: "readerBackButton"
                         visible: readerHeader.backVisible && !readerHeader.searching
-                        iconOnly: true; iconName: "back"; accessibleText: qsTr("Back to messages")
+                        stacked: true; stackedText: qsTr("返回"); iconName: "back"; accessibleText: qsTr("Back to messages")
                         floatingAction: true; shellBackdrop: chromeBackdrop
                         onClicked: window.readerVisible = false
                     }
@@ -295,10 +325,11 @@ ApplicationWindow {
                         id: mailboxActions
                         Layout.rightMargin: 8
                         objectName: "mailboxActionGroup"
-                        visible: !readerHeader.compactActions && !readerHeader.searching
+                        stacked: true
+                        visible: !readerHeader.compactActions && !readerHeader.searching && window.width >= 1180
                         buttonSize: MailStyle.toolbarButtonHeight
                         icons: ["refreshRounded", "editRounded"]
-                        labels: [qsTr("Check for mail"), qsTr("New message")]
+                        labels: [qsTr("收取"), qsTr("撰写")]
                         enabledActions: [!mail.busy && !window.draftsVisible && (mail.configured || mail.demo), mail.configured || mail.demo]
                         backdrop: chromeBackdrop
                         materialForm: !window.liquidControls
@@ -308,42 +339,81 @@ ApplicationWindow {
                         }
                     }
                     LiquidActionButtonGroup {
+                        id: messageOpsGroup
+                        objectName: "messageOpsGroup"
+                        Layout.rightMargin: 8
+                        visible: !window.draftsVisible && window.width >= 1100
+                        stacked: true
+                        buttonSize: 38
+                        icons: ["trash", "archive", "flag"]
+                        labels: [qsTr("删除"), qsTr("归档"), qsTr("旗标")]
+                        enabledActions: [window.hasMessage, window.hasMessage, window.hasMessage]
+                        backdrop: chromeBackdrop
+                        materialForm: !window.liquidControls
+                        onTriggered: index => {
+                            const row = window.selectedIndex()
+                            if (row < 0) return
+                            if (index === 0) mail.deleteMessage(row)
+                            else if (index === 1) mail.archiveMessage(row)
+                            else mail.toggleFlagged(row)
+                        }
+                    }
+                    LiquidActionButtonGroup {
                         id: replyActions
                         Layout.rightMargin: 8
                         objectName: "replyActionGroup"
-                        visible: readerHeader.showReplyGroup && !readerHeader.searching
+                        stacked: true
+                        visible: readerHeader.showReplyGroup && !readerHeader.searching && window.width >= 1480
                         buttonSize: MailStyle.toolbarButtonHeight
                         icons: readerHeader.fullReplyGroup ? ["undo", "arrows", "forward"] : ["undo", "forward"]
-                        labels: readerHeader.fullReplyGroup ? [qsTr("Reply"), qsTr("Reply to all"), qsTr("Forward")] : [qsTr("Reply"), qsTr("Forward")]
+                        labels: readerHeader.fullReplyGroup ? [qsTr("回复"), qsTr("全部回复"), qsTr("转发")] : [qsTr("回复"), qsTr("转发")]
                         enabledActions: [window.hasMessage && !mail.sending, window.hasMessage && !mail.sending, window.hasMessage && !mail.sending]
                         backdrop: chromeBackdrop
                         materialForm: !window.liquidControls
                         onTriggered: index => window.compose(readerHeader.fullReplyGroup ? ["reply", "replyAll", "forward"][index] : ["reply", "forward"][index])
                         onVisibleChanged: { if (!visible && window.focusWithin(replyActions)) moreButton.forceActiveFocus() }
                     }
+                    LiquidActionButtonGroup {
+                        id: messageOptionsGroup
+                        objectName: "messageOptionsGroup"
+                        Layout.rightMargin: 8
+                        visible: !window.draftsVisible
+                        stacked: true
+                        buttonSize: 38
+                        icons: readerHeader.wideSearch ? ["sliders", "info", "more"] : ["sliders", "more"]
+                        labels: readerHeader.wideSearch ? [qsTr("显示"), qsTr("详情"), qsTr("更多")] : [qsTr("显示"), qsTr("更多")]
+                        enabledActions: [true, window.hasMessage, window.hasMessage]
+                        backdrop: chromeBackdrop
+                        materialForm: !window.liquidControls
+                        onTriggered: index => {
+                            if (index === 0) listOptions.open()
+                            else if (index === 1) details.open()
+                            else moreMenu.openAtAnchor()
+                        }
+                    }
                     Item {
                         Layout.fillWidth: true
                         Layout.minimumWidth: 0
                         Layout.fillHeight: true
-                        Layout.rightMargin: toolbarSearch.visible ? 8 : 0
-                        Item {
-                            id: toolbarSearch
-                            objectName: "toolbarSearch"
-                            property bool active: false
-                            anchors.right: parent.right
-                            width: active && !window.draftsVisible ? Math.min(280, parent.width) : 0
-                            height: parent.height
-                            visible: width > 0
+                    }
+                    Item {
+                        id: toolbarSearch
+                        objectName: "toolbarSearch"
+                        property bool active: true
+                        readonly property real wanted: 216
+                        readonly property bool shown: !window.draftsVisible && (readerHeader.wideSearch || readerHeader.searchOpen)
+                        Layout.preferredWidth: shown ? wanted : 0
+                        Layout.minimumWidth: 0
+                        Layout.fillHeight: true
+                        Layout.rightMargin: shown ? 8 : 0
+                        visible: shown
                             clip: true
-                            Behavior on width {
-                                NumberAnimation { duration: AppTheme.reduceMotion ? 0 : AppTheme.motionFast; easing.type: Easing.OutCubic }
-                            }
                             LiquidTextField {
                                 id: searchField
                                 objectName: "searchField"
                                 anchors.fill: parent
                                 implicitHeight: MailStyle.toolbarButtonHeight
-                                enabled: toolbarSearch.active && !window.draftsVisible
+                                enabled: !window.draftsVisible
                                 materialForm: !window.liquidControls
                                 liquidFinish: true
                                 liquidIntensity: "light"
@@ -358,74 +428,24 @@ ApplicationWindow {
                                     name: "search"; size: 14; color: searchField.textColor
                                 }
                                 Timer { id: searchDelay; interval: 200; onTriggered: mail.search = searchField.text }
+                                onActiveFocusChanged: {
+                                    if (!activeFocus && !readerHeader.wideSearch && text.length === 0)
+                                        readerHeader.searchOpen = false
+                                }
                             }
                         }
-                    }
-                    MailAction {
-                        id: unreadFilterButton
-                        Layout.rightMargin: 8
-                        objectName: "unreadFilterButton"
-                        visible: readerHeader.directFilter && !readerHeader.searching
-                        iconOnly: true; iconName: "circle"
-                        checkable: true
-                        checked: mail.unreadOnly
-                        highlighted: mail.unreadOnly
-                        accessibleText: mail.unreadOnly ? qsTr("Show all cached messages") : qsTr("Show unread cached messages")
-                        floatingAction: true; shellBackdrop: chromeBackdrop
-                        focusPolicy: Qt.TabFocus
-                        onClicked: mail.unreadOnly = !mail.unreadOnly
-                        onVisibleChanged: { if (!visible && activeFocus) listOptionsButton.forceActiveFocus() }
-                    }
-                    MailAction {
-                        id: listOptionsButton
-                        Layout.rightMargin: 8
-                        objectName: "listOptionsButton"
-                        visible: !window.draftsVisible && !readerHeader.searching
-                        iconOnly: true; iconName: "grid"
-                        accessibleText: qsTr("List display options")
-                        highlighted: mail.unreadOnly
-                        floatingAction: true; shellBackdrop: chromeBackdrop
-                        focusPolicy: Qt.TabFocus
-                        property bool openOnRelease: false
-                        onPressed: openOnRelease = !listOptions.visible
-                        onClicked: openOnRelease ? listOptions.open() : listOptions.close()
-                        onVisibleChanged: { if (!visible) listOptions.close() }
-                    }
-                    MailAction {
-                        id: detailsButton
-                        Layout.rightMargin: 8
-                        objectName: "detailsButton"
-                        visible: readerHeader.directDetails && !readerHeader.searching
-                        iconOnly: true; iconName: "reminder"; accessibleText: qsTr("Message details")
-                        floatingAction: true; shellBackdrop: chromeBackdrop
-                        enabled: window.hasMessage; onClicked: details.open()
-                        onVisibleChanged: {
-                            if (!visible) {
-                                details.close()
-                                if (activeFocus) moreButton.forceActiveFocus()
-                            }
-                        }
-                    }
-                    MailAction {
-                        id: moreButton
-                        Layout.rightMargin: 8
-                        objectName: "moreButton"
-                        visible: readerHeader.messageActions && !readerHeader.searching
-                        iconOnly: true; iconName: "more"; accessibleText: qsTr("More message actions")
-                        floatingAction: true; shellBackdrop: chromeBackdrop
-                        enabled: window.hasMessage; onClicked: moreMenu.openAtAnchor()
-                        onVisibleChanged: { if (!visible) { moreMenu.close(); details.close() } }
-                    }
                     MailAction {
                         objectName: "searchToggleButton"
-                        visible: !window.draftsVisible
-                        iconOnly: true; iconName: "search"
-                        accessibleText: toolbarSearch.active ? qsTr("Close search") : qsTr("Search cached mail")
+                        Layout.rightMargin: 8
+                        visible: !readerHeader.wideSearch && !readerHeader.searchOpen && !window.draftsVisible
+                        stacked: true
+                        stackedText: qsTr("搜索")
+                        iconName: "search"
+                        accessibleText: qsTr("Search cached mail")
                         floatingAction: true; shellBackdrop: chromeBackdrop
-                        focusPolicy: Qt.TabFocus
-                        onClicked: toolbarSearch.active ? readerHeader.closeSearch() : readerHeader.openSearch()
+                        onClicked: { readerHeader.searchOpen = true; searchField.focus = true }
                     }
-                }
+                                    }
                 Timer {
                     id: searchFocus
                     interval: AppTheme.reduceMotion ? 0 : AppTheme.motionFast + 50
@@ -438,28 +458,26 @@ ApplicationWindow {
                 x: window.sidebarVisible ? 0 : 14
                 width: window.sidebarVisible ? sidebarPlane.width : sidebarToggleButton.width
                 height: parent.height
-                MailAction {
+                                    Text {
+                        objectName: "windowTitle"
+                        text: qsTr("邮件")
+                        visible: window.sidebarVisible
+                        color: window.ink
+                        font.pixelSize: 28
+                        font.weight: Font.Bold
+                        font.letterSpacing: -0.4
+                        anchors.left: parent.left
+                        anchors.leftMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+MailAction {
+
                     id: sidebarToggleButton
                     objectName: "sidebarToggleButton"
                     anchors.right: parent.right
                     anchors.rightMargin: window.sidebarVisible ? 12 : 0
                     y: windowChrome.controlsCenterY - height / 2
-                    iconOnly: true
-                    // Same glyph geometry as Weather/Calendar's KosSidebarGlyph.
-                    contentItem: Item {
-                        Rectangle {
-                            objectName: "sidebarGlyphFrame"
-                            anchors.centerIn: parent
-                            width: 16; height: 13; radius: 3.5
-                            color: "transparent"
-                            border.width: 1.25; border.color: sidebarToggleButton.iconColor
-                            Rectangle {
-                                objectName: "sidebarGlyphPane"
-                                x: 3.5; y: 2.5; width: 2.5; height: 8; radius: 1.25
-                                color: sidebarToggleButton.iconColor
-                            }
-                        }
-                    }
+                    stacked: true; stackedText: qsTr("侧栏"); iconName: "panelLeft"
                     accessibleText: window.sidebarVisible ? qsTr("Hide sidebar") : qsTr("Show sidebar")
                     floatingAction: true; shellBackdrop: chromeBackdrop
                     liquidIntensity: "strong"
@@ -510,13 +528,15 @@ ApplicationWindow {
                 z: 1
                 ColumnLayout {
                     objectName: "mailboxNavigation"
-                    anchors.fill: parent; anchors.margins: 14
+                    anchors.fill: parent
+                    anchors.leftMargin: 14; anchors.rightMargin: 14
+                    anchors.bottomMargin: 14; anchors.topMargin: 4
                     spacing: 0
                     Text {
                         objectName: "mailboxGroupTitle"
                         text: qsTr("MAILBOXES"); color: window.muted
                         font.pixelSize: 11; font.weight: Font.DemiBold
-                        topPadding: 12; bottomPadding: 4
+                        topPadding: 0; bottomPadding: 6
                     }
                     Repeater {
                         objectName: "mailboxFolders"
@@ -736,7 +756,7 @@ ApplicationWindow {
                                             anchors.fill: parent; anchors.margins: 10
                                             VectorIcon { name: "album"; size: 18; color: window.muted }
                                             Text { text: attachmentRow.modelData.name; color: window.ink; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                                            MailAction { iconOnly: true; iconName: "download"; accessibleText: qsTr("Save attachment"); onClicked: { saveAttachmentDialog.attachmentIndex = attachmentRow.index; saveAttachmentDialog.open() } }
+                                            MailAction { stacked: true; stackedText: qsTr("保存"); iconName: "download"; accessibleText: qsTr("Save attachment"); onClicked: { saveAttachmentDialog.attachmentIndex = attachmentRow.index; saveAttachmentDialog.open() } }
                                         }
                                     }
                                 }
@@ -831,7 +851,7 @@ ApplicationWindow {
         id: listOptions
         objectName: "listOptionsPopover"
         sourceItem: chromePlanes
-        anchorItem: listOptionsButton
+        anchorItem: messageOptionsGroup
         preferredSide: "bottom"
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
         onOpened: unreadFilterCheck.forceActiveFocus()
@@ -891,17 +911,32 @@ ApplicationWindow {
         id: moreMenu
         objectName: "moreMessageMenu"
         sourceItem: chromePlanes
-        anchorItem: moreButton
+        anchorItem: messageOptionsGroup
         LiquidPopoverItem { text: qsTr("Reply"); iconName: "undo"; enabled: !mail.sending; onTriggered: window.compose("reply") }
         LiquidPopoverItem { objectName: "moreReplyAll"; text: qsTr("Reply to all"); iconName: "arrows"; enabled: window.hasMessage && !mail.sending; onTriggered: window.compose("replyAll") }
         LiquidPopoverItem { text: qsTr("Forward"); iconName: "forward"; enabled: !mail.sending; onTriggered: window.compose("forward") }
         LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: details.open() }
+        LiquidPopoverItem {
+            text: qsTr("删除"); iconName: "trash"
+            enabled: window.hasMessage && window.width < 1100
+            onTriggered: mail.deleteMessage(window.selectedIndex())
+        }
+        LiquidPopoverItem {
+            text: qsTr("归档"); iconName: "archive"
+            enabled: window.hasMessage && window.width < 1100
+            onTriggered: mail.archiveMessage(window.selectedIndex())
+        }
+        LiquidPopoverItem {
+            text: window.message.flagged ? qsTr("取消旗标") : qsTr("标为旗标"); iconName: "flag"
+            enabled: window.hasMessage && window.width < 1100
+            onTriggered: mail.toggleFlagged(window.selectedIndex())
+        }
     }
     LiquidContentPopover {
         id: details
         objectName: "messageDetailsPopover"
         sourceItem: chromePlanes
-        anchorItem: detailsButton.visible ? detailsButton : moreButton
+        anchorItem: messageOptionsGroup
         preferredSide: "bottom"
         width: Math.min(360, window.width - 16)
         implicitHeight: Math.min(360, detailsColumn.implicitHeight + topPadding + bottomPadding)
@@ -919,7 +954,7 @@ ApplicationWindow {
                 RowLayout {
                     Layout.fillWidth: true
                     Text { text: qsTr("Message details"); color: window.ink; font.pixelSize: 15; font.weight: Font.DemiBold; Layout.fillWidth: true }
-                    MailAction { iconOnly: true; iconName: "close"; accessibleText: qsTr("Close message details"); onClicked: details.close() }
+                    MailAction { stacked: true; stackedText: qsTr("关闭"); iconName: "close"; accessibleText: qsTr("Close message details"); onClicked: details.close() }
                 }
                 Repeater {
                     model: [ {title: qsTr("From"), value: window.value(window.message, "senderAddress")},

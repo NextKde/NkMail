@@ -63,6 +63,8 @@ int main(int argc, char **argv) {
     nkmail::MailController mail(demo, root);
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("reviewAppearance"), demo ? parser.value("appearance") : QStringLiteral("system"));
+    engine.rootContext()->setContextProperty(QStringLiteral("forceGlassPreview"),
+        qEnvironmentVariableIsSet("NKMAIL_FORCE_GLASS"));
     // Window preferences follow the mailbox data directory. Demo uses its private
     // temporary directory; screenshot reviews never read or write preferences.
     const bool persistWindow = !parser.isSet("screenshot");
