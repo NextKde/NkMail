@@ -10,6 +10,8 @@ Item {
     objectName: "windowChrome"
     height: MailStyle.shellHeaderHeight
     readonly property real controlsReservedWidth: controls.width + 29
+    readonly property real controlsCenterY: controls.y + controls.height / 2
+    readonly property real controlsLeft: controls.x
 
     MouseArea {
         id: moveArea
