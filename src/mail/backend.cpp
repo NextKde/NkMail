@@ -70,6 +70,18 @@ unsigned long identity(const QString &s)
         throw BackendError("Invalid message identity.");
     return static_cast<unsigned long>(n);
 }
+std::list<std::string> flagList(const QStringList &flags)
+{
+    static const QRegularExpression atom(QStringLiteral("^[A-Za-z0-9._\\\\-]+$"));
+    if (flags.isEmpty() || flags.size() > 16) throw BackendError("Invalid message flags.");
+    std::list<std::string> wire;
+    for (const auto &flag : flags) {
+        if (flag.isEmpty() || flag.size() > 64 || !atom.match(flag).hasMatch())
+            throw BackendError("Invalid message flags.");
+        wire.push_back(utf8(flag));
+    }
+    return wire;
+}
 mailio::dialog_ssl::ssl_options_t tlsOptions(const Account &a)
 {
     return {boost::asio::ssl::context::tls_client, boost::asio::ssl::verify_peer, utf8(a.caFile)};
@@ -416,5 +428,54 @@ SendResult MailioBackend::send(const Account &a, const Draft &d)
             ? SendResult{SendResult::Unknown, QStringLiteral("Submission outcome is unknown. Check Sent mail before retrying manually.")}
             : SendResult{SendResult::Rejected, QStringLiteral("Message was not submitted. Check account, connection and trusted TLS certificate.")};
     }
+}
+void MailioBackend::storeFlags(const Account &a, const QString &folder, const QString &validity,
+                               const QString &uid, const QStringList &flags, bool add)
+{
+    try {
+        accountValid(a, false); folderValid(folder);
+        const auto expected = identity(validity), id = identity(uid);
+        const auto wire = flagList(flags);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), false);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        imap.store_flags(id, wire, add, true);
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to update message flags. Check account, connection and trusted TLS certificate."); }
+}
+void MailioBackend::copyTo(const Account &a, const QString &folder, const QString &validity,
+                           const QString &uid, const QString &destination)
+{
+    try {
+        accountValid(a, false); folderValid(folder); folderValid(destination);
+        const auto expected = identity(validity), id = identity(uid);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), false);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        imap.copy(id, utf8(destination), true);
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to copy message. Check account, connection and trusted TLS certificate."); }
+}
+void MailioBackend::expunge(const Account &a, const QString &folder, const QString &validity,
+                            const QString &uid, bool *usedFullExpunge)
+{
+    if (usedFullExpunge) *usedFullExpunge = false;
+    try {
+        accountValid(a, false); folderValid(folder);
+        const auto expected = identity(validity);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), false);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        if (!uid.isEmpty()) {
+            const auto id = identity(uid);
+            if (imap.capabilities().count("UIDPLUS")) {
+                imap.expunge(id, true);
+                return;
+            }
+            if (usedFullExpunge) *usedFullExpunge = true;
+        }
+        imap.expunge();
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to expunge deleted messages. Check account, connection and trusted TLS certificate."); }
 }
 } // namespace nkmail

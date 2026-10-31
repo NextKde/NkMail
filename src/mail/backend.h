@@ -21,6 +21,15 @@ public:
     static Content content(const Account &account, const QString &folder,
                            const QString &uidValidity, const QString &uid);
     static SendResult send(const Account &account, const Draft &draft);
+    static void storeFlags(const Account &account, const QString &folder,
+                           const QString &uidValidity, const QString &uid,
+                           const QStringList &flags, bool add);
+    static void copyTo(const Account &account, const QString &folder,
+                       const QString &uidValidity, const QString &uid,
+                       const QString &destination);
+    static void expunge(const Account &account, const QString &folder,
+                        const QString &uidValidity, const QString &uid = {},
+                        bool *usedFullExpunge = nullptr);
 };
 
 } // namespace nkmail
