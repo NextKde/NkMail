@@ -39,6 +39,11 @@ This file is a recoverable work ledger, not a native Codex Goal. Work requires a
 - No server Sent APPEND; no remote flags/move/delete/OAuth/IDLE/multiaccount.
 - Folder statistics currently use sequential STATUS; network deadlines are per-I/O, not whole-operation limits. MIME tree bounds are checked after mailio parsing, not a complete upstream parser audit.
 
+## Required UI integration gate · 2026-10-31
+
+- Implementing a read-only release/dependency guard with an explicit tag/SHA lock, offline negative tests, and hosted clean Release build/CTest. Main protection and PR/CI acceptance are not yet verified; do not treat policy documentation as proof that remote protection is active.
+- Existing `v0.1.0-rc.1` remains unchanged; this task does not modify or publish upstream components. The guard complements fixed versions and cannot infer untested changes in another developer workspace.
+
 ## UI dependency release pin · 2026-10-31
 
 - Replaced the default sibling workspace with a canonical Git submodule at `third_party/nextkdeAppDemo`, fixed to source prerelease [`v0.1.0-rc.1`](https://github.com/NextKde/nextkdeAppDemo/releases/tag/v0.1.0-rc.1), commit `dd0d5f3e7a7eab75c7bd465f29709d5f86e8091d`. The annotated tag and GitHub prerelease are published; this is not a stable/binary SDK release.
