@@ -12,6 +12,44 @@ NkMail has five distinct local suites. Enable them with `-DNKMAIL_BUILD_TESTS=ON
 
 A controller mock or linked boundary replacement is not protocol acceptance. Conversely a passing protocol fixture does not prove that QML/controller workflows use it correctly; this is why the suites are separate.
 
+## UI release gate
+
+Run `python3 -m unittest discover -s tests/dependency -v` for offline guard regressions,
+then `python3 scripts/check_ui_dependency.py` for the read-only live upstream check.
+The lock at `third_party/kos-ui.lock.json`, staged gitlink and clean submodule HEAD
+must match. Stage intentional dependency metadata updates first. The canonical
+upstream must have a published, non-draft Release whose tag resolves to exactly that
+commit; a local tag, moving branch, draft or unpushed commit is insufficient. Source
+prereleases are currently accepted. API/TLS/rate-limit failures block verification;
+resolve them and retry, do not bypass the guard.
+
+Guard tests create temporary Git fixtures under `tmp/`, mock network responses, and
+cover uninitialized submodules, dirty tracked/staged/untracked files, wrong URL or
+tracking branch, lock/gitlink/HEAD mismatches, unpublished releases, annotated and
+lightweight tags, tag mismatches and API failures. They are separate from the existing
+five CTest suites, not additional evidence of mail/provider or GPU compatibility.
+
+The hosted `release-gate` job runs on all PRs to main and pushes to main, without path
+filters. It uses an ephemeral Arch container on Ubuntu, a SHA-pinned checkout Action,
+read-only token, no repository secrets and no build cache. It verifies the release,
+then configures a new Release build with tests enabled, checks that the cached UI
+source is the pinned submodule, requires all five named suites and runs CTest.
+The container installs current Qt (at least 6.8), CMake (at least 3.30) and OpenSSL
+(at least 3.4, required by the existing expired-certificate fixture). Package versions
+are printed. Arch packages roll forward: a clean build is not a fully locked OS or a
+minimum-Qt-version matrix. Keyring packages satisfy QtKeychain installation dependencies;
+tests do not start a Secret Service or use real credentials. UI runs offscreen/software,
+not a GPU or standalone Demo acceptance check.
+
+Main requires a PR and the successful Actions `release-gate` check with an up-to-date
+base, including administrators. Approval count is zero to support a single maintainer;
+review threads must be resolved, force pushes/deletion are disallowed. New component
+usage still needs loading/behavior coverage: CI cannot inspect another workspace or
+infer an intended but untested visual change. Published UI tags must not be moved;
+the guard detects when a tag no longer matches the locked SHA but does not configure
+upstream tag protection. Administrators can change branch policy, so this is an
+accident-prevention gate rather than protection against malicious maintainers.
+
 ## Screenshots
 
 ```sh

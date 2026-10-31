@@ -67,6 +67,54 @@ commit the gitlink and version-record updates. Do not use `git submodule update 
 follow `main` or automatically select the newest release. Published tags are immutable;
 other applications upgrade on their own schedule.
 
+### Required UI release gate
+
+Before opening an integration PR, stage the intended gitlink and lock-file updates,
+then run:
+
+```sh
+python3 -m unittest discover -s tests/dependency -v
+python3 scripts/check_ui_dependency.py
+```
+
+`third_party/kos-ui.lock.json` records the chosen tag and full SHA. The guard compares
+it with the staged gitlink and clean submodule HEAD, requires the canonical URL and
+no tracking branch, and checks the upstream published GitHub Release and actual tag
+commit (including annotated tags). Prereleases are allowed; missing releases, dirty
+submodules, mismatched commits and API/network errors fail the check. The script is
+read-only and never submits or publishes shared changes for you.
+
+For a new shared component, the order is: develop/test upstream → commit and push it
+upstream → publish its source release → check out that release in NkMail's submodule
+→ update/stage the gitlink, lock and source notices → run the guard → open a PR.
+Running `git add` in NkMail does **not** commit files inside its submodule. For example,
+after upstream publishes `v0.1.0-rc.2` (do not run before it exists):
+
+```sh
+git -C third_party/nextkdeAppDemo fetch origin tag v0.1.0-rc.2
+git -C third_party/nextkdeAppDemo checkout --detach v0.1.0-rc.2
+git -C third_party/nextkdeAppDemo rev-parse HEAD
+# Put that tag and full SHA in third_party/kos-ui.lock.json; update README/NOTICE.
+git add third_party/nextkdeAppDemo third_party/kos-ui.lock.json README.md NOTICE.md
+python3 scripts/check_ui_dependency.py
+```
+
+The checker deliberately accepts a staged dependency upgrade before the parent commit,
+so you can fix a missing release before opening the PR. It does not need a locally
+installed Git hook, and does not silently repair the dependency.
+
+Every PR to `main` runs the `release-gate` GitHub Actions job: guard regressions,
+release verification, a fresh default-source Release build and all five CTest suites.
+The main-branch policy requires a PR and that check against the latest base, including
+for administrators, with no force-push/deletion. No second-person approval is required
+for this single-maintainer workflow. Repository administrators can still change the
+protection settings; this prevents accidental omissions, not malicious policy edits.
+
+CI cannot inspect another local UI workspace. New/dynamically loaded UI must have a
+loading/behavior test; otherwise passing tests cannot prove an intended visual change
+was included. An explicit local source override is never the release-gate build.
+See [testing and guard boundaries](docs/TESTING.md#ui-release-gate).
+
 ## Preview and data
 
 Use `./build/nkmail --data-dir /a/private/directory` for a separate persistent mailbox. Preview mode always uses a fresh temporary directory, never existing credentials, and never the network.

@@ -1,0 +1,102 @@
+name: Release gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release-gate:
+    name: release-gate
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 30
+    env:
+      LANG: C.UTF-8
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - name: Install dependencies and print versions
+        run: |
+          pacman -Syu --noconfirm --needed base-devel git ca-certificates cmake ninja boost openssl python qt6-base qt6-declarative qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring fontconfig noto-fonts
+          pacman -Q base-devel git ca-certificates cmake ninja boost openssl python qt6-base qt6-declarative qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring fontconfig noto-fonts
+
+      - name: Check out source and pinned submodules
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare Git trust and headless runtime
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/third_party/nextkdeAppDemo"
+          runtime_dir=$(mktemp -d "$RUNNER_TEMP/nkmail-runtime.XXXXXX")
+          chmod 0700 "$runtime_dir"
+          printf 'XDG_RUNTIME_DIR=%s\n' "$runtime_dir" >> "$GITHUB_ENV"
+
+      - name: Test dependency guard
+        run: python -m unittest discover -s tests/dependency -v
+
+      - name: Verify published UI dependency
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_ui_dependency.py
+
+      - name: Configure clean Release build and verify cache
+        run: |
+          test ! -e build/ci-release
+          test -z "${NKMAIL_UI_SOURCE_DIR:-}"
+          cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DNKMAIL_BUILD_TESTS=ON
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          cache = {}
+          for line in Path("build/ci-release/CMakeCache.txt").read_text().splitlines():
+              if line and not line.startswith(("#", "//")) and "=" in line:
+                  key, value = line.split("=", 1)
+                  cache[key] = value
+
+          expected_ui = (Path(os.environ["GITHUB_WORKSPACE"]) / "third_party/nextkdeAppDemo").resolve(strict=True)
+          actual_ui = Path(cache["NKMAIL_UI_SOURCE_DIR:PATH"]).resolve(strict=True)
+          if actual_ui != expected_ui:
+              raise SystemExit(f"Unexpected UI source: {actual_ui}; expected {expected_ui}")
+          for key, expected in {"CMAKE_BUILD_TYPE:STRING": "Release", "NKMAIL_BUILD_TESTS:BOOL": "ON"}.items():
+              if cache.get(key) != expected:
+                  raise SystemExit(f"Unexpected {key}: {cache.get(key)!r}; expected {expected!r}")
+          print(f"Verified Release tests enabled with canonical UI source: {actual_ui}")
+          PY
+
+      - name: Build Release
+        run: cmake --build build/ci-release --parallel 2
+
+      - name: Verify required tests are registered
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+
+          listing = json.loads(subprocess.check_output(
+              ["ctest", "--test-dir", "build/ci-release", "--show-only=json-v1"], text=True
+          ))
+          required = {"nkmail_cli", "nkmail_ui", "nkmail_core", "nkmail_controller", "loopback-protocol"}
+          registered = {test["name"] for test in listing["tests"]}
+          missing = required - registered
+          if missing:
+              raise SystemExit(f"Missing required tests: {', '.join(sorted(missing))}")
+          print(f"Verified required tests: {', '.join(sorted(required))}")
+          PY
+
+      - name: Run Release tests
+        run: ctest --test-dir build/ci-release --output-on-failure --no-tests=error --timeout 120

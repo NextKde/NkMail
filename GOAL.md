@@ -39,6 +39,13 @@ This file is a recoverable work ledger, not a native Codex Goal. Work requires a
 - No server Sent APPEND; no remote flags/move/delete/OAuth/IDLE/multiaccount.
 - Folder statistics currently use sequential STATUS; network deadlines are per-I/O, not whole-operation limits. MIME tree bounds are checked after mailio parsing, not a complete upstream parser audit.
 
+## Required UI integration gate · 2026-10-31
+
+- Added a read-only release/dependency guard with an explicit tag/SHA lock and 28 offline negative/positive regression tests (all passed locally), including hidden assume-unchanged/skip-worktree index flags. Live verification of the existing canonical prerelease passed.
+- [PR #1](https://github.com/NextKde/NkMail/pull/1) bootstraps the hosted gate. [Initial hosted run](https://github.com/NextKde/NkMail/actions/runs/41173564341) passed the first 26 guard tests, live release check, fresh default-source Release build and **5/5 CTest suites in 28.36 seconds**, using Qt 6.12.0 / OpenSSL 3.6.5. The updated 28-test run is in progress; PR has not yet merged.
+- GitHub main protection was enabled and read back: PR required, zero outside approvals, enforce_admins=true, strict required `release-gate` from GitHub Actions app 15368, conversation resolution required, force-push/deletion forbidden. The first protected merge and main push run remain to be verified.
+- Existing `v0.1.0-rc.1` remains unchanged; this task does not modify or publish upstream components. The guard complements fixed versions and cannot infer untested changes in another developer workspace.
+
 ## UI dependency release pin · 2026-10-31
 
 - Replaced the default sibling workspace with a canonical Git submodule at `third_party/nextkdeAppDemo`, fixed to source prerelease [`v0.1.0-rc.1`](https://github.com/NextKde/nextkdeAppDemo/releases/tag/v0.1.0-rc.1), commit `dd0d5f3e7a7eab75c7bd465f29709d5f86e8091d`. The annotated tag and GitHub prerelease are published; this is not a stable/binary SDK release.
