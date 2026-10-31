@@ -87,7 +87,21 @@ read-only and never submits or publishes shared changes for you.
 For a new shared component, the order is: develop/test upstream → commit and push it
 upstream → publish its source release → check out that release in NkMail's submodule
 → update/stage the gitlink, lock and source notices → run the guard → open a PR.
-Running `git add` in NkMail does **not** commit files inside its submodule.
+Running `git add` in NkMail does **not** commit files inside its submodule. For example,
+after upstream publishes `v0.1.0-rc.2` (do not run before it exists):
+
+```sh
+git -C third_party/nextkdeAppDemo fetch origin tag v0.1.0-rc.2
+git -C third_party/nextkdeAppDemo checkout --detach v0.1.0-rc.2
+git -C third_party/nextkdeAppDemo rev-parse HEAD
+# Put that tag and full SHA in third_party/kos-ui.lock.json; update README/NOTICE.
+git add third_party/nextkdeAppDemo third_party/kos-ui.lock.json README.md NOTICE.md
+python3 scripts/check_ui_dependency.py
+```
+
+The checker deliberately accepts a staged dependency upgrade before the parent commit,
+so you can fix a missing release before opening the PR. It does not need a locally
+installed Git hook, and does not silently repair the dependency.
 
 Every PR to `main` runs the `release-gate` GitHub Actions job: guard regressions,
 release verification, a fresh default-source Release build and all five CTest suites.
