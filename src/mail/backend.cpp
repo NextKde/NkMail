@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <functional>
 #include <limits>
+#include <set>
 
 namespace nkmail {
 namespace {
@@ -125,6 +126,12 @@ Summary summary(const Message &m, const QString &folder, const QString &validity
     }
     s.recipients = addressList(m.recipients());
     s.subject = unicode(m.subject_raw());
+    s.messageId = unicode(m.message_id());
+    QStringList inReplyTo, references;
+    for (const auto &id : m.in_reply_to()) inReplyTo << unicode(id);
+    for (const auto &id : m.references()) references << unicode(id);
+    s.inReplyTo = inReplyTo.join(QStringLiteral(" "));
+    s.references = references.join(QStringLiteral(" "));
     if (!m.date_time().is_not_a_date_time())
         s.date = unicode(boost::posix_time::to_iso_extended_string(m.date_time().utc_time())) + u'Z';
     s.unread = true;
@@ -375,6 +382,45 @@ Page MailioBackend::page(const Account &a, const QString &folder, int offset, in
         return p;
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError("Unable to read message headers. Check account, connection and trusted TLS certificate."); }
+}
+QList<QVariantMap> MailioBackend::search(const Account &a, const QString &folder, const QString &validity,
+                                        const QString &query, int limit)
+{
+    try {
+        accountValid(a, false); folderValid(folder);
+        if (query.isEmpty() || query.size() > 4096) throw BackendError("Invalid search query.");
+        if (limit < 1 || limit > 200) throw BackendError("Invalid search bounds.");
+        const auto expected = identity(validity);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), true);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        // A condition list is AND-combined and there is no OR combinator, so
+        // search each field separately and union the UIDs.
+        std::set<unsigned long> uidSet;
+        int failures = 0;
+        for (const auto key : {Imap::search_condition_t::SUBJECT,
+                               Imap::search_condition_t::BODY,
+                               Imap::search_condition_t::FROM}) {
+            try {
+                std::list<unsigned long> hits;
+                imap.search({Imap::search_condition_t(key, utf8(query))}, hits, true);
+                uidSet.insert(hits.begin(), hits.end());
+            } catch (...) { ++failures; }
+        }
+        if (failures == 3) throw BackendError("Unable to search messages on the mail server.");
+        std::list<unsigned long> uids(uidSet.begin(), uidSet.end());
+        // UIDs ascend with arrival order, so walk backwards for the newest hits.
+        QList<QVariantMap> result;
+        int count = 0;
+        imap.literal_limit(256 * 1024);
+        for (auto it = uids.rbegin(); it != uids.rend() && count < limit; ++it, ++count) {
+            const auto messages = imap.fetch({{*it, *it}}, options(true), mailio::codec::line_len_policy_t::NONE);
+            const auto found = messages.find(*it);
+            if (found != messages.end()) result << summaryMap(summary(found->second, folder, validity, *it));
+        }
+        return result;
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to search messages. Check account, connection and trusted TLS certificate."); }
 }
 Content MailioBackend::content(const Account &a, const QString &folder, const QString &validity, const QString &uid)
 {
