@@ -32,6 +32,9 @@ Summary summaryFromMap(const QVariantMap &m)
     s.subject = m.value("subject").toString();
     s.date = m.value("date").toString();
     s.preview = m.value("preview").toString();
+    s.messageId = m.value("messageId").toString();
+    s.inReplyTo = m.value("inReplyTo").toString();
+    s.references = m.value("references").toString();
     s.unread = m.value("unread").toBool();
     s.flagged = m.value("flagged").toBool();
     s.hasAttachments = m.value("hasAttachments").toBool();
