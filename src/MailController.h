@@ -27,6 +27,7 @@ class MailController : public QObject {
     Q_PROPERTY(bool demo READ demo CONSTANT)
     Q_PROPERTY(bool hasMore READ hasMore NOTIFY statusChanged)
     Q_PROPERTY(QString search READ search WRITE setSearch NOTIFY searchChanged)
+    Q_PROPERTY(bool unreadOnly READ unreadOnly WRITE setUnreadOnly NOTIFY unreadOnlyChanged)
 public:
     explicit MailController(bool demo, const QString &dataRoot, QObject *parent = nullptr);
     ~MailController() override;
@@ -46,6 +47,8 @@ public:
     bool hasMore() const { return m_hasMore; }
     QString search() const { return m_search; }
     void setSearch(const QString &query);
+    bool unreadOnly() const { return m_unreadOnly; }
+    void setUnreadOnly(bool unreadOnly);
     Q_INVOKABLE void configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void selectFolder(const QString &folder);
@@ -68,6 +71,7 @@ signals:
     void folderChanged();
     void statusChanged();
     void searchChanged();
+    void unreadOnlyChanged();
     void draftAccepted(const QString &id);
 private:
     void initialize();
@@ -79,7 +83,8 @@ private:
     QString credentialKey() const;
     void run(std::function<void()> task);
     bool m_demo = false, m_busy = false, m_sending = false, m_restorePending = false, m_hasMore = false;
-    bool m_cachedOnly = true; // Until a successful header fetch, paging stays local.
+    bool m_cachedOnly = true; // Query offsets stay local until a successful unfiltered header fetch.
+    bool m_unreadOnly = false;
     QString m_root, m_folder = QStringLiteral("INBOX"), m_status, m_error, m_search, m_selectedUid;
     int m_offset = 0;
     quint64 m_generation = 0, m_selectionGeneration = 0;

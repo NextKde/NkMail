@@ -55,6 +55,8 @@ private slots:
     void authoritativeDraftSendStates();
     void uidValidityIsolation();
     void paginationAndSearch();
+    void unreadPaginationAndSearch();
+    void unreadUidValidityIsolation();
     void migrations();
     void futureSchemaRejected();
     void independentConnectionsAndErrors();
@@ -374,6 +376,92 @@ void CoreTests::paginationAndSearch()
     QCOMPARE(db.cachedPage("INBOX", 0, 20, "updated").messages.size(), 1);
     QVERIFY(db.cachedPage("INBOX", -1, 20).messages.isEmpty());
     QVERIFY(!db.error().isEmpty());
+}
+void CoreTests::unreadPaginationAndSearch()
+{
+    QTemporaryDir dir(temporaryTemplate());
+    MailDatabase db;
+    QVERIFY(db.open(dir.path()));
+    QList<Summary> summaries;
+    for (int uid = 1; uid <= 200; ++uid) {
+        auto s = message(QString::number(uid));
+        // Seventy newest messages are read: filtering only a raw first page
+        // would incorrectly report an empty mailbox, not 130 unread messages.
+        s.unread = uid <= 130;
+        s.subject = uid % 2 ? QStringLiteral("Odd 合成") : QStringLiteral("Even 100%_literal");
+        if (!s.unread) s.subject += QStringLiteral(" read-only-token");
+        summaries.append(s);
+    }
+    QVERIFY(db.savePage(page(summaries)));
+    QList<Summary> unread;
+    int offset = 0;
+    for (int batch = 0; batch < 3; ++batch) {
+        const auto p = db.cachedPage("INBOX", offset, 50, {}, true);
+        QCOMPARE(p.uidValidity, QStringLiteral("100"));
+        QCOMPARE(p.messages.size(), batch == 2 ? 30 : 50);
+        QCOMPARE(p.messages.first().uid, QString::number(130 - offset));
+        QCOMPARE(p.hasMore, batch < 2);
+        QCOMPARE(p.nextOffset, offset + p.messages.size());
+        unread.append(p.messages);
+        offset = p.nextOffset;
+    }
+    QCOMPARE(offset, 130);
+    for (int row = 0; row < unread.size(); ++row) {
+        QVERIFY(unread[row].unread);
+        QCOMPARE(unread[row].uid, QString::number(130 - row));
+    }
+    const auto combined = db.cachedPage("INBOX", 0, 50, "EVEN", true);
+    QCOMPARE(combined.messages.size(), 50);
+    QCOMPARE(combined.messages.first().uid, QStringLiteral("130"));
+    QCOMPARE(combined.messages.last().uid, QStringLiteral("32"));
+    QVERIFY(combined.hasMore);
+    QCOMPARE(combined.nextOffset, 50);
+    const auto combinedTail = db.cachedPage("INBOX", combined.nextOffset, 50, "EVEN", true);
+    QCOMPARE(combinedTail.messages.size(), 15);
+    QCOMPARE(combinedTail.messages.first().uid, QStringLiteral("30"));
+    QCOMPARE(combinedTail.messages.last().uid, QStringLiteral("2"));
+    QCOMPARE(combinedTail.nextOffset, 65);
+    QVERIFY(!combinedTail.hasMore);
+    QCOMPARE(db.cachedPage("INBOX", 0, 200, "%_", true).messages.size(), 65);
+    QCOMPARE(db.cachedPage("INBOX", 0, 200, "合成", true).messages.size(), 65);
+    QCOMPARE(db.cachedPage("INBOX", 0, 200, "read-only-token").messages.size(), 70);
+    for (const auto &query : {QStringLiteral("missing"), QStringLiteral("read-only-token"), QStringLiteral("' OR 1=1 --")}) {
+        const auto empty = db.cachedPage("INBOX", 0, 50, query, true);
+        QVERIFY(empty.messages.isEmpty());
+        QVERIFY(!empty.hasMore);
+        QCOMPARE(empty.nextOffset, 0);
+        QCOMPARE(empty.uidValidity, QStringLiteral("100"));
+    }
+    const auto exhausted = db.cachedPage("INBOX", 150, 50, {}, true);
+    QVERIFY(exhausted.messages.isEmpty());
+    QVERIFY(!exhausted.hasMore);
+    QCOMPARE(exhausted.nextOffset, 150);
+    const auto raw = db.cachedPage("INBOX", 0, 200);
+    QCOMPARE(raw.messages.size(), 200);
+    QVERIFY(!raw.messages.first().unread); // Reads did not mutate cached flags.
+    QCOMPARE(raw.messages.first().uid, QStringLiteral("200"));
+    QVERIFY(db.cachedPage("INBOX", -1, 50, {}, true).messages.isEmpty());
+    QVERIFY(!db.error().isEmpty());
+}
+void CoreTests::unreadUidValidityIsolation()
+{
+    QTemporaryDir dir(temporaryTemplate());
+    MailDatabase db;
+    QVERIFY(db.open(dir.path()));
+    auto oldRead = message("1");
+    oldRead.unread = false;
+    auto oldUnread = message("2");
+    oldUnread.unread = true;
+    QVERIFY(db.savePage(page({oldRead, oldUnread}, "100")));
+    QCOMPARE(db.cachedPage("INBOX", 0, 20, {}, true).messages.size(), 1);
+    QVERIFY(db.invalidateUidValidity("INBOX", "101"));
+    QVERIFY(db.cachedPage("INBOX", 0, 20, {}, true).messages.isEmpty());
+    auto current = message("3", "101");
+    current.unread = true;
+    QVERIFY(db.savePage(page({current}, "101")));
+    QCOMPARE(db.cachedPage("INBOX", 0, 20, {}, true).messages.first().uid, QStringLiteral("3"));
+    QVERIFY(!db.savePage(page({oldUnread}, "100")));
+    QCOMPARE(db.cachedPage("INBOX", 0, 20, {}, true).messages.first().uid, QStringLiteral("3"));
 }
 void CoreTests::migrations()
 {

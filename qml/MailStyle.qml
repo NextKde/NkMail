@@ -6,11 +6,10 @@ import Kos.Ui
 // NkMail layout tokens. Semantic colours remain owned by AppTheme.
 QtObject {
     readonly property int chromeHeight: 30
-    readonly property int shellHeaderHeight: 68
+    readonly property int shellHeaderHeight: 35
     readonly property int toolbarHeight: 44
     readonly property int toolbarButtonHeight: 26
     readonly property int fieldHeight: 28
-    readonly property int sidebarRowHeight: 32
     readonly property int messageRowHeight: 84
     readonly property int draftRowHeight: 72
     readonly property int contentInset: 18

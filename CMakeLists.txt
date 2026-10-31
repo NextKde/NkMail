@@ -3,7 +3,7 @@ project(NkMail VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 QuickDialogs2 Sql Concurrent Network)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 QuickDialogs2 Sql Concurrent Network LinguistTools)
 find_package(Qt6Keychain REQUIRED)
 qt_standard_project_setup(REQUIRES 6.8)
 set(NKMAIL_UI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nextkdeAppDemo" CACHE PATH "Pinned nextkdeAppDemo source directory (override for local development)")
@@ -36,6 +36,22 @@ qt_add_qml_module(nkmail
 target_link_libraries(nkmail PRIVATE nkmail_core Kos::Ui Kos::UiPlugin
     Qt6::Quick Qt6::QuickControls2 Qt6::QuickDialogs2 Qt6::Concurrent Qt6::Network)
 target_compile_definitions(nkmail PRIVATE NKMAIL_VERSION="${PROJECT_VERSION}")
+qt_add_lrelease(
+    TS_FILES translations/nkmail_zh_CN.ts
+    QM_FILES_OUTPUT_VARIABLE NKMAIL_QM_FILES)
+set(NKMAIL_QT_CATALOGS)
+foreach(catalog qtbase qtdeclarative)
+    find_file(NKMAIL_${catalog}_ZH "${catalog}_zh_CN.qm"
+        PATHS "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}" NO_DEFAULT_PATH REQUIRED)
+    list(APPEND NKMAIL_QT_CATALOGS "${NKMAIL_${catalog}_ZH}")
+endforeach()
+function(nkmail_add_translations target)
+    qt_add_resources(${target} nkmail_language
+        PREFIX /i18n BASE "${CMAKE_CURRENT_BINARY_DIR}" FILES ${NKMAIL_QM_FILES})
+    qt_add_resources(${target} qt_language
+        PREFIX /i18n BASE "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}" FILES ${NKMAIL_QT_CATALOGS})
+endfunction()
+nkmail_add_translations(nkmail)
 install(TARGETS nkmail RUNTIME DESTINATION bin)
 install(FILES data/nkmail.desktop DESTINATION share/applications)
 install(FILES data/nkmail.svg DESTINATION share/icons/hicolor/scalable/apps)
@@ -46,6 +62,9 @@ if(NKMAIL_BUILD_TESTS)
     add_subdirectory(tests/controller)
     add_subdirectory(tests/protocol)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME nkmail_translations COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/translations/check_catalog.py" --lupdate $<TARGET_FILE:Qt6::lupdate>)
+    set_tests_properties(nkmail_translations PROPERTIES TIMEOUT 30)
     add_test(NAME nkmail_cli COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/cli/check_cli.py" $<TARGET_FILE:nkmail>)
     set_tests_properties(nkmail_cli PROPERTIES TIMEOUT 60)
     find_package(Qt6 REQUIRED COMPONENTS QuickTest)
@@ -53,6 +72,7 @@ if(NKMAIL_BUILD_TESTS)
     qt_add_qml_module(nkmail_ui_tests
         URI NextKde.Mail.TestViews VERSION 1.0 RESOURCE_PREFIX /qt/qml
         QML_FILES qml/Main.qml qml/WindowChrome.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
+    nkmail_add_translations(nkmail_ui_tests)
     target_compile_definitions(nkmail_ui_tests PRIVATE QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/ui")
     target_link_libraries(nkmail_ui_tests PRIVATE Qt6::QuickTest Qt6::QuickControls2 Qt6::QuickDialogs2 Kos::Ui Kos::UiPlugin)
     add_test(NAME nkmail_ui COMMAND nkmail_ui_tests -input "${CMAKE_CURRENT_SOURCE_DIR}/tests/ui")

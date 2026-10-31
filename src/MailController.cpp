@@ -226,14 +226,14 @@ void MailController::refresh() {
             if (self) QMetaObject::invokeMethod(self, [self, error, generation] {
                 if (!self || generation != self->m_generation) return;
                 self->m_busy = false; self->m_cachedOnly = true;
-                self->loadCached(); self->setStatus(self->tr("Offline · cached mail"), error);
+                self->loadCached(); self->setStatus(MailController::tr("Offline · cached mail"), error);
             }, Qt::QueuedConnection);
         }
     });
 }
 void MailController::loadCached(bool append) {
     if (!m_database->isOpen()) return;
-    auto page = m_database->cachedPage(m_folder, append ? m_offset : 0, pageSize, m_search);
+    auto page = m_database->cachedPage(m_folder, append ? m_offset : 0, pageSize, m_search, m_unreadOnly);
     if (append) m_messages->append(page.messages); else m_messages->replace(page.messages);
     m_offset = page.nextOffset; m_hasMore = page.hasMore; emit statusChanged();
 }
@@ -246,17 +246,28 @@ void MailController::selectFolder(const QString &folder) {
 }
 void MailController::setSearch(const QString &query) {
     if (m_search == query) return;
-    ++m_generation; m_busy = false; m_search = query; m_offset = 0; emit searchChanged(); loadCached();
+    ++m_generation; m_busy = false; m_cachedOnly = true; m_search = query; m_offset = 0;
+    emit searchChanged(); loadCached();
     setStatus(m_demo ? tr("Preview · search synthetic cached messages") : tr("Search · cached messages only"));
+}
+void MailController::setUnreadOnly(bool unreadOnly) {
+    if (m_unreadOnly == unreadOnly) return;
+    ++m_generation; m_busy = false; m_cachedOnly = true; m_unreadOnly = unreadOnly; m_offset = 0;
+    emit unreadOnlyChanged(); loadCached();
+    setStatus(m_demo ? tr("Preview · synthetic cached messages")
+                     : m_unreadOnly ? tr("Unread · cached messages only") : tr("Cached messages only"));
 }
 void MailController::loadMore() {
     if (m_busy || !m_hasMore) return;
-    if (m_demo || m_cachedOnly || !m_search.isEmpty() || m_account.password.isEmpty()) loadCached(true);
+    if (m_demo || m_cachedOnly || !m_search.isEmpty() || m_unreadOnly || m_account.password.isEmpty()) loadCached(true);
     else fetchPage(true);
 }
 void MailController::fetchPage(bool append) {
     if (m_busy || m_demo || m_account.password.isEmpty()) return;
-    if (!m_search.isEmpty()) { loadCached(append); return; }
+    // Search and unread filtering are deliberately cache-only. A first-page
+    // refresh for unread still fetches raw offset zero below, then reloads the
+    // filtered view from the cache; filtered pagination never reaches IMAP.
+    if (!m_search.isEmpty() || (append && m_unreadOnly)) { loadCached(append); return; }
     const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
     const auto offset = append ? m_offset : 0;
     m_busy = true; setStatus(tr("Fetching message headers…"));
@@ -267,7 +278,7 @@ void MailController::fetchPage(bool append) {
             if (self) QMetaObject::invokeMethod(self, [self, page, generation, append] {
                 if (!self || generation != self->m_generation) return;
                 self->m_busy = false;
-                if (!self->m_database->savePage(page)) { self->setStatus(self->tr("Could not cache messages"), self->m_database->error()); return; }
+                if (!self->m_database->savePage(page)) { self->setStatus(MailController::tr("Could not cache messages"), self->m_database->error()); return; }
                 const bool changedValidity = !self->m_content.summary.uidValidity.isEmpty() && self->m_content.summary.folder == page.folder
                     && self->m_content.summary.uidValidity != page.uidValidity;
                 const bool listChangedValidity = self->m_messages->count() > 0
@@ -283,17 +294,23 @@ void MailController::fetchPage(bool append) {
                     self->fetchPage(false);
                     return;
                 }
-                if (append) self->m_messages->append(page.messages); else self->m_messages->replace(page.messages);
-                self->m_cachedOnly = false;
-                self->m_offset = page.nextOffset; self->m_hasMore = page.hasMore;
-                self->setStatus(self->tr("Up to date · headers cached · server flags are read-only"));
+                if (self->m_unreadOnly) {
+                    // The network page is intentionally raw. Recompute filtered
+                    // offsets against the complete cache after saving it.
+                    self->loadCached(false);
+                } else {
+                    if (append) self->m_messages->append(page.messages); else self->m_messages->replace(page.messages);
+                    self->m_offset = page.nextOffset; self->m_hasMore = page.hasMore;
+                }
+                self->m_cachedOnly = self->m_unreadOnly || !self->m_search.isEmpty();
+                self->setStatus(MailController::tr("Up to date · headers cached · server flags are read-only"));
             }, Qt::QueuedConnection);
         } catch (const std::exception &e) {
             const auto error = QString::fromUtf8(e.what());
             if (self) QMetaObject::invokeMethod(self, [self, generation, error, append] {
                 if (!self || generation != self->m_generation) return;
                 self->m_busy = false; self->m_cachedOnly = true;
-                self->loadCached(append); self->setStatus(self->tr("Offline · cached mail"), error);
+                self->loadCached(append); self->setStatus(MailController::tr("Offline · cached mail"), error);
             }, Qt::QueuedConnection);
         }
     });
@@ -314,13 +331,13 @@ void MailController::openMessage(const QString &uid, const QString &validity) {
             auto content = MailioBackend::content(account, folder, validity, uid);
             if (self) QMetaObject::invokeMethod(self, [self, content, generation, selectionGeneration] {
                 if (!self || generation != self->m_generation || selectionGeneration != self->m_selectionGeneration) return;
-                if (!self->m_database->saveContent(content)) { self->setStatus(self->tr("Could not cache content"), self->m_database->error()); return; }
-                self->present(content); self->setStatus(self->tr("Message cached · remote content blocked"));
+                if (!self->m_database->saveContent(content)) { self->setStatus(MailController::tr("Could not cache content"), self->m_database->error()); return; }
+                self->present(content); self->setStatus(MailController::tr("Message cached · remote content blocked"));
             }, Qt::QueuedConnection);
         } catch (const std::exception &e) {
             const auto error = QString::fromUtf8(e.what());
             if (self) QMetaObject::invokeMethod(self, [self, generation, selectionGeneration, error] {
-                if (self && generation == self->m_generation && selectionGeneration == self->m_selectionGeneration) self->setStatus(self->tr("Could not load message"), error);
+                if (self && generation == self->m_generation && selectionGeneration == self->m_selectionGeneration) self->setStatus(MailController::tr("Could not load message"), error);
             }, Qt::QueuedConnection);
         }
     });
@@ -449,8 +466,8 @@ void MailController::sendDraft(const QVariantMap &map) {
             const QString state = result.state == SendResult::Accepted ? "accepted" : result.state == SendResult::Rejected ? "rejected" : "unknown";
             self->m_database->markDraftState(id, state); emit self->draftsChanged();
             if (result.state == SendResult::Accepted) {
-                self->setStatus(self->tr("SMTP server accepted this message · delivery not confirmed")); emit self->draftAccepted(id);
-            } else self->setStatus(result.state == SendResult::Unknown ? self->tr("Send result unknown · not retried") : self->tr("Message not accepted · draft preserved"), result.message);
+                self->setStatus(MailController::tr("SMTP server accepted this message · delivery not confirmed")); emit self->draftAccepted(id);
+            } else self->setStatus(result.state == SendResult::Unknown ? MailController::tr("Send result unknown · not retried") : MailController::tr("Message not accepted · draft preserved"), result.message);
         }, Qt::QueuedConnection);
     });
 }

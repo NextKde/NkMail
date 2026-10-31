@@ -1,4 +1,5 @@
 #include "MailController.h"
+#include "UiLanguage.h"
 #include <QCommandLineParser>
 #include <QDir>
 #include <QFile>
@@ -20,6 +21,11 @@
 
 int main(int argc, char **argv) {
     QGuiApplication app(argc, argv);
+    nkmail::UiLanguage language;
+    if (!language.install()) {
+        std::fprintf(stderr, "Cannot load the embedded Chinese interface translations.\n");
+        return 2;
+    }
     app.setApplicationName(QStringLiteral("nkmail"));
     app.setApplicationDisplayName(QStringLiteral("NkMail"));
     app.setOrganizationName(QStringLiteral("NextKde"));
@@ -33,7 +39,7 @@ int main(int argc, char **argv) {
     parser.addOption({"demo", "Use isolated synthetic mail; no network or saved credentials."});
     parser.addOption({"data-dir", "Use a separate local data directory.", "path"});
     parser.addOption({"screenshot", "Capture this application's synthetic preview window and exit (requires --demo).", "path"});
-    parser.addOption({"review-scenario", "Synthetic review: inbox, compose, account or details.", "name", "inbox"});
+    parser.addOption({"review-scenario", "Synthetic review: inbox, list, reader, search, options, unread, compose, account or details.", "name", "inbox"});
     parser.addOption({"appearance", "Review appearance: light or dark.", "name", "light"});
     parser.addOption({"review-width", "Synthetic preview window width.", "pixels", "1240"});
     parser.addOption({"review-height", "Synthetic preview window height.", "pixels", "800"});
@@ -66,6 +72,7 @@ int main(int argc, char **argv) {
         windowSettings = std::make_unique<QSettings>(QDir(root).filePath("window.ini"), QSettings::IniFormat);
         initialProperties.insert(QStringLiteral("sidebarPreferredWidth"), qBound(190, windowSettings->value("sidebarWidth", 236).toInt(), 340));
         initialProperties.insert(QStringLiteral("listPreferredWidth"), qBound(260, windowSettings->value("listWidth", 320).toInt(), 520));
+        initialProperties.insert(QStringLiteral("showSummary"), windowSettings->value("showSummary", true).toBool());
     }
     engine.setInitialProperties(initialProperties);
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
@@ -107,6 +114,7 @@ int main(int argc, char **argv) {
             windowSettings->setValue("maximized", maximized);
             windowSettings->setValue("sidebarWidth", window->property("sidebarPreferredWidth"));
             windowSettings->setValue("listWidth", window->property("listPreferredWidth"));
+            windowSettings->setValue("showSummary", window->property("showSummary"));
             windowSettings->sync();
             QFile::setPermissions(windowSettings->fileName(), QFileDevice::ReadOwner | QFileDevice::WriteOwner);
         };
@@ -128,6 +136,11 @@ int main(int argc, char **argv) {
         // QQmlProperty bridges QML-generated notify signals to the debounce timer.
         QQmlProperty(window, "sidebarPreferredWidth").connectNotifySignal(&preferenceSave, SLOT(start()));
         QQmlProperty(window, "listPreferredWidth").connectNotifySignal(&preferenceSave, SLOT(start()));
+        QQmlProperty(window, "showSummary").connectNotifySignal(&preferenceSave, SLOT(start()));
+        // Materialize the effective initial values as well as later user changes.
+        // This keeps a fresh profile explicit and makes restore serialization
+        // deterministic without adding a command-line preference surface.
+        preferenceSave.start();
     }
     if (demo && window && (parser.isSet("screenshot") || parser.isSet("review-width") || parser.isSet("review-height"))) {
         window->resize(qBound(580, parser.value("review-width").toInt(), 2000), qBound(520, parser.value("review-height").toInt(), 1600));

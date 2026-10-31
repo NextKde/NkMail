@@ -27,8 +27,8 @@ jobs:
     steps:
       - name: Install dependencies and print versions
         run: |
-          pacman -Syu --noconfirm --needed base-devel git ca-certificates cmake ninja boost openssl python qt6-base qt6-declarative qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring fontconfig noto-fonts
-          pacman -Q base-devel git ca-certificates cmake ninja boost openssl python qt6-base qt6-declarative qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring fontconfig noto-fonts
+          pacman -Syu --noconfirm --needed base-devel git ca-certificates cmake ninja boost openssl python qt6-base qt6-declarative qt6-tools qt6-translations qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring fontconfig noto-fonts
+          pacman -Q base-devel git ca-certificates cmake ninja boost openssl python qt6-base qt6-declarative qt6-tools qt6-translations qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring fontconfig noto-fonts
 
       - name: Check out source and pinned submodules
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -90,7 +90,7 @@ jobs:
           listing = json.loads(subprocess.check_output(
               ["ctest", "--test-dir", "build/ci-release", "--show-only=json-v1"], text=True
           ))
-          required = {"nkmail_cli", "nkmail_ui", "nkmail_core", "nkmail_controller", "loopback-protocol"}
+          required = {"nkmail_cli", "nkmail_ui", "nkmail_core", "nkmail_controller", "loopback-protocol", "nkmail_translations"}
           registered = {test["name"] for test in listing["tests"]}
           missing = required - registered
           if missing:

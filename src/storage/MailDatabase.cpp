@@ -345,7 +345,7 @@ bool MailDatabase::savePage(const Page &page)
             return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
-Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, const QString &search) const
+Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, const QString &search, bool unreadOnly) const
 {
     Page page;
     page.folder = folder;
@@ -359,13 +359,14 @@ Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, cons
     if (!m_error.isEmpty() || page.uidValidity.isEmpty())
         return page;
     QSqlQuery q(m_db);
+    const bool filtered = unreadOnly || !search.isEmpty();
     QString sql = QStringLiteral("SELECT payload FROM summaries WHERE folder=? AND uid_validity=? ORDER BY length(uid) DESC,uid DESC");
-    if (search.isEmpty())
+    if (!filtered)
         sql += QStringLiteral(" LIMIT ? OFFSET ?");
     q.prepare(sql);
     q.addBindValue(folder);
     q.addBindValue(page.uidValidity);
-    if (search.isEmpty()) {
+    if (!filtered) {
         q.addBindValue(limit + 1);
         q.addBindValue(offset);
     }
@@ -376,14 +377,18 @@ Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, cons
     int matched = 0;
     while (q.next()) {
         const auto s = summaryFromMap(mapFromJson(q.value(0)));
+        if (unreadOnly && !s.unread)
+            continue;
         if (!search.isEmpty()) {
             const QString haystack = s.sender + '\n' + s.senderAddress + '\n' + s.recipients
                                    + '\n' + s.subject + '\n' + s.preview;
             if (!haystack.contains(search, Qt::CaseInsensitive))
                 continue;
-            if (matched++ < offset)
-                continue;
         }
+        // Filter the entire cache before counting offsets, including the extra
+        // matching row used for hasMore. Raw mailbox offsets are unrelated.
+        if (filtered && matched++ < offset)
+            continue;
         if (page.messages.size() == limit) {
             page.hasMore = true;
             break;

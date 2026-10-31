@@ -14,6 +14,7 @@ Mailio is a protocol/MIME library, not a complete application backend. NkMail su
 
 - CMake 3.30+, C++20 compiler, Ninja (optional)
 - Qt 6.8+: Core, Gui, Qml, Quick, QuickControls2, QuickDialogs2, Network, Concurrent, Sql; QtTest/QuickTest for testing
+- Qt LinguistTools (`lupdate`/`lrelease`) and Chinese Qt translation catalogs (`qtbase`, `qtdeclarative`); Arch packages: `qt6-tools`, `qt6-translations`
 - Qt graphical-effects compatibility module and SVG support as required by Kos.Ui
 - QtKeychain for Qt 6; system Secret Service or equivalent
 - Boost development files (`date_time`, `regex`) and OpenSSL

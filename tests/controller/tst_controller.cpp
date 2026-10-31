@@ -140,6 +140,28 @@ bool seed(const QString &root, int cachedCount = 0, bool restore = true)
     settings.sync();
     return settings.status() == QSettings::NoError;
 }
+void useUnreadMailbox()
+{
+    synthetic::folders = [](const Account &) { return QList<Folder>{{"INBOX", "Inbox", 200}, {"Archive", "Archive", 200}}; };
+    synthetic::page = [](const Account &, const QString &folder, int offset, int limit) {
+        Page p;
+        p.folder = folder;
+        p.uidValidity = QStringLiteral("100");
+        for (int i = offset; i < qMin(offset + limit, 200); ++i) {
+            Summary s;
+            s.folder = folder; s.uidValidity = p.uidValidity; s.uid = QString::number(200 - i);
+            // More than a raw first page of read messages precedes every unread.
+            s.unread = s.uid.toInt() <= 130;
+            s.subject = s.uid.toInt() % 2 ? QStringLiteral("odd") : QStringLiteral("even");
+            if (!s.unread) s.subject += QStringLiteral(" read-only-token");
+            s.senderAddress = QStringLiteral("sender@example.invalid");
+            p.messages.append(s);
+        }
+        p.nextOffset = offset + int(p.messages.size());
+        p.hasMore = p.nextOffset < 200;
+        return p;
+    };
+}
 MessageListModel *messages(MailController &controller)
 {
     return qobject_cast<MessageListModel *>(controller.messages());
@@ -162,8 +184,15 @@ private slots:
     void initTestCase() { QVERIFY(QDir().mkpath(QStringLiteral(NKMAIL_CONTROLLER_TMP_ROOT))); }
     void init() { synthetic::reset(); }
     void demoNeverUsesExternalBoundaries();
+    void demoUnreadFilterPreservesHiddenSelection();
     void refreshAndPagination();
     void cachedSearchNeverFetches();
+    void unreadFilterNeverFetchesAndPaginatesCache();
+    void unreadFilterRefreshesRawFirstPage();
+    void queryToggleOffKeepsCacheCursorUntilRefresh();
+    void unreadRefreshInvalidatesHiddenSelection();
+    void lateRefreshIgnoredDuringUnreadFilter();
+    void lateBodyIgnoredDuringUnreadFilter();
     void refreshFailureStillPaginatesCache();
     void failedNetworkAppendUsesCachedTail();
     void latePageIgnoredDuringCachedSearch();
@@ -196,6 +225,49 @@ void ControllerTests::demoNeverUsesExternalBoundaries()
     draft.insert("to", "nobody@example.invalid");
     controller.sendDraft(draft);
     QCOMPARE(controller.loadDraft(draft.value("id").toString()).value("state").toString(), QStringLiteral("draft"));
+    QCOMPARE(synthetic::folderCalls.load(), 0);
+    QCOMPARE(synthetic::pageCalls.load(), 0);
+    QCOMPARE(synthetic::contentCalls.load(), 0);
+    QCOMPARE(synthetic::sendCalls.load(), 0);
+    QCOMPARE(synthetic::credentialReads.load(), 0);
+    QCOMPARE(synthetic::credentialWrites.load(), 0);
+    QCOMPARE(synthetic::credentialDeletes.load(), 0);
+}
+void ControllerTests::demoUnreadFilterPreservesHiddenSelection()
+{
+    QTemporaryDir root(temporaryTemplate());
+    MailController controller(true, root.path());
+    QTRY_COMPARE(messages(controller)->count(), 8);
+    controller.openMessage("98", "20261029"); // A read message will be hidden, not deselected.
+    const auto selected = controller.selectedMessage();
+    QVERIFY(!selected.isEmpty());
+    QSignalSpy selection(&controller, &MailController::selectionChanged);
+    QSignalSpy unreadChanges(&controller, &MailController::unreadOnlyChanged);
+    QVERIFY(!controller.unreadOnly());
+    controller.setUnreadOnly(true);
+    QCOMPARE(messages(controller)->count(), 2);
+    QCOMPARE(messages(controller)->get(0).value("uid").toString(), QStringLiteral("100"));
+    QCOMPARE(messages(controller)->get(1).value("uid").toString(), QStringLiteral("99"));
+    QCOMPARE(controller.selectedMessage(), selected);
+    QCOMPARE(controller.selectedUid(), QStringLiteral("98"));
+    QCOMPARE(selection.count(), 0);
+    controller.setSearch("design");
+    QCOMPARE(messages(controller)->count(), 1);
+    QCOMPARE(messages(controller)->get(0).value("uid").toString(), QStringLiteral("99"));
+    controller.setSearch("missing");
+    QCOMPARE(messages(controller)->count(), 0);
+    QCOMPARE(controller.selectedMessage(), selected);
+    QCOMPARE(selection.count(), 0);
+    controller.setSearch({});
+    QCOMPARE(messages(controller)->count(), 2);
+    controller.setUnreadOnly(true);
+    QCOMPARE(unreadChanges.count(), 1); // Same query is a no-op.
+    controller.openMessage("100", "20261029");
+    QCOMPARE(messages(controller)->count(), 2); // Reading remains read-only.
+    QVERIFY(messages(controller)->get(0).value("unread").toBool());
+    controller.setUnreadOnly(false);
+    QCOMPARE(messages(controller)->count(), 8);
+    QCOMPARE(unreadChanges.count(), 2);
     QCOMPARE(synthetic::folderCalls.load(), 0);
     QCOMPARE(synthetic::pageCalls.load(), 0);
     QCOMPARE(synthetic::contentCalls.load(), 0);
@@ -244,6 +316,214 @@ void ControllerTests::cachedSearchNeverFetches()
     controller.setSearch("' OR 1=1 --");
     QCOMPARE(messages(controller)->count(), 0);
     QCOMPARE(synthetic::contentCalls.load(), 0);
+}
+void ControllerTests::unreadFilterNeverFetchesAndPaginatesCache()
+{
+    QTemporaryDir root(temporaryTemplate());
+    useUnreadMailbox();
+    QVERIFY(seed(root.path(), 200));
+    MailController controller(false, root.path());
+    QTRY_VERIFY(controller.status().contains("restored"));
+    controller.setUnreadOnly(true);
+    QCOMPARE(messages(controller)->count(), 50);
+    QCOMPARE(messages(controller)->get(0).value("uid").toString(), QStringLiteral("130"));
+    QVERIFY(controller.hasMore());
+    controller.loadMore();
+    QCOMPARE(messages(controller)->count(), 100);
+    QVERIFY(controller.hasMore());
+    controller.loadMore();
+    QCOMPARE(messages(controller)->count(), 130);
+    QVERIFY(!controller.hasMore());
+    for (int row = 0; row < messages(controller)->count(); ++row) {
+        QVERIFY(messages(controller)->get(row).value("unread").toBool());
+        QCOMPARE(messages(controller)->get(row).value("uid").toString(), QString::number(130 - row));
+    }
+    controller.setSearch("EVEN");
+    QCOMPARE(messages(controller)->count(), 50);
+    controller.loadMore();
+    QCOMPARE(messages(controller)->count(), 65);
+    QVERIFY(!controller.hasMore());
+    QCOMPARE(messages(controller)->get(64).value("uid").toString(), QStringLiteral("2"));
+    controller.setSearch("read-only-token");
+    QCOMPARE(messages(controller)->count(), 0);
+    QVERIFY(!controller.hasMore());
+    controller.setSearch("missing");
+    QCOMPARE(messages(controller)->count(), 0);
+    controller.setSearch({});
+    QCOMPARE(messages(controller)->count(), 50);
+    QCOMPARE(messages(controller)->get(0).value("uid").toString(), QStringLiteral("130"));
+    QCOMPARE(synthetic::folderCalls.load(), 0);
+    QCOMPARE(synthetic::pageCalls.load(), 0);
+    QCOMPARE(synthetic::contentCalls.load(), 0);
+}
+void ControllerTests::unreadFilterRefreshesRawFirstPage()
+{
+    QTemporaryDir root(temporaryTemplate());
+    useUnreadMailbox();
+    QVERIFY(seed(root.path(), 200));
+    MailController controller(false, root.path());
+    QTRY_VERIFY(controller.status().contains("restored"));
+    controller.setUnreadOnly(true);
+    controller.loadMore();
+    QCOMPARE(messages(controller)->count(), 100);
+    controller.refresh();
+    QTRY_VERIFY(!controller.busy());
+    QCOMPARE(offsets(), QList<int>({0}));
+    // The raw first page is entirely read, but all older cached unread matches
+    // remain available. A filtered offset must never be sent to the backend.
+    QCOMPARE(messages(controller)->count(), 50);
+    QCOMPARE(messages(controller)->get(0).value("uid").toString(), QStringLiteral("130"));
+    QVERIFY(controller.hasMore());
+    controller.loadMore();
+    QCOMPARE(messages(controller)->count(), 100);
+    QCOMPARE(offsets(), QList<int>({0}));
+    controller.setUnreadOnly(false);
+    controller.loadMore();
+    QCOMPARE(messages(controller)->count(), 100);
+    QCOMPARE(offsets(), QList<int>({0})); // Filtered refresh did not enable network paging.
+    controller.setUnreadOnly(true);
+    controller.selectFolder("Archive");
+    QTRY_VERIFY(!controller.busy());
+    QCOMPARE(offsets(), QList<int>({0, 0}));
+    QCOMPARE(messages(controller)->count(), 0);
+    QVERIFY(!controller.hasMore());
+    MailDatabase db;
+    QVERIFY(db.open(root.path()));
+    QCOMPARE(db.cachedPage("Archive", 0, 200).messages.size(), 50); // Raw page was cached first.
+}
+void ControllerTests::unreadRefreshInvalidatesHiddenSelection()
+{
+    QTemporaryDir root(temporaryTemplate());
+    useUnreadMailbox();
+    QVERIFY(seed(root.path(), 200));
+    const auto normal = synthetic::page;
+    synthetic::page = [normal](const Account &a, const QString &folder, int offset, int limit) {
+        auto p = normal(a, folder, offset, limit);
+        p.uidValidity = QStringLiteral("101");
+        for (auto &s : p.messages) s.uidValidity = p.uidValidity;
+        return p;
+    };
+    MailController controller(false, root.path());
+    QTRY_VERIFY(controller.status().contains("restored"));
+    controller.openMessage("200", "100");
+    QTRY_VERIFY(!controller.selectedMessage().isEmpty());
+    const auto selected = controller.selectedMessage();
+    controller.setUnreadOnly(true);
+    QCOMPARE(messages(controller)->get(0).value("uid").toString(), QStringLiteral("130"));
+    QCOMPARE(controller.selectedMessage(), selected);
+    controller.refresh();
+    QTRY_VERIFY(!controller.busy());
+    QCOMPARE(offsets(), QList<int>({0}));
+    // New validity only returned read messages. Even an empty filtered list
+    // must invalidate the hidden old-generation body and its attachment.
+    QCOMPARE(messages(controller)->count(), 0);
+    QVERIFY(controller.selectedMessage().isEmpty());
+    QVERIFY(controller.selectedUid().isEmpty());
+    const auto target = root.filePath("must-not-export-retired-generation.txt");
+    controller.saveAttachment(0, QUrl::fromLocalFile(target).toString());
+    QVERIFY(!QFile::exists(target));
+    MailDatabase db;
+    QVERIFY(db.open(root.path()));
+    QCOMPARE(db.cachedPage("INBOX").uidValidity, QStringLiteral("101"));
+    QVERIFY(!db.content("INBOX", "100", "200"));
+}
+void ControllerTests::lateRefreshIgnoredDuringUnreadFilter()
+{
+    for (bool blockFolders : {false, true}) {
+        synthetic::reset();
+        QTemporaryDir root(temporaryTemplate());
+        useUnreadMailbox();
+        QVERIFY(seed(root.path(), 200));
+        QSemaphore release;
+        const auto normalFolders = synthetic::folders;
+        const auto normalPage = synthetic::page;
+        synthetic::folders = [&release, normalFolders, blockFolders](const Account &a) {
+            if (blockFolders) release.acquire();
+            return normalFolders(a);
+        };
+        synthetic::page = [&release, normalPage, blockFolders](const Account &a, const QString &folder, int offset, int limit) {
+            if (!blockFolders) release.acquire();
+            auto p = normalPage(a, folder, offset, limit);
+            p.uidValidity = QStringLiteral("101");
+            for (auto &s : p.messages) s.uidValidity = p.uidValidity;
+            return p;
+        };
+        MailController controller(false, root.path());
+        ReleaseOnExit cleanup{release};
+        QTRY_VERIFY(controller.status().contains("restored"));
+        controller.refresh();
+        if (blockFolders) {
+            QTRY_COMPARE(synthetic::folderCalls.load(), 1);
+        } else {
+            QTRY_COMPARE(synthetic::pageCalls.load(), 1);
+        }
+        controller.setUnreadOnly(true);
+        QVERIFY(!controller.busy());
+        QCOMPARE(messages(controller)->get(0).value("uid").toString(), QStringLiteral("130"));
+        release.release();
+        // A body completion behind the old request drains the same worker pool.
+        controller.openMessage("130", "100");
+        QTRY_COMPARE(controller.selectedMessage().value("uid").toString(), QStringLiteral("130"));
+        QCOMPARE(messages(controller)->get(0).value("uidValidity").toString(), QStringLiteral("100"));
+        controller.loadMore();
+        QCOMPARE(messages(controller)->count(), 100);
+        QCOMPARE(synthetic::pageCalls.load(), blockFolders ? 0 : 1);
+        MailDatabase db;
+        QVERIFY(db.open(root.path()));
+        QCOMPARE(db.cachedPage("INBOX").uidValidity, QStringLiteral("100"));
+    }
+}
+void ControllerTests::queryToggleOffKeepsCacheCursorUntilRefresh()
+{
+    QTemporaryDir root(temporaryTemplate());
+    QVERIFY(seed(root.path(), 120));
+    MailController controller(false, root.path());
+    QTRY_VERIFY(controller.status().contains("restored"));
+    controller.setSearch("EVEN");
+    QCOMPARE(messages(controller)->count(), 50);
+    controller.loadMore();
+    QCOMPARE(messages(controller)->count(), 60);
+    controller.setSearch({});
+    QCOMPARE(messages(controller)->count(), 50);
+    // Search toggling intentionally leaves m_cachedOnly true: no raw offset
+    // is sent until an explicit refresh establishes a fresh server cursor.
+    controller.loadMore();
+    QCOMPARE(messages(controller)->count(), 100);
+    QCOMPARE(synthetic::pageCalls.load(), 0);
+    controller.refresh();
+    QTRY_VERIFY(!controller.busy());
+    QCOMPARE(synthetic::pageCalls.load(), 1);
+    controller.loadMore();
+    QTRY_VERIFY(!controller.busy());
+    QCOMPARE(synthetic::pageCalls.load(), 2);
+}
+void ControllerTests::lateBodyIgnoredDuringUnreadFilter()
+{
+    QTemporaryDir root(temporaryTemplate());
+    useUnreadMailbox();
+    QVERIFY(seed(root.path(), 200));
+    QSemaphore release;
+    const auto normal = synthetic::content;
+    synthetic::content = [&release, normal](const Account &a, const QString &folder, const QString &validity, const QString &uid) {
+        if (uid == QLatin1String("120")) release.acquire();
+        return normal(a, folder, validity, uid);
+    };
+    MailController controller(false, root.path());
+    ReleaseOnExit cleanup{release};
+    QTRY_VERIFY(controller.status().contains("restored"));
+    controller.openMessage("120", "100");
+    QTRY_COMPARE(synthetic::contentCalls.load(), 1);
+    controller.setUnreadOnly(true);
+    QVERIFY(controller.selectedMessage().isEmpty());
+    controller.openMessage("130", "100");
+    release.release();
+    // The new body queues behind the blocked old body in the same worker pool.
+    QTRY_COMPARE(controller.selectedMessage().value("uid").toString(), QStringLiteral("130"));
+    QCOMPARE(controller.selectedUid(), QStringLiteral("130"));
+    QCOMPARE(synthetic::contentCalls.load(), 2);
+    MailDatabase db;
+    QVERIFY(db.open(root.path()));
+    QVERIFY(!db.content("INBOX", "100", "120"));
 }
 void ControllerTests::refreshFailureStillPaginatesCache()
 {
