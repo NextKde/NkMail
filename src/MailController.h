@@ -63,6 +63,11 @@ public:
     Q_INVOKABLE void sendDraft(const QVariantMap &draft);
     Q_INVOKABLE void clearError();
     Q_INVOKABLE void disconnectAccount();
+    Q_INVOKABLE void setMessageRead(int index, bool read);
+    Q_INVOKABLE void toggleFlagged(int index);
+    Q_INVOKABLE void deleteMessage(int index);
+    Q_INVOKABLE void archiveMessage(int index);
+    Q_INVOKABLE void moveMessage(int index, const QString &destination);
 signals:
     void foldersChanged();
     void draftsChanged();
@@ -83,6 +88,7 @@ private:
     QString credentialKey() const;
     void run(std::function<void()> task);
     bool m_demo = false, m_busy = false, m_sending = false, m_restorePending = false, m_hasMore = false;
+    bool m_mutating = false; // One mailbox write operation at a time.
     bool m_cachedOnly = true; // Query offsets stay local until a successful unfiltered header fetch.
     bool m_unreadOnly = false;
     QString m_root, m_folder = QStringLiteral("INBOX"), m_status, m_error, m_search, m_selectedUid;

@@ -462,6 +462,16 @@ std::optional<Content> MailDatabase::content(const QString &folder, const QStrin
     }
     return c;
 }
+bool MailDatabase::removeMessage(const QString &folder, const QString &uidValidity, const QString &uid)
+{
+    if (!check())
+        return false;
+    if (folder.isEmpty() || uidValidity.isEmpty() || uid.isEmpty())
+        return fail(QStringLiteral("Folder, UIDVALIDITY and UID are required"));
+    const QVariantList identity{folder, uidValidity, uid};
+    return exec(m_db, QStringLiteral("DELETE FROM contents WHERE folder=? AND uid_validity=? AND uid=?"), identity, &m_error)
+        && exec(m_db, QStringLiteral("DELETE FROM summaries WHERE folder=? AND uid_validity=? AND uid=?"), identity, &m_error);
+}
 QList<Draft> MailDatabase::drafts() const
 {
     QList<Draft> result;
