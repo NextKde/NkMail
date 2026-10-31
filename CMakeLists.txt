@@ -6,9 +6,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 QuickDialogs2 Sql Concurrent Network)
 find_package(Qt6Keychain REQUIRED)
 qt_standard_project_setup(REQUIRES 6.8)
-set(NKMAIL_UI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../nextkdeAppDemo" CACHE PATH "Canonical nextkdeAppDemo source directory")
+set(NKMAIL_UI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nextkdeAppDemo" CACHE PATH "Pinned nextkdeAppDemo source directory (override for local development)")
 if(NOT EXISTS "${NKMAIL_UI_SOURCE_DIR}/shared/qml/CMakeLists.txt")
-    message(FATAL_ERROR "Kos.Ui source is missing. Set NKMAIL_UI_SOURCE_DIR to nextkdeAppDemo.")
+    message(FATAL_ERROR
+        "Kos.Ui source is missing at ${NKMAIL_UI_SOURCE_DIR}. "
+        "Run 'git submodule update --init --recursive' in the NkMail checkout, "
+        "or set NKMAIL_UI_SOURCE_DIR to a valid nextkdeAppDemo checkout for local development.")
 endif()
 add_subdirectory("${NKMAIL_UI_SOURCE_DIR}/shared/qml" kos-ui)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build dependencies statically")

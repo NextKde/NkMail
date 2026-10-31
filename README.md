@@ -17,16 +17,55 @@ Mailio is a protocol/MIME library, not a complete application backend. NkMail su
 - Qt graphical-effects compatibility module and SVG support as required by Kos.Ui
 - QtKeychain for Qt 6; system Secret Service or equivalent
 - Boost development files (`date_time`, `regex`) and OpenSSL
-- Sibling `../nextkdeAppDemo/shared/qml` (or set `NKMAIL_UI_SOURCE_DIR`)
+- Pinned Kos.Ui source submodule at `third_party/nextkdeAppDemo/shared/qml`
 
 Mailio 0.26.1 source commit: `f358b1f85f9a021f0bd814e285eb8ae102fc8f79`.
-Kos.Ui workspace base: `54fd5f14a5bc50132d524d053b373b1dc1189935` with pre-existing local component updates. NkMail consumes this canonical workspace as-is; that SHA alone does **not** reproduce the current components. No component sources are copied or changed here.
+Kos.Ui source prerelease: [`v0.1.0-rc.1`](https://github.com/NextKde/nextkdeAppDemo/releases/tag/v0.1.0-rc.1),
+commit `dd0d5f3e7a7eab75c7bd465f29709d5f86e8091d`. The Git submodule records that exact
+canonical source revision, not a moving branch or an application-specific component copy.
+System dependencies above must still be installed.
+
+## Clone and build
 
 ```sh
+git clone --recurse-submodules https://github.com/NextKde/NkMail.git
+cd NkMail
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --parallel 4
 ./build/nkmail --demo
 ```
+
+For an existing or non-recursive checkout, first run:
+
+```sh
+git submodule update --init --recursive
+```
+
+GitHub's automatic source ZIP/tarball does **not** include submodule sources. Use a
+recursive Git clone. CMake does not download missing dependencies or fall back to a
+sibling checkout automatically. Kos.Ui is built into the app; its source checkout is
+not needed to run the resulting binary.
+
+### Local UI development and upgrades
+
+To work on shared components, explicitly override the source in a separate build:
+
+```sh
+cmake -S . -B build/ui-dev -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+  -DNKMAIL_UI_SOURCE_DIR=/absolute/path/to/nextkdeAppDemo
+cmake --build build/ui-dev --parallel 4
+```
+
+An existing CMake cache may still point to the old sibling workspace, even after this
+checkout is updated. Use a fresh build directory for pinned release builds, or pass
+`-DNKMAIL_UI_SOURCE_DIR="$PWD/third_party/nextkdeAppDemo"` to explicitly reset the cache.
+Development overrides are not proof of acceptance of the pinned version.
+
+Shared fixes belong in the canonical repository. After a new source release, fetch
+its tag in the submodule, check out that chosen release, run NkMail's regressions, then
+commit the gitlink and version-record updates. Do not use `git submodule update --remote`,
+follow `main` or automatically select the newest release. Published tags are immutable;
+other applications upgrade on their own schedule.
 
 Use `./build/nkmail --data-dir /a/private/directory` for a separate persistent mailbox. Preview mode always uses a fresh temporary directory, never existing credentials, and never the network.
 

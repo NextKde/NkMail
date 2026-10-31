@@ -1,7 +1,7 @@
 # NkMail local delivery goal
 
 ## Contract
-Build a working single-account Qt Quick mail client in this directory. Reuse canonical Kos.Ui from the sibling nextkdeAppDemo project; use mailio for IMAP/SMTP/MIME. Follow KMusic application patterns and calendar's dialog/popover interactions, with macOS Mail as a visual reference. No server-side flag editing, move or delete in the first release.
+Build a working single-account Qt Quick mail client in this directory. Reuse canonical Kos.Ui from the pinned nextkdeAppDemo Git submodule at third_party/nextkdeAppDemo; use mailio for IMAP/SMTP/MIME. External UI workspaces require an explicit NKMAIL_UI_SOURCE_DIR development override. Follow KMusic application patterns and calendar's dialog/popover interactions, with macOS Mail as a visual reference. No server-side flag editing, move or delete in the first release.
 
 The user authorized local builds, GUI and isolated automated testing, installation of the missing Boost development package, and milestone commits/pushes with synthetic screenshots to the public NextKde/NkMail repository. A specific enterprise test account was subsequently supplied for local read-only provider verification, after TLS/PEEK acceptance. Its details and credentials must never enter this repository or public output. No existing mail-client access, external sending, mailbox mutation, default-client registration or reference-project modification.
 
@@ -39,7 +39,14 @@ This file is a recoverable work ledger, not a native Codex Goal. Work requires a
 - No server Sent APPEND; no remote flags/move/delete/OAuth/IDLE/multiaccount.
 - Folder statistics currently use sequential STATUS; network deadlines are per-I/O, not whole-operation limits. MIME tree bounds are checked after mailio parsing, not a complete upstream parser audit.
 
-## Current work · 2026-10-30
+## UI dependency release pin · 2026-10-31
+
+- Replaced the default sibling workspace with a canonical Git submodule at `third_party/nextkdeAppDemo`, fixed to the `v0.1.0-rc.1` source candidate `dd0d5f3e7a7eab75c7bd465f29709d5f86e8091d`.
+- Candidate source is committed and remotely available; the tag/prerelease is not published yet. Fresh Release build and isolated regression checks are in progress. Do not treat these as completed acceptance until the results below are recorded.
+- CMake retains an explicit `NKMAIL_UI_SOURCE_DIR` development override. Default builds neither follow a moving branch nor fall back to the sibling workspace. Existing caches must be reset or replaced to verify the pin.
+- Historical 2026-10-29 source/acceptance facts below remain historical; they did not use this release pin. The 2026-10-30 skeleton record is likewise a prior iteration, subsequently committed as `d47833d`, not the current working-tree state.
+
+## Prior UI iteration · 2026-10-30
 
 The user rejected the previous shell presentation. The current uncommitted iteration is **skeleton only**, not visual acceptance or a published milestone:
 

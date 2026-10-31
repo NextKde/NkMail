@@ -1,6 +1,7 @@
 # NkMail contributor instructions
 
-- Build an actual Qt Quick mail client using the canonical `../nextkdeAppDemo/shared/qml` Kos.Ui module and mailio for IMAP, SMTP and MIME. Do not replace the mail backend with curl or duplicate the component library.
+- Build an actual Qt Quick mail client using canonical Kos.Ui from the pinned `third_party/nextkdeAppDemo` Git submodule and mailio for IMAP, SMTP and MIME. Initialize with `git submodule update --init --recursive`. Do not replace the mail backend with curl or duplicate the component library.
+- Keep the UI gitlink fixed to a tested source release; never automatically follow `main`, latest releases or `git submodule update --remote`. Make shared component changes in the canonical upstream repository, not as uncommitted edits in this submodule. `NKMAIL_UI_SOURCE_DIR` is an explicit local-development override; use a fresh/default-source build for release acceptance and record the tag and full SHA when upgrading.
 - KMusic is an architectural/visual reference; calendar in quickshell is a dialog/popover reference only. Do not modify or launch the reference projects. Preserve their working trees.
 - The user explicitly authorized local compilation, GUI execution and isolated automated tests for NkMail, including Kos.Ui compiled as its dependency. This task-specific exception does not authorize testing or changing the other projects themselves.
 - First release: single account, application-password authentication, folder/message browsing, cached search, safe text reader, attachments, compose/reply/reply-all/forward and durable drafts. No server flag mutation, move or delete. No fake buttons implying unsupported actions.
