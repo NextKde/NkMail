@@ -1,4 +1,6 @@
 #include "MessageListModel.h"
+#include <QHash>
+#include <QRegularExpression>
 #include <QSet>
 
 namespace nkmail {
@@ -24,6 +26,9 @@ QVariant MessageListModel::data(const QModelIndex &index, int role) const
     case UnreadRole: return s.unread;
     case FlaggedRole: return s.flagged;
     case HasAttachmentsRole: return s.hasAttachments;
+    case ThreadKeyRole: return m_threadKeys.at(index.row());
+    case ThreadCountRole: return m_threadCounts.at(index.row());
+    case ThreadFirstRole: return m_threadFirst.at(index.row());
     default: return {};
     }
 }
@@ -33,7 +38,55 @@ QHash<int, QByteArray> MessageListModel::roleNames() const
             {SenderRole, "sender"}, {SenderAddressRole, "senderAddress"},
             {SubjectRole, "subject"}, {DateRole, "date"}, {PreviewRole, "preview"},
             {UnreadRole, "unread"}, {FlaggedRole, "flagged"},
-            {HasAttachmentsRole, "hasAttachments"}};
+            {HasAttachmentsRole, "hasAttachments"}, {ThreadKeyRole, "threadKey"},
+            {ThreadCountRole, "threadCount"}, {ThreadFirstRole, "threadFirst"}};
+}
+QString MessageListModel::normalizedSubject(const QString &subject)
+{
+    static const QRegularExpression prefix(
+        QStringLiteral("^\\s*(?:re\\[\\s*\\d+\\s*\\]|re\\(\\s*\\d+\\s*\\)|re|aw|sv|答复|回复|转发|fwd|fw)\\s*:\\s*"),
+        QRegularExpression::CaseInsensitiveOption);
+    QString text = subject;
+    forever {
+        const auto match = prefix.match(text);
+        if (!match.hasMatch() || match.capturedLength() == 0)
+            break;
+        text = text.mid(match.capturedEnd());
+    }
+    return text.trimmed().toCaseFolded();
+}
+QString MessageListModel::threadKeyFor(const Summary &s)
+{
+    static const QRegularExpression whitespace(QStringLiteral("\\s+"));
+    for (const auto &token : s.references.split(whitespace, Qt::SkipEmptyParts)) {
+        if (!token.isEmpty())
+            return token;
+    }
+    for (const auto &token : s.inReplyTo.split(whitespace, Qt::SkipEmptyParts)) {
+        if (!token.isEmpty())
+            return token;
+    }
+    return normalizedSubject(s.subject);
+}
+void MessageListModel::rebuildThreads()
+{
+    const int size = int(m_messages.size());
+    m_threadKeys.resize(size);
+    m_threadCounts.fill(0, size);
+    m_threadFirst.fill(false, size);
+    QHash<QString, int> counts;
+    for (int row = 0; row < size; ++row) {
+        m_threadKeys[row] = threadKeyFor(m_messages.at(row));
+        ++counts[m_threadKeys.at(row)];
+    }
+    QSet<QString> seen;
+    for (int row = 0; row < size; ++row) {
+        m_threadCounts[row] = counts.value(m_threadKeys.at(row));
+        if (!seen.contains(m_threadKeys.at(row))) {
+            m_threadFirst[row] = true;
+            seen.insert(m_threadKeys.at(row));
+        }
+    }
 }
 QString MessageListModel::identity(const Summary &s)
 {
@@ -62,6 +115,7 @@ bool MessageListModel::update(const Summary &message)
         return false;
     if (summaryMap(m_messages.at(row)) != summaryMap(message)) {
         m_messages[row] = message;
+        rebuildThreads();
         emit dataChanged(index(row), index(row));
     }
     return true;
@@ -75,6 +129,7 @@ void MessageListModel::append(const QList<Summary> &messages)
         const int row = count();
         beginInsertRows({}, row, row);
         m_messages.append(s);
+        rebuildThreads();
         endInsertRows();
     }
     if (count() != before)
@@ -98,6 +153,7 @@ void MessageListModel::replace(const QList<Summary> &messages)
         if (!wanted.contains(identity(m_messages.at(row)))) {
             beginRemoveRows({}, row, row);
             m_messages.removeAt(row);
+            rebuildThreads();
             endRemoveRows();
         }
     }
@@ -107,11 +163,13 @@ void MessageListModel::replace(const QList<Summary> &messages)
         if (old < 0) {
             beginInsertRows({}, row, row);
             m_messages.insert(row, s);
+            rebuildThreads();
             endInsertRows();
         } else {
             if (old != row) {
                 beginMoveRows({}, old, old, {}, old < row ? row + 1 : row);
                 m_messages.move(old, row);
+                rebuildThreads();
                 endMoveRows();
             }
             update(s);

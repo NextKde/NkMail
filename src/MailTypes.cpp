@@ -43,7 +43,9 @@ QVariantMap summaryMap(const Summary &s)
     return {{"folder", s.folder}, {"uidValidity", s.uidValidity}, {"uid", s.uid},
             {"sender", s.sender}, {"senderAddress", s.senderAddress},
             {"recipients", s.recipients}, {"subject", s.subject}, {"date", s.date},
-            {"preview", s.preview}, {"unread", s.unread}, {"flagged", s.flagged},
+            {"preview", s.preview}, {"messageId", s.messageId},
+            {"inReplyTo", s.inReplyTo}, {"references", s.references},
+            {"unread", s.unread}, {"flagged", s.flagged},
             {"hasAttachments", s.hasAttachments}};
 }
 QVariantMap contentMap(const Content &c)
