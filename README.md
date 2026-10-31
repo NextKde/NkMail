@@ -67,6 +67,8 @@ commit the gitlink and version-record updates. Do not use `git submodule update 
 follow `main` or automatically select the newest release. Published tags are immutable;
 other applications upgrade on their own schedule.
 
+## Preview and data
+
 Use `./build/nkmail --data-dir /a/private/directory` for a separate persistent mailbox. Preview mode always uses a fresh temporary directory, never existing credentials, and never the network.
 
 ```sh

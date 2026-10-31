@@ -41,8 +41,9 @@ This file is a recoverable work ledger, not a native Codex Goal. Work requires a
 
 ## UI dependency release pin · 2026-10-31
 
-- Replaced the default sibling workspace with a canonical Git submodule at `third_party/nextkdeAppDemo`, fixed to the `v0.1.0-rc.1` source candidate `dd0d5f3e7a7eab75c7bd465f29709d5f86e8091d`.
-- Candidate source is committed and remotely available; the tag/prerelease is not published yet. Fresh Release build and isolated regression checks are in progress. Do not treat these as completed acceptance until the results below are recorded.
+- Replaced the default sibling workspace with a canonical Git submodule at `third_party/nextkdeAppDemo`, fixed to source prerelease [`v0.1.0-rc.1`](https://github.com/NextKde/nextkdeAppDemo/releases/tag/v0.1.0-rc.1), commit `dd0d5f3e7a7eab75c7bd465f29709d5f86e8091d`. The annotated tag and GitHub prerelease are published; this is not a stable/binary SDK release.
+- Fresh default-source Release configure/build succeeded on Qt 6.12.0 / GCC 16.2.1. Existing CTest suites passed **5/5 in 32.82 seconds** (CLI, software/offscreen UI, core, controller, loopback protocol); no real mailbox was accessed. A separate clean recursive clone of integration commit `2a697b1d48fc632ecc8191be25ec7e432c765171` initialized the UI source from GitHub and independently built/passed **5/5 in 29.89 seconds**. Both runs used the exact commit now tagged for the release.
+- Verified an uninitialized clean source snapshot fails with the documented submodule-init command, the fresh default cache points inside this checkout's submodule, both consumer copies have the exact clean candidate SHA, and an explicit sibling development override still configures. Existing Qt/QML tooling/plugin discovery and upstream mailio compiler warnings remain; no new qmllint, standalone Demo or GPU acceptance is claimed.
 - CMake retains an explicit `NKMAIL_UI_SOURCE_DIR` development override. Default builds neither follow a moving branch nor fall back to the sibling workspace. Existing caches must be reset or replaced to verify the pin.
 - Historical 2026-10-29 source/acceptance facts below remain historical; they did not use this release pin. The 2026-10-30 skeleton record is likewise a prior iteration, subsequently committed as `d47833d`, not the current working-tree state.
 
