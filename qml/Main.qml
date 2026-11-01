@@ -687,8 +687,33 @@ ApplicationWindow {
                                     iconName: "flag"
                                     onTriggered: mail.toggleFlagged(messageRow.messageIndex)
                                 }
+                                LiquidPopoverItem {
+                                    objectName: "moveToMenuItem"
+                                    text: qsTr("移动到…")
+                                    iconName: "folder"
+                                    enabled: mail.folders.filter(f => f.id !== mail.currentFolder).length > 0
+                                    onTriggered: { rowMenu.close(); messageMoveMenu.openAtAnchor() }
+                                }
                                 LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; onTriggered: mail.archiveMessage(messageRow.messageIndex) }
                                 LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; onTriggered: mail.deleteMessage(messageRow.messageIndex) }
+                            }
+                            LiquidPopover {
+                                id: messageMoveMenu
+                                objectName: "messageMoveMenu"
+                                sourceItem: chromePlanes
+                                anchorItem: messageRow
+                                closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
+                                Repeater {
+                                    model: mail.folders.filter(f => f.id !== mail.currentFolder)
+                                    LiquidPopoverItem {
+                                        text: modelData.title || modelData.id
+                                        iconName: "folder"
+                                        onTriggered: {
+                                            messageMoveMenu.close()
+                                            mail.moveMessage(messageRow.messageIndex, modelData.id)
+                                        }
+                                    }
+                                }
                             }
                             background: Rectangle {
                                 color: messageRow.selected ? window.selectedSurface : messageRow.hovered ? window.hoverSurface : "transparent"
