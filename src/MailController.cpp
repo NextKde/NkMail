@@ -431,6 +431,23 @@ QVariantList MailController::foldersFor(const QString &accountId) const {
     probe.close();
     return out;
 }
+QVariantMap MailController::folderUnread() const {
+    QVariantMap out;
+    if (!m_database || !m_database->isOpen()) return out;
+    const auto counts = m_database->unreadCounts();
+    for (auto it = counts.cbegin(); it != counts.cend(); ++it)
+        out.insert(it.key(), it.value());
+    return out;
+}
+int MailController::accountUnread(const QString &accountId) const {
+    // Read-only probe: a separate connection keeps another account's cache
+    // inspectable without touching the active binding or opening a socket.
+    MailDatabase probe;
+    if (!probe.open(m_root, accountId)) return 0;
+    const int unread = probe.unreadCounts().value(QStringLiteral("INBOX"), 0);
+    probe.close();
+    return unread;
+}
 void MailController::removeAccount(const QString &id) {
     if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return; }
     if (m_busy || m_sending || m_mutating) { setStatus(tr("Finish the current operation before switching accounts")); return; }
@@ -484,6 +501,7 @@ void MailController::loadCached(bool append) {
     if (!page.uidValidity.isEmpty()) m_uidValidity = page.uidValidity;
     if (append) m_messages->append(page.messages); else m_messages->replace(page.messages);
     m_offset = page.nextOffset; m_hasMore = page.hasMore; emit statusChanged();
+    emit folderUnreadChanged();
 }
 void MailController::selectFolder(const QString &folder) {
     if (folder == m_folder) return;
@@ -633,6 +651,8 @@ void MailController::fetchPage(bool append, bool quiet) {
                     self->m_offset = page.nextOffset; self->m_hasMore = page.hasMore;
                 }
                 self->m_cachedOnly = self->m_unreadOnly || !self->m_search.isEmpty();
+                // Saved headers changed the cached unread totals.
+                emit self->folderUnreadChanged();
                 if (quiet && !append && page.folder == QLatin1String("INBOX")) self->checkNewMail(page);
                 if (!quiet) self->setStatus(MailController::tr("Up to date · headers cached · server flags are read-only"));
             }, Qt::QueuedConnection);
@@ -854,6 +874,7 @@ void MailController::setMessageRead(int index, bool read) {
     if (!m_selected.isEmpty() && sameMessage(summaryFromMap(m_selected), summary)) {
         m_selected["unread"] = summary.unread; m_content.summary.unread = summary.unread; emit selectionChanged();
     }
+    emit folderUnreadChanged();
     if (m_demo) { setStatus(tr("Preview · flags are local only")); return; }
     m_mutating = true; setStatus(tr("Updating message flags…"));
     const auto account = m_account; const auto generation = m_generation;
@@ -969,6 +990,7 @@ void MailController::deleteMessage(int index) {
                 if (!self) return;
                 self->m_mutating = false;
                 if (self->m_database) self->m_database->removeMessage(folder, validity, uid);
+                emit self->folderUnreadChanged();
                 if (generation == self->m_generation) self->setStatus(usedFullExpunge
                     ? MailController::tr("Message deleted · mailbox was expunged")
                     : MailController::tr("Message deleted"));
@@ -1042,6 +1064,7 @@ void MailController::moveMessage(int index, const QString &destination) {
                 if (!self) return;
                 self->m_mutating = false;
                 if (self->m_database) self->m_database->removeMessage(folder, validity, uid);
+                emit self->folderUnreadChanged();
                 if (generation != self->m_generation) return;
                 if (toArchive) self->setStatus(usedFullExpunge
                     ? MailController::tr("Moved to Archive · mailbox was expunged")
@@ -1091,6 +1114,7 @@ void MailController::setMessagesRead(const QVariantList &indices, bool read) {
         }
     }
     if (touchedSelection) emit selectionChanged();
+    emit folderUnreadChanged();
     if (m_demo) { setStatus(tr("Preview · flags are local only")); return; }
     m_mutating = true; setStatus(tr("Updating message flags…"));
     const auto account = m_account; const auto generation = m_generation;
@@ -1235,6 +1259,7 @@ void MailController::deleteMessages(const QVariantList &indices) {
                 if (!self) return;
                 self->m_mutating = false;
                 if (self->m_database) for (const auto &uid : uids) self->m_database->removeMessage(folder, validity, uid);
+                emit self->folderUnreadChanged();
                 if (generation == self->m_generation)
                     self->setStatus(MailController::tr("%1 messages deleted").arg(count));
             }, Qt::QueuedConnection);
@@ -1323,6 +1348,7 @@ void MailController::moveMessagesTo(const QVariantList &indices, const QString &
                 if (!self) return;
                 self->m_mutating = false;
                 if (self->m_database) for (const auto &uid : uids) self->m_database->removeMessage(folder, validity, uid);
+                emit self->folderUnreadChanged();
                 if (generation != self->m_generation) return;
                 self->setStatus(archive ? MailController::tr("%1 messages archived").arg(count)
                                         : MailController::tr("%1 messages moved").arg(count));

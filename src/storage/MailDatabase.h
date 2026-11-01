@@ -1,5 +1,6 @@
 #pragma once
 #include "MailTypes.h"
+#include <QMap>
 #include <QSqlDatabase>
 #include <optional>
 
@@ -30,6 +31,8 @@ public:
     bool savePage(const Page &page);
     Page cachedPage(const QString &folder, int offset = 0, int limit = 50,
                     const QString &search = {}, bool unreadOnly = false) const;
+    QMap<QString, int> unreadCounts() const;
+
     bool saveContent(const Content &content);
     std::optional<Content> content(const QString &folder, const QString &uidValidity,
                                    const QString &uid) const;

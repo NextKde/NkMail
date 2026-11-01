@@ -519,6 +519,26 @@ Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, cons
     page.nextOffset = offset + int(page.messages.size());
     return page;
 }
+QMap<QString, int> MailDatabase::unreadCounts() const
+{
+    QMap<QString, int> result;
+    if (!check())
+        return result;
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("SELECT folder,payload FROM summaries WHERE account=?"));
+    q.addBindValue(m_accountId);
+    if (!q.exec()) {
+        fail(q.lastError().text());
+        return {};
+    }
+    while (q.next()) {
+        // Count unread rows in C++ rather than with SQL JSON functions so the
+        // result never depends on optional SQLite compile-time features.
+        if (summaryFromMap(mapFromJson(q.value(1))).unread)
+            ++result[q.value(0).toString()];
+    }
+    return result;
+}
 bool MailDatabase::saveContent(const Content &content)
 {
     if (!check())

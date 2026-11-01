@@ -38,6 +38,7 @@ TestCase {
         property var lastSaved: ({})
         signal selectionChanged()
         signal folderChanged()
+        signal folderUnreadChanged()
         signal draftAccepted(string id)
         ListModel {
             id: messageModel
@@ -47,6 +48,9 @@ TestCase {
         function refresh() { refreshCount++ }
         function selectFolder(folder) { currentFolder = folder }
         function foldersFor(accountId) { return folders }
+        property var folderUnreadMap: ({})
+        function folderUnread() { return folderUnreadMap }
+        function accountUnread(accountId) { return 0 }
         property var favorites: ([])
         property var favoriteKeys: ({})
         function isFavorite(accountId, folderId) { return favoriteKeys[accountId + "|" + folderId] === true }

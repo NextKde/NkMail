@@ -76,6 +76,13 @@ ApplicationWindow {
         const current = window.mail.account
         return (current && String(current.address || "").length > 0) ? [current] : []
     }
+    // Cache counters are read on demand; this bump makes the sidebar bindings
+    // re-query them whenever the controller reports a change.
+    property int unreadRevision: 0
+    Connections {
+        target: window.mail
+        function onFolderUnreadChanged() { window.unreadRevision++ }
+    }
     onDraftsVisibleChanged: {
         listOptions.close()
         if (draftsVisible) readerHeader.closeSearch()
@@ -627,6 +634,7 @@ ApplicationWindow {
         component MailboxAction: LiquidNavigationButton {
             id: action
             property string countText: ""
+            property string unreadText: ""
             Layout.fillWidth: true
             specificationForm: true
             specificationFontSize: 12
@@ -639,6 +647,7 @@ ApplicationWindow {
             checked: false
             iconColor: checked ? specificationSelectedTextColor : AppTheme.mutedText
             rightPadding: 12 + (count.visible ? count.implicitWidth + 8 : 0)
+                + (unread.visible ? unread.implicitWidth + 4 : 0)
             Text {
                 id: count
                 objectName: "mailboxCount"
@@ -648,6 +657,19 @@ ApplicationWindow {
                 text: action.countText
                 font: action.font
                 color: action.checked ? action.specificationSelectedTextColor : AppTheme.mutedText
+                textFormat: Text.PlainText
+            }
+            Text {
+                id: unread
+                objectName: "mailboxUnread"
+                anchors.right: count.visible ? count.left : parent.right
+                anchors.rightMargin: count.visible ? 10 : 12
+                anchors.verticalCenter: parent.verticalCenter
+                visible: text.length > 0
+                text: action.unreadText
+                font: action.font
+                color: action.checked ? action.specificationSelectedTextColor : AppTheme.accent
+                opacity: action.checked ? 0.9 : 1
                 textFormat: Text.PlainText
             }
         }
@@ -675,9 +697,23 @@ ApplicationWindow {
                     name: "id"; size: 16; color: header.current ? AppTheme.text : AppTheme.mutedText
                 }
                 Text {
+                    id: accountUnread
+                    objectName: "accountUnread_" + header.accountId
+                    anchors.right: parent.right; anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: text.length > 0
+                    text: {
+                        window.unreadRevision
+                        const count = window.mail.accountUnread(header.accountId)
+                        return count > 0 ? String(count) : ""
+                    }
+                    color: AppTheme.mutedText; font.pixelSize: 11
+                    textFormat: Text.PlainText
+                }
+                Text {
                     id: title
                     anchors.fill: parent; anchors.leftMargin: 26
-                    anchors.rightMargin: chevron.implicitWidth + 8
+                    anchors.rightMargin: chevron.implicitWidth + 8 + (accountUnread.visible ? accountUnread.implicitWidth + 6 : 0)
                     text: header.text
                     color: header.current ? AppTheme.text : AppTheme.mutedText
                     font: header.font
@@ -811,6 +847,12 @@ ApplicationWindow {
                                         text: window.mailboxTitle(modelData)
                                         iconName: "folder"
                                         countText: modelData.total >= 0 ? String(modelData.total) : ""
+                                        unreadText: {
+                                            window.unreadRevision
+                                            const count = accountSection.current
+                                                ? (window.mail.folderUnread()[modelData.id] || 0) : 0
+                                            return count > 0 ? "· " + count : ""
+                                        }
                                         checked: accountSection.current && !window.draftsVisible && window.mail.currentFolder === modelData.id
                                         Accessible.name: window.mailboxTitle(modelData)
                                         onClicked: {

@@ -74,6 +74,11 @@ public:
     // active account or opening a connection.
     Q_INVOKABLE QVariantList foldersFor(const QString &accountId) const;
     Q_INVOKABLE void removeAccount(const QString &id);
+    // Read-only cache probes: no network request and no change to the active
+    // account binding. folderUnread() reports the bound account; accountUnread()
+    // reads another account's cache in place.
+    Q_INVOKABLE QVariantMap folderUnread() const;
+    Q_INVOKABLE int accountUnread(const QString &accountId) const;
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void searchServer();
     Q_INVOKABLE void selectFolder(const QString &folder);
@@ -100,6 +105,7 @@ public:
     Q_INVOKABLE void moveMessages(const QVariantList &indices, const QString &destination);
 signals:
     void foldersChanged();
+    void folderUnreadChanged();
     void draftsChanged();
     void favoritesChanged();
     void accountChanged();
