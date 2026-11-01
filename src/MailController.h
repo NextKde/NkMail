@@ -17,6 +17,8 @@ class MailController : public QObject {
     Q_PROPERTY(QVariantList folders READ folders NOTIFY foldersChanged)
     Q_PROPERTY(QVariantList drafts READ drafts NOTIFY draftsChanged)
     Q_PROPERTY(QVariantMap account READ account NOTIFY accountChanged)
+    Q_PROPERTY(QVariantList accounts READ accounts NOTIFY accountsChanged)
+    Q_PROPERTY(QString currentAccountId READ currentAccountId NOTIFY accountChanged)
     Q_PROPERTY(QVariantMap selectedMessage READ selectedMessage NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedUid READ selectedUid NOTIFY selectionChanged)
     Q_PROPERTY(QString currentFolder READ currentFolder NOTIFY folderChanged)
@@ -38,6 +40,8 @@ public:
     QVariantList folders() const { return m_folders; }
     QVariantList drafts() const;
     QVariantMap account() const;
+    QVariantList accounts() const;
+    QString currentAccountId() const { return m_account.id; }
     QVariantMap selectedMessage() const { return m_selected; }
     QString selectedUid() const { return m_selectedUid; }
     QString currentFolder() const { return m_folder; }
@@ -57,6 +61,10 @@ public:
     int refreshInterval() const { return m_refreshInterval; }
     void setRefreshInterval(int seconds);
     Q_INVOKABLE void configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
+    // Multi-account scope: only the current account is polled or pushed. There is
+    // deliberately no unified inbox/search and no concurrent connection per account.
+    Q_INVOKABLE void switchAccount(const QString &id);
+    Q_INVOKABLE void removeAccount(const QString &id);
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void searchServer();
     Q_INVOKABLE void selectFolder(const QString &folder);
@@ -85,6 +93,7 @@ signals:
     void foldersChanged();
     void draftsChanged();
     void accountChanged();
+    void accountsChanged();
     void selectionChanged();
     void folderChanged();
     void statusChanged();
@@ -104,8 +113,10 @@ private:
     void present(const Content &content);
     void moveMessagesTo(const QVariantList &indices, const QString &destination, bool archive);
     QString credentialKey() const;
+    QString credentialKey(const Account &account) const;
     void run(std::function<void()> task);
     bool m_demo = false, m_busy = false, m_sending = false, m_restorePending = false, m_hasMore = false;
+    bool m_switchCredentialPending = false; // Credential read was started by switchAccount.
     bool m_serverSearching = false; // Server search is in flight, but must not block paging.
     bool m_mutating = false; // One mailbox write operation at a time.
     bool m_cachedOnly = true; // Query offsets stay local until a successful unfiltered header fetch.

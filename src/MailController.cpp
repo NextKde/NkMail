@@ -148,6 +148,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     connect(m_credentials, &CredentialStore::passwordReady, this, [this](const QString &id, const QString &password) {
         if (id != credentialKey() || m_demo || !m_restorePending || !m_account.password.isEmpty()) return;
         m_restorePending = false;
+        m_switchCredentialPending = false;
         m_account.password = password;
         setStatus(tr("Saved credentials restored. Refresh to connect."));
     });
@@ -156,8 +157,17 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         if (!settings.value("restoreAllowed", false).toBool()) return;
         if (!m_busy && !m_sending) setStatus(tr("Credentials saved in the system keychain."));
     });
-    connect(m_credentials, &CredentialStore::error, this, [this](const QString &, const QString &) {
+    connect(m_credentials, &CredentialStore::error, this, [this](const QString &id, const QString &) {
+        if (id != credentialKey()) return;
         m_restorePending = false;
+        if (m_switchCredentialPending) {
+            // A switch could not restore a stored secret (most often no entry).
+            // Stay on the newly selected account and ask for its password.
+            m_switchCredentialPending = false;
+            m_account.password.clear();
+            setStatus(tr("Account needs a password"), tr("Enter an application password for this account."));
+            return;
+        }
         setStatus(tr("System keychain needs attention"), tr("Credential storage or removal could not be completed. The local restore permission is authoritative; no plaintext fallback is used."));
     });
     QTimer::singleShot(0, this, &MailController::initialize);
@@ -166,6 +176,12 @@ MailController::~MailController() { m_pool.clear(); m_pool.waitForDone(); }
 QObject *MailController::messages() const { return m_messages; }
 bool MailController::configured() const { return !m_account.address.isEmpty() && !m_account.imapHost.isEmpty(); }
 QVariantMap MailController::account() const { return accountMap(m_account); }
+QVariantList MailController::accounts() const {
+    QVariantList out;
+    if (!m_database || !m_database->isOpen()) return out;
+    for (const auto &account : m_database->accounts()) out.append(accountMap(account));
+    return out;
+}
 QVariantList MailController::drafts() const {
     QVariantList out;
     if (m_database->isOpen()) for (const auto &draft : m_database->drafts()) out.append(draftMap(draft));
@@ -174,14 +190,17 @@ QVariantList MailController::drafts() const {
 void MailController::setStatus(const QString &status, const QString &error) {
     m_status = status; m_error = error; emit statusChanged();
 }
-QString MailController::credentialKey() const {
-    // Account id is "default" in every profile. Scope secrets to this explicit
-    // data root; never probe the legacy global key shared by unrelated profiles.
+QString MailController::credentialKey() const { return credentialKey(m_account); }
+QString MailController::credentialKey(const Account &account) const {
+    // Keep the canonical-root hash used for profile scoping and prefix it with the
+    // account id. The same username configured in two accounts of one profile now
+    // maps to distinct keys, while separate profiles never share a secret.
     const QFileInfo root(m_root);
     QString path = root.canonicalFilePath();
     if (path.isEmpty()) path = root.absoluteFilePath();
-    const QByteArray scope = path.toUtf8() + '\0' + m_account.id.toUtf8();
-    return QStringLiteral("profile-") + QString::fromLatin1(QCryptographicHash::hash(scope, QCryptographicHash::Sha256).toHex());
+    const QByteArray scope = path.toUtf8() + '\0' + account.id.toUtf8();
+    const QString profile = QStringLiteral("profile-") + QString::fromLatin1(QCryptographicHash::hash(scope, QCryptographicHash::Sha256).toHex());
+    return account.id + QLatin1Char(':') + profile;
 }
 void MailController::run(std::function<void()> task) { (void)QtConcurrent::run(&m_pool, std::move(task)); }
 void MailController::initialize() {
@@ -239,36 +258,120 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
         || next.imapPort < 1 || next.imapPort > 65535 || next.smtpPort < 1 || next.smtpPort > 65535) {
         setStatus(tr("Check account settings"), tr("Enter an email address, username, valid server names and ports.")); return;
     }
-    // A cache is bound to one account. Changing identity must not expose the previous account's mail.
-    if (configured() && (next.address.compare(m_account.address, Qt::CaseInsensitive) != 0 || next.imapHost != m_account.imapHost || next.username != m_account.username)) {
-        setStatus(tr("Account change requires a separate data directory"), tr("This first version keeps one mailbox per data directory. Use a new --data-dir for a different account.")); return;
+    // An explicit id selects an existing account to edit; otherwise the address
+    // (case-folded, whitespace trimmed) is the stable identity, and a random id is
+    // the last resort so two empty drafts never collapse into one record.
+    QString id = configuration.value("id").toString().trimmed();
+    if (id.isEmpty()) id = next.address.trimmed().toLower();
+    if (id.isEmpty()) id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    next.id = id;
+    const bool editingCurrent = next.id == m_account.id;
+    // A cache is bound to one account identity. For the current account, keep the
+    // original restriction so single-account behaviour is unchanged; other accounts
+    // are independent records and may differ freely.
+    if (editingCurrent && configured() && (next.address.compare(m_account.address, Qt::CaseInsensitive) != 0
+        || next.imapHost != m_account.imapHost || next.username != m_account.username)) {
+        setStatus(tr("Account change requires a separate data directory"), tr("Remove and re-add the account to change its email address, username or IMAP host.")); return;
     }
-    next.password = password.isEmpty() ? m_account.password : password;
-    next.id = QStringLiteral("default");
-    const bool changedMailbox = m_account.id != next.id || m_account.address != next.address
-        || m_account.username != next.username || m_account.imapHost != next.imapHost
-        || m_account.imapPort != next.imapPort || m_account.imapStartTls != next.imapStartTls;
+    // Only the live account may reuse the session-only password held in memory.
+    next.password = password.isEmpty() ? (editingCurrent ? m_account.password : QString{}) : password;
     if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return; }
-    const bool accountRebound = m_account.id != next.id;
-    m_restorePending = false;
-    m_account = next; ++m_generation; ++m_selectionGeneration;
-    if (accountRebound && !m_database->open(m_root, m_account.id)) {
-        setStatus(tr("Storage unavailable"), m_database->error());
+    if (!editingCurrent) {
+        // Adding or editing a background account must not disturb the live mailbox.
+        if (remember && !next.password.isEmpty()) m_credentials->write(credentialKey(next), next.password);
+        else if (!remember) m_credentials->remove(credentialKey(next));
+        emit accountsChanged();
+        setStatus(tr("Account saved."));
         return;
     }
+    const bool changedMailbox = m_account.address != next.address
+        || m_account.username != next.username || m_account.imapHost != next.imapHost
+        || m_account.imapPort != next.imapPort || m_account.imapStartTls != next.imapStartTls;
+    m_restorePending = false;
+    m_switchCredentialPending = false;
+    m_account = next; ++m_generation; ++m_selectionGeneration;
     if (changedMailbox) {
         m_cachedOnly = true; m_offset = 0; m_hasMore = false;
         m_messages->clear(); m_folders.clear(); m_selected.clear(); m_selectedUid.clear(); m_content = {};
         m_uidValidity.clear();
         emit foldersChanged(); emit selectionChanged();
     }
-    emit accountChanged();
+    emit accountChanged(); emit accountsChanged();
     QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
     settings.setValue("restoreAllowed", remember && !m_account.password.isEmpty()); settings.sync();
     if (remember && !m_account.password.isEmpty()) m_credentials->write(credentialKey(), m_account.password);
     else m_credentials->remove(credentialKey());
     startRefreshTimer();
     setStatus(tr("Account saved. Refresh to connect."));
+}
+void MailController::switchAccount(const QString &id) {
+    const QString accountId = id.trimmed();
+    if (m_busy || m_sending || m_mutating) { setStatus(tr("Finish the current operation before switching accounts")); return; }
+    if (accountId.isEmpty() || accountId == m_account.id) return;
+    bool exists = false;
+    for (const auto &account : m_database->accounts())
+        if (account.id == accountId) { exists = true; break; }
+    if (!exists) return;
+
+    ++m_generation; ++m_selectionGeneration;
+    m_database->close();
+    if (!m_database->open(m_root, accountId)) {
+        const QString error = m_database->error();
+        // Keep the previous account usable when the new binding cannot be opened.
+        m_database->open(m_root, m_account.id);
+        setStatus(tr("Storage unavailable"), error);
+        return;
+    }
+
+    // The new account starts from an empty, cached-only view. Only this account is
+    // polled; other accounts are never fetched, pushed, or searched in the background.
+    m_messages->replace({});
+    m_selected.clear(); m_selectedUid.clear(); m_content = {};
+    m_folder = QStringLiteral("INBOX");
+    m_search.clear();
+    m_offset = 0; m_hasMore = false; m_uidValidity.clear(); m_cachedOnly = true;
+
+    m_account = m_database->account();
+    m_folders.clear();
+    for (const auto &folder : m_database->folders())
+        m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
+    loadCached();
+    // Account has no per-account interval yet; reuse the controller-wide value.
+    startRefreshTimer();
+
+    // Credentials are per account. Clear the previous session secret before an
+    // asynchronous read so it can never be used for the wrong mailbox.
+    m_restorePending = false;
+    m_switchCredentialPending = false;
+    m_account.password.clear();
+    if (configured()) {
+        m_restorePending = true;
+        m_switchCredentialPending = true;
+        m_credentials->read(credentialKey());
+    }
+
+    emit accountChanged(); emit foldersChanged(); emit selectionChanged();
+    emit searchChanged(); emit folderChanged();
+    setStatus(configured() ? tr("Offline · cached mail") : tr("Add your email account to get started"));
+}
+void MailController::removeAccount(const QString &id) {
+    if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return; }
+    if (m_busy || m_sending || m_mutating) { setStatus(tr("Finish the current operation before switching accounts")); return; }
+    const QString accountId = id.trimmed().isEmpty() ? QStringLiteral("default") : id.trimmed();
+    Account target;
+    bool found = false;
+    for (const auto &account : m_database->accounts())
+        if (account.id == accountId) { target = account; found = true; break; }
+    if (!found) return;
+    if (!m_database->removeAccount(accountId)) { setStatus(tr("Could not remove account"), m_database->error()); return; }
+    m_credentials->remove(credentialKey(target));
+    emit accountsChanged();
+    if (accountId != m_account.id) return;
+
+    const auto remaining = m_database->accounts();
+    if (!remaining.isEmpty()) { switchAccount(remaining.first().id); return; }
+    disconnectAccount();
+    setStatus(tr("No accounts left"));
 }
 void MailController::refresh() {
     if (m_demo) { setStatus(tr("Preview · synthetic mail · not connected")); return; }
@@ -387,7 +490,7 @@ void MailController::checkNewMail(const Page &page) {
         if (ok && uid > maxUid) maxUid = uid;
     }
     QSettings settings;
-    const QString key = QStringLiteral("inbox/lastMaxUid");
+    const QString key = QStringLiteral("accounts/%1/lastMaxUid").arg(m_account.id);
     if (!settings.contains(key)) { settings.setValue(key, QVariant::fromValue<qulonglong>(maxUid)); return; }
     const quint64 lastUid = settings.value(key).toULongLong();
     // A lower maximum means the mailbox or every UID was regenerated; re-baseline quietly.
@@ -653,7 +756,7 @@ void MailController::sendDraft(const QVariantMap &map) {
 void MailController::clearError() { m_error.clear(); emit statusChanged(); }
 void MailController::disconnectAccount() {
     if (m_sending) return;
-    ++m_generation; ++m_selectionGeneration; m_pool.clear(); m_account.password.clear(); m_busy = false; m_restorePending = false; m_cachedOnly = true;
+    ++m_generation; ++m_selectionGeneration; m_pool.clear(); m_account.password.clear(); m_busy = false; m_restorePending = false; m_switchCredentialPending = false; m_cachedOnly = true;
     m_refreshTimer.stop();
     QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
     settings.setValue("restoreAllowed", false); settings.sync();
