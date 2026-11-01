@@ -6,9 +6,13 @@
 #include "mail/backend.h"
 #include <QCryptographicHash>
 #include <QDir>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
 #include <QMimeDatabase>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QPair>
 #include <QPointer>
 #include <QSaveFile>
@@ -45,7 +49,23 @@ QString escapeHtml(const QString &text)
     }
     return out;
 }
-// Deliberately bounded mailbox-list subset for automatic reply generation. We
+bool remoteHttpUrl(const QString &value) {
+    if (value.isEmpty()) return false;
+    for (const auto ch : value)
+        if (ch.unicode() < 0x20) return false;
+    const auto lower = value.toLower();
+    return lower.startsWith(QStringLiteral("http://")) || lower.startsWith(QStringLiteral("https://"));
+}
+// The sanitizer HTML-escapes the placeholder URL, so the attribute read back
+// from the sanitized markup must be unescaped before it can be fetched.
+QString htmlAttributeText(const QString &value) {
+    QString out = value;
+    out.replace(QStringLiteral("&lt;"), QStringLiteral("<"));
+    out.replace(QStringLiteral("&gt;"), QStringLiteral(">"));
+    out.replace(QStringLiteral("&quot;"), QStringLiteral("\""));
+    out.replace(QStringLiteral("&amp;"), QStringLiteral("&"));
+    return out;
+}
 // extract addr-specs, never display-name fragments. Unsupported RFC groups,
 // comments, quoted local parts and malformed input fail closed for manual review.
 bool replyAddresses(const QString &field, QStringList *addresses) {
@@ -722,6 +742,122 @@ void MailController::fetchPage(bool append, bool quiet) {
 void MailController::present(const Content &content) {
     m_content = content; m_selectedUid = content.summary.uid; m_selected = contentMap(content);
     emit selectionChanged();
+}
+int MailController::blockedImageCount() const {
+    return int(m_content.html.count(QStringLiteral("data-nkmail-src=\"")));
+}
+void MailController::loadRemoteImages() {
+    const QString html = m_content.html;
+    if (html.isEmpty()) return;
+    const Summary summary = m_content.summary;
+    const QString messageKey = summary.folder + QLatin1Char('|') + summary.uidValidity
+        + QLatin1Char('|') + summary.uid;
+    if (m_loadedImageMessages.contains(messageKey)) return;
+
+    // Collect the distinct placeholder URLs, capped so a hostile message cannot
+    // turn one click into an unbounded number of requests.
+    static const QRegularExpression srcPattern(QStringLiteral("data-nkmail-src=\"([^\"]*)\""));
+    QList<QPair<QString, QString>> sources; // escaped attribute text, fetch URL
+    QSet<QString> seen;
+    auto matches = srcPattern.globalMatch(html);
+    while (matches.hasNext() && sources.size() < 20) {
+        const QString escaped = matches.next().captured(1);
+        const QString url = htmlAttributeText(escaped).trimmed();
+        if (!remoteHttpUrl(url) || seen.contains(url)) continue;
+        seen.insert(url);
+        sources.append({escaped, url});
+    }
+    if (sources.isEmpty()) return;
+    m_loadedImageMessages.insert(messageKey);
+
+    const quint64 selectionGeneration = m_selectionGeneration;
+    QPointer<MailController> self(this);
+    run([self, sources, selectionGeneration, messageKey] {
+        constexpr qint64 maxBytes = 2 * 1024 * 1024;
+        constexpr int timeoutMs = 10000;
+        // One manager per batch, created inside the task and never shared.
+        QNetworkAccessManager manager;
+        QList<QPair<QString, QString>> results; // escaped attribute text, replacement HTML
+        for (const auto &source : sources) {
+            const QString &escaped = source.first;
+            const QUrl url(source.second);
+            const bool schemeOk = url.isValid()
+                && (url.scheme() == QLatin1String("http") || url.scheme() == QLatin1String("https"));
+            QString replacement = QStringLiteral("<span>[图片加载失败]</span>");
+            if (schemeOk) {
+                // No Referer, no cookies: only the bare image request goes out.
+                QNetworkRequest request(url);
+                request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                                     QNetworkRequest::NoLessSafeRedirectPolicy);
+                request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("NkMail"));
+                QNetworkReply *reply = manager.get(request);
+                QEventLoop loop;
+                QTimer timer;
+                timer.setSingleShot(true);
+                QObject::connect(&timer, &QTimer::timeout, &loop, [&reply, &loop] {
+                    reply->abort();
+                    loop.quit();
+                });
+                // Stop buffering once a response clearly exceeds the size cap.
+                QObject::connect(reply, &QNetworkReply::readyRead, &loop, [&reply, &loop, maxBytes] {
+                    if (reply->bytesAvailable() > maxBytes) {
+                        reply->abort();
+                        loop.quit();
+                    }
+                });
+                QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+                timer.start(timeoutMs);
+                if (!reply->isFinished()) loop.exec();
+                timer.stop();
+
+                const QUrl finalUrl = reply->url();
+                const bool finalSchemeOk = finalUrl.scheme() == QLatin1String("http")
+                    || finalUrl.scheme() == QLatin1String("https");
+                QString contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString().trimmed();
+                const auto semi = contentType.indexOf(QLatin1Char(';'));
+                if (semi >= 0) contentType = contentType.left(semi).trimmed();
+                const QByteArray data = reply->error() == QNetworkReply::NoError ? reply->readAll() : QByteArray();
+                if (reply->error() == QNetworkReply::NoError && finalSchemeOk
+                    && contentType.toLower().startsWith(QStringLiteral("image/"))
+                    && data.size() <= maxBytes && !data.isEmpty()) {
+                    replacement = QStringLiteral("<img src=\"data:%1;base64,%2\">")
+                                      .arg(contentType,
+                                           QString::fromLatin1(data.toBase64()));
+                }
+            }
+            results.append({escaped, replacement});
+        }
+
+        if (self) QMetaObject::invokeMethod(self, [self, results, selectionGeneration, messageKey] {
+            if (!self) return;
+            if (selectionGeneration != self->m_selectionGeneration) {
+                // The user moved on mid-download; drop the guard so returning to
+                // this message can try again.
+                self->m_loadedImageMessages.remove(messageKey);
+                return;
+            }
+            const QString current = self->m_content.html;
+            static const QRegularExpression imgPattern(
+                QStringLiteral("<img\\b[^>]*\\bdata-nkmail-src=\"([^\"]*)\"[^>]*>"));
+            QHash<QString, QString> replacements;
+            for (const auto &result : results) replacements.insert(result.first, result.second);
+            QString out;
+            qsizetype last = 0;
+            auto matches = imgPattern.globalMatch(current);
+            while (matches.hasNext()) {
+                const auto match = matches.next();
+                const auto it = replacements.constFind(match.captured(1));
+                if (it == replacements.constEnd()) continue;
+                out += current.mid(last, match.capturedStart() - last);
+                out += it.value();
+                last = match.capturedEnd();
+            }
+            out += current.mid(last);
+            self->m_content.html = out;
+            if (!self->m_selected.isEmpty()) self->m_selected["html"] = self->m_content.html;
+            emit self->selectionChanged();
+        }, Qt::QueuedConnection);
+    });
 }
 void MailController::openMessage(const QString &uid, const QString &validity) {
     const auto selectionGeneration = ++m_selectionGeneration;

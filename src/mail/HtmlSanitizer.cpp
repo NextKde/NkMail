@@ -54,7 +54,7 @@ const QSet<QString> &dropVoidTags()
 {
     static const QSet<QString> set = {
         QStringLiteral("input"), QStringLiteral("link"), QStringLiteral("meta"),
-        QStringLiteral("base"), QStringLiteral("img"), QStringLiteral("embed")};
+        QStringLiteral("base"), QStringLiteral("embed")};
     return set;
 }
 bool isVoidAllowed(const QString &name)
@@ -221,13 +221,32 @@ bool safeHref(const QString &value)
            || lower.startsWith(QStringLiteral("mailto:"));
 }
 
+// A remote image source is only kept as a placeholder; anything that is not
+// plain http(s) is dropped with the tag.
+bool safeRemoteSrc(const QString &value)
+{
+    if (value.isEmpty())
+        return false;
+    for (const QChar c : value) {
+        if (c.unicode() < 0x20)
+            return false;
+    }
+    const QString lower = value.toLower();
+    return lower.startsWith(QStringLiteral("http://"))
+           || lower.startsWith(QStringLiteral("https://"));
+}
+
 struct TagParse {
     bool ok = false;
     bool closing = false;
     bool selfClosing = false;
     bool hasHref = false;
+    bool hasSrc = false;
+    bool hasAlt = false;
     QString name;
     QString href;
+    QString src;
+    QString alt;
     qsizetype end = 0;
 };
 
@@ -324,10 +343,19 @@ TagParse parseTag(QStringView s, qsizetype start)
                 value = s.mid(valueStart, i - valueStart).toString();
             }
         }
-        if (!tag.closing
-            && attrName.compare(QStringLiteral("href"), Qt::CaseInsensitive) == 0) {
-            tag.hasHref = true;
-            tag.href = value;
+        if (!tag.closing) {
+            if (attrName.compare(QStringLiteral("href"), Qt::CaseInsensitive) == 0) {
+                tag.hasHref = true;
+                tag.href = value;
+            } else if (tag.name == QStringLiteral("img")) {
+                if (attrName.compare(QStringLiteral("src"), Qt::CaseInsensitive) == 0) {
+                    tag.hasSrc = true;
+                    tag.src = value;
+                } else if (attrName.compare(QStringLiteral("alt"), Qt::CaseInsensitive) == 0) {
+                    tag.hasAlt = true;
+                    tag.alt = value;
+                }
+            }
         }
     }
     return tag;
@@ -403,6 +431,24 @@ QString sanitizeMailHtml(const QString &input)
                     }
                 } else if (dropVoidTags().contains(tag.name)) {
                     // Dropped with no content.
+                } else if (tag.name == QStringLiteral("img")) {
+                    // Keep only a placeholder: remote images are downloaded on
+                    // demand, so the URL lives in data-nkmail-src and every other
+                    // attribute (width, style, on*) is discarded. Non-http(s)
+                    // sources drop the tag entirely.
+                    if (!tag.closing) {
+                        const QString src =
+                                tag.hasSrc ? decodeEntities(QStringView(tag.src)).trimmed() : QString();
+                        if (safeRemoteSrc(src)) {
+                            const QString alt =
+                                    tag.hasAlt ? decodeEntities(QStringView(tag.alt)).trimmed() : QString();
+                            out += QLatin1String("<img data-nkmail-src=\"");
+                            appendEscapedString(out, src);
+                            out += QLatin1String("\" alt=\"");
+                            appendEscapedString(out, alt);
+                            out += QLatin1String("\">");
+                        }
+                    }
                 } else if (allowedTags().contains(tag.name)) {
                     if (openTags.size() < MaxDepth) {
                         if (tag.name == QStringLiteral("a")) {

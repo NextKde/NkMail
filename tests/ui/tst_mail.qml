@@ -21,6 +21,8 @@ TestCase {
         property string currentAccountId: "default"
         property var selectedMessage: ({uid: "1", uidValidity: "1", sender: "Studio Example", senderAddress: "studio@example.invalid", subject: "A quieter inbox", date: "2026-10-29T09:00:00Z", to: "alex@example.invalid", cc: "", messageId: "<one@example.invalid>", text: "<img src=https://example.invalid/tracker>\nPlain text only.", attachments: []})
         property string selectedUid: "1"
+        property int blockedImageCount: 0
+        function loadRemoteImages() {}
         property string currentFolder: "INBOX"
         property string status: "Demo"
         property string error: ""

@@ -4,6 +4,7 @@
 #include <QVariantList>
 #include <QStringList>
 #include <QHash>
+#include <QSet>
 #include <QThreadPool>
 #include <QTimer>
 #include <memory>
@@ -24,6 +25,7 @@ class MailController : public QObject {
     Q_PROPERTY(QString currentAccountId READ currentAccountId NOTIFY accountChanged)
     Q_PROPERTY(QVariantMap selectedMessage READ selectedMessage NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedUid READ selectedUid NOTIFY selectionChanged)
+    Q_PROPERTY(int blockedImageCount READ blockedImageCount NOTIFY selectionChanged)
     Q_PROPERTY(QString currentFolder READ currentFolder NOTIFY folderChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
@@ -52,6 +54,11 @@ public:
     QString currentAccountId() const { return m_account.id; }
     QVariantMap selectedMessage() const { return m_selected; }
     QString selectedUid() const { return m_selectedUid; }
+    int blockedImageCount() const;
+    // Downloads the remote images of the selected message on explicit request,
+    // replacing each placeholder inline. Never touches the status bar; failures
+    // become a local placeholder text.
+    Q_INVOKABLE void loadRemoteImages();
     QString currentFolder() const { return m_folder; }
     QString status() const { return m_status; }
     QString error() const { return m_error; }
@@ -157,6 +164,9 @@ private:
     QVariantList m_folders;
     QVariantMap m_selected;
     Content m_content;
+    // Messages whose remote images were already fetched this session, keyed
+    // folder|uidValidity|uid, so repeated clicks do not re-download.
+    QSet<QString> m_loadedImageMessages;
     std::unique_ptr<MailDatabase> m_database;
     MessageListModel *m_messages = nullptr;
     CredentialStore *m_credentials = nullptr;
