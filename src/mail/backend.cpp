@@ -280,7 +280,7 @@ void addIds(const QString &field, const std::function<void(const std::string &)>
 Message compose(const Account &a, const Draft &d)
 {
     singleLine(a.address); singleLine(a.name); singleLine(d.subject);
-    if (d.subject.size() > 16384 || d.body.toUtf8().size() > MaxDecoded || d.attachments.size() > 100)
+    if (d.subject.size() > 16384 || d.body.toUtf8().size() + d.html.toUtf8().size() > MaxDecoded || d.attachments.size() > 100)
         throw BackendError("Draft exceeds safety limits.");
     Message m;
     m.line_policy(mailio::codec::line_len_policy_t::RECOMMENDED);
@@ -302,15 +302,39 @@ Message compose(const Account &a, const Draft &d)
     body.content_type(Mime::media_type_t::TEXT, "plain", "UTF-8");
     body.content_transfer_encoding(Mime::content_transfer_encoding_t::BASE_64);
     body.content(utf8(d.body));
-    if (d.attachments.empty()) {
-        m.content_type(Mime::media_type_t::TEXT, "plain", "UTF-8");
-        m.content_transfer_encoding(Mime::content_transfer_encoding_t::BASE_64);
-        m.content(utf8(d.body));
-    } else {
-        m.content_type(Mime::media_type_t::MULTIPART, "mixed");
+    Mime htmlPart;
+    if (!d.html.isEmpty()) {
+        htmlPart.content_type(Mime::media_type_t::TEXT, "html", "UTF-8");
+        htmlPart.content_transfer_encoding(Mime::content_transfer_encoding_t::BASE_64);
+        htmlPart.content(utf8(d.html));
+    }
+    if (d.html.isEmpty()) {
+        if (d.attachments.empty()) {
+            m.content_type(Mime::media_type_t::TEXT, "plain", "UTF-8");
+            m.content_transfer_encoding(Mime::content_transfer_encoding_t::BASE_64);
+            m.content(utf8(d.body));
+        } else {
+            m.content_type(Mime::media_type_t::MULTIPART, "mixed");
+            m.content_type().boundary(m.content_type().make_boundary());
+            m.add_part(body);
+        }
+    } else if (d.attachments.empty()) {
+        m.content_type(Mime::media_type_t::MULTIPART, "alternative");
         m.content_type().boundary(m.content_type().make_boundary());
         m.add_part(body);
-        qint64 total = d.body.toUtf8().size();
+        m.add_part(htmlPart);
+    } else {
+        Mime alternative;
+        alternative.content_type(Mime::media_type_t::MULTIPART, "alternative");
+        alternative.content_type().boundary(alternative.content_type().make_boundary());
+        alternative.add_part(body);
+        alternative.add_part(htmlPart);
+        m.content_type(Mime::media_type_t::MULTIPART, "mixed");
+        m.content_type().boundary(m.content_type().make_boundary());
+        m.add_part(alternative);
+    }
+    if (!d.attachments.empty()) {
+        qint64 total = d.body.toUtf8().size() + d.html.toUtf8().size();
         for (const auto &a : d.attachments) {
             QByteArray bytes = a.bytes;
             if (bytes.isEmpty() && !a.path.isEmpty()) {

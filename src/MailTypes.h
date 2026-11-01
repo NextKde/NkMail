@@ -34,7 +34,7 @@ struct Page {
     int nextOffset = 0;
 };
 struct Draft {
-    QString id, to, cc, bcc, subject, body, inReplyTo, references;
+    QString id, to, cc, bcc, subject, body, html, inReplyTo, references;
     QList<Attachment> attachments;
     QString state = QStringLiteral("draft");
     QDateTime updated;
