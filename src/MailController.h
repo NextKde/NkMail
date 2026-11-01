@@ -76,6 +76,11 @@ public:
     Q_INVOKABLE void deleteMessage(int index);
     Q_INVOKABLE void archiveMessage(int index);
     Q_INVOKABLE void moveMessage(int index, const QString &destination);
+    Q_INVOKABLE void setMessagesRead(const QVariantList &indices, bool read);
+    Q_INVOKABLE void setMessagesFlagged(const QVariantList &indices, bool flagged);
+    Q_INVOKABLE void deleteMessages(const QVariantList &indices);
+    Q_INVOKABLE void archiveMessages(const QVariantList &indices);
+    Q_INVOKABLE void moveMessages(const QVariantList &indices, const QString &destination);
 signals:
     void foldersChanged();
     void draftsChanged();
@@ -97,6 +102,7 @@ private:
     void checkNewMail(const Page &page);
     void setStatus(const QString &status, const QString &error = {});
     void present(const Content &content);
+    void moveMessagesTo(const QVariantList &indices, const QString &destination, bool archive);
     QString credentialKey() const;
     void run(std::function<void()> task);
     bool m_demo = false, m_busy = false, m_sending = false, m_restorePending = false, m_hasMore = false;

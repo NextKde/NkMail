@@ -933,6 +933,83 @@ void imap::expunge(unsigned long message_no, bool is_uid)
 }
 
 
+void imap::store_flags(const string& uid_set, const std::list<std::string>& flags, bool add)
+{
+    string cmd;
+    cmd.append("UID STORE " + uid_set + TOKEN_SEPARATOR_STR + (add ? "+FLAGS" : "-FLAGS") + TOKEN_SEPARATOR_STR);
+    cmd += LIST_BEGIN;
+    for (auto flag = flags.begin(); flag != flags.end(); ++flag)
+    {
+        if (flag != flags.begin())
+            cmd.append(TOKEN_SEPARATOR_STR);
+        cmd.append(*flag);
+    }
+    cmd += LIST_END;
+    dlg_->send(format(cmd));
+
+    while (true)
+    {
+        string line = dlg_->receive();
+        tag_result_response_t parsed_line = parse_tag_result(line);
+
+        if (parsed_line.tag == UNTAGGED_RESPONSE)
+            continue;
+
+        if (parsed_line.tag != to_string(tag_))
+            throw imap_error("Incorrect tag.", "Tag=`" + parsed_line.tag + "`.");
+        if (!parsed_line.result.has_value() || parsed_line.result.value() != tag_result_response_t::OK)
+            throw imap_error("Storing message flags failure.", "");
+        return;
+    }
+}
+
+
+void imap::copy(const string& uid_set, const string& destination_mailbox)
+{
+    string cmd;
+    cmd.append("UID COPY " + uid_set + TOKEN_SEPARATOR_STR + to_astring(destination_mailbox));
+    dlg_->send(format(cmd));
+
+    while (true)
+    {
+        string line = dlg_->receive();
+        tag_result_response_t parsed_line = parse_tag_result(line);
+
+        if (parsed_line.tag == UNTAGGED_RESPONSE)
+            continue;
+
+        if (parsed_line.tag != to_string(tag_))
+            throw imap_error("Incorrect tag.", "Tag=`" + parsed_line.tag + "`.");
+        if (!parsed_line.result.has_value() || parsed_line.result.value() != tag_result_response_t::OK)
+            throw imap_error("Copying message failure.", "");
+        return;
+    }
+}
+
+
+void imap::expunge(const string& uid_set)
+{
+    string cmd;
+    cmd.append("UID EXPUNGE" + TOKEN_SEPARATOR_STR + uid_set);
+    dlg_->send(format(cmd));
+
+    while (true)
+    {
+        string line = dlg_->receive();
+        tag_result_response_t parsed_line = parse_tag_result(line);
+
+        if (parsed_line.tag == UNTAGGED_RESPONSE)
+            continue;
+
+        if (parsed_line.tag != to_string(tag_))
+            throw imap_error("Incorrect tag.", "Tag=`" + parsed_line.tag + "`.");
+        if (!parsed_line.result.has_value() || parsed_line.result.value() != tag_result_response_t::OK)
+            throw imap_error("Expunging messages failure.", "");
+        return;
+    }
+}
+
+
 set<string> imap::capabilities()
 {
     dlg_->send(format("CAPABILITY"));

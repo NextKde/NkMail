@@ -35,6 +35,15 @@ public:
     static void expunge(const Account &account, const QString &folder,
                         const QString &uidValidity, const QString &uid = {},
                         bool *usedFullExpunge = nullptr);
+    static void storeFlagsMany(const Account &account, const QString &folder,
+                               const QString &uidValidity, const QStringList &uids,
+                               const QStringList &flags, bool add);
+    static void copyMany(const Account &account, const QString &folder,
+                         const QString &uidValidity, const QStringList &uids,
+                         const QString &destination);
+    static void expungeMany(const Account &account, const QString &folder,
+                            const QString &uidValidity, const QStringList &uids,
+                            bool *usedFullExpunge = nullptr);
 };
 
 } // namespace nkmail

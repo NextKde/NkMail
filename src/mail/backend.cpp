@@ -83,6 +83,16 @@ std::list<std::string> flagList(const QStringList &flags)
     }
     return wire;
 }
+std::string uidSet(const QStringList &uids)
+{
+    if (uids.size() > 500) throw BackendError("Too many messages selected.");
+    std::string set;
+    for (const auto &uid : uids) {
+        if (!set.empty()) set += ',';
+        set += std::to_string(identity(uid));
+    }
+    return set;
+}
 mailio::dialog_ssl::ssl_options_t tlsOptions(const Account &a)
 {
     return {boost::asio::ssl::context::tls_client, boost::asio::ssl::verify_peer, utf8(a.caFile)};
@@ -570,6 +580,58 @@ void MailioBackend::expunge(const Account &a, const QString &folder, const QStri
             }
             if (usedFullExpunge) *usedFullExpunge = true;
         }
+        imap.expunge();
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to expunge deleted messages. Check account, connection and trusted TLS certificate."); }
+}
+void MailioBackend::storeFlagsMany(const Account &a, const QString &folder, const QString &validity,
+                                   const QStringList &uids, const QStringList &flags, bool add)
+{
+    if (uids.isEmpty()) return;
+    try {
+        accountValid(a, false); folderValid(folder);
+        const auto expected = identity(validity);
+        const auto wire = flagList(flags);
+        const auto set = uidSet(uids);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), false);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        imap.store_flags(set, wire, add);
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to update message flags. Check account, connection and trusted TLS certificate."); }
+}
+void MailioBackend::copyMany(const Account &a, const QString &folder, const QString &validity,
+                             const QStringList &uids, const QString &destination)
+{
+    if (uids.isEmpty()) return;
+    try {
+        accountValid(a, false); folderValid(folder); folderValid(destination);
+        const auto expected = identity(validity);
+        const auto set = uidSet(uids);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), false);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        imap.copy(set, utf8(destination));
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to copy message. Check account, connection and trusted TLS certificate."); }
+}
+void MailioBackend::expungeMany(const Account &a, const QString &folder, const QString &validity,
+                                const QStringList &uids, bool *usedFullExpunge)
+{
+    if (usedFullExpunge) *usedFullExpunge = false;
+    if (uids.isEmpty()) return;
+    try {
+        accountValid(a, false); folderValid(folder);
+        const auto expected = identity(validity);
+        const auto set = uidSet(uids);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), false);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        if (imap.capabilities().count("UIDPLUS")) {
+            imap.expunge(set);
+            return;
+        }
+        if (usedFullExpunge) *usedFullExpunge = true;
         imap.expunge();
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError("Unable to expunge deleted messages. Check account, connection and trusted TLS certificate."); }

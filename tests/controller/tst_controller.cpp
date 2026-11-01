@@ -112,6 +112,15 @@ void MailioBackend::copyTo(const Account &, const QString &, const QString &, co
 void MailioBackend::expunge(const Account &, const QString &, const QString &, const QString &, bool *)
 {
 }
+void MailioBackend::storeFlagsMany(const Account &, const QString &, const QString &, const QStringList &, const QStringList &, bool)
+{
+}
+void MailioBackend::copyMany(const Account &, const QString &, const QString &, const QStringList &, const QString &)
+{
+}
+void MailioBackend::expungeMany(const Account &, const QString &, const QString &, const QStringList &, bool *)
+{
+}
 CredentialStore::CredentialStore(QObject *parent) : CredentialStore(QStringLiteral("synthetic"), parent) {}
 CredentialStore::CredentialStore(const QString &service, QObject *parent) : QObject(parent), m_service(service) {}
 void CredentialStore::read(const QString &id)
