@@ -121,6 +121,10 @@ void MailioBackend::copyMany(const Account &, const QString &, const QString &, 
 void MailioBackend::expungeMany(const Account &, const QString &, const QString &, const QStringList &, bool *)
 {
 }
+InboxStats MailioBackend::inboxStats(const Account &)
+{
+    return {};
+}
 CredentialStore::CredentialStore(QObject *parent) : CredentialStore(QStringLiteral("synthetic"), parent) {}
 CredentialStore::CredentialStore(const QString &service, QObject *parent) : QObject(parent), m_service(service) {}
 void CredentialStore::read(const QString &id)

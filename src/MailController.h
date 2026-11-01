@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QVariantList>
 #include <QStringList>
+#include <QHash>
 #include <QThreadPool>
 #include <QTimer>
 #include <memory>
@@ -35,6 +36,7 @@ class MailController : public QObject {
     Q_PROPERTY(bool unreadOnly READ unreadOnly WRITE setUnreadOnly NOTIFY unreadOnlyChanged)
     Q_PROPERTY(bool notifyEnabled READ notifyEnabled WRITE setNotifyEnabled NOTIFY notifyEnabledChanged)
     Q_PROPERTY(int refreshInterval READ refreshInterval WRITE setRefreshInterval NOTIFY refreshIntervalChanged)
+    Q_PROPERTY(int accountUnreadRevision READ accountUnreadRevision NOTIFY accountUnreadChanged)
 public:
     explicit MailController(bool demo, const QString &dataRoot, QObject *parent = nullptr);
     ~MailController() override;
@@ -66,6 +68,7 @@ public:
     void setNotifyEnabled(bool enabled);
     int refreshInterval() const { return m_refreshInterval; }
     void setRefreshInterval(int seconds);
+    int accountUnreadRevision() const { return m_accountUnreadRevision; }
     Q_INVOKABLE void configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
     // Multi-account scope: only the current account is polled or pushed. There is
     // deliberately no unified inbox/search and no concurrent connection per account.
@@ -117,6 +120,7 @@ signals:
     void unreadOnlyChanged();
     void notifyEnabledChanged();
     void refreshIntervalChanged();
+    void accountUnreadChanged();
     void draftAccepted(const QString &id);
 private:
     void initialize();
@@ -143,6 +147,8 @@ private:
     bool m_notifyEnabled = true;
     int m_refreshInterval = 300; // Seconds, clamped to at least 60.
     QTimer m_refreshTimer;
+    QHash<QString, int> m_accountUnread; // Network-reported INBOX unread per account.
+    int m_accountUnreadRevision = 0;
     QString m_root, m_folder = QStringLiteral("INBOX"), m_status, m_error, m_search, m_selectedUid;
     QString m_uidValidity; // Selected folder generation, for validating server search.
     int m_offset = 0;

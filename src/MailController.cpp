@@ -9,6 +9,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMimeDatabase>
+#include <QPair>
 #include <QPointer>
 #include <QSaveFile>
 #include <QSettings>
@@ -144,6 +145,54 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     connect(&m_refreshTimer, &QTimer::timeout, this, [this] {
         if (m_busy || m_sending || m_demo || !configured() || m_account.password.isEmpty()) return;
         fetchPage(false, true);
+
+        // Background sweep of the other accounts' INBOX statistics. Accounts are
+        // visited serially in a single task (one connection at a time); failures
+        // are per-account and never surface to the foreground UI or status bar.
+        QList<Account> others;
+        for (const auto &account : m_database->accounts())
+            if (account.id != m_account.id) others.append(account);
+        if (others.isEmpty()) return;
+        const bool notify = m_notifyEnabled;
+        QPointer<MailController> self(this);
+        run([self, others, notify] {
+            QHash<QString, int> unread;
+            QList<QPair<QString, QString>> notices;
+            for (const auto &account : others) {
+                InboxStats stats;
+                try { stats = MailioBackend::inboxStats(account); }
+                catch (...) { continue; }
+                unread.insert(account.id, stats.unseen);
+                bool ok = false;
+                const quint64 current = stats.maxUid.toULongLong(&ok);
+                if (!ok) continue;
+                QSettings settings;
+                const QString key = QStringLiteral("accounts/%1/lastMaxUid").arg(account.id);
+                if (!settings.contains(key)) {
+                    settings.setValue(key, QVariant::fromValue<qulonglong>(current));
+                    continue;
+                }
+                const quint64 last = settings.value(key).toULongLong();
+                if (current <= last) {
+                    // A lower maximum means the mailbox was regenerated; re-baseline quietly.
+                    if (current < last) settings.setValue(key, QVariant::fromValue<qulonglong>(current));
+                    continue;
+                }
+                settings.setValue(key, QVariant::fromValue<qulonglong>(current));
+                if (!notify) continue;
+                const QString title = account.name.isEmpty() ? account.address : account.name;
+                notices.append({title, MailController::tr("%1 new messages").arg(current - last)});
+            }
+            if (self) QMetaObject::invokeMethod(self, [self, unread, notices] {
+                if (!self) return;
+                for (auto it = unread.cbegin(); it != unread.cend(); ++it)
+                    self->m_accountUnread.insert(it.key(), it.value());
+                ++self->m_accountUnreadRevision;
+                emit self->accountUnreadChanged();
+                for (const auto &notice : notices)
+                    NotificationService::notify(notice.first, notice.second);
+            }, Qt::QueuedConnection);
+        });
     });
     connect(m_credentials, &CredentialStore::passwordReady, this, [this](const QString &id, const QString &password) {
         if (id != credentialKey() || m_demo || !m_restorePending || !m_account.password.isEmpty()) return;
@@ -440,6 +489,9 @@ QVariantMap MailController::folderUnread() const {
     return out;
 }
 int MailController::accountUnread(const QString &accountId) const {
+    // Prefer the count most recently reported by the server; fall back to the
+    // local cache when this account has not been polled yet.
+    if (m_accountUnread.contains(accountId)) return m_accountUnread.value(accountId);
     // Read-only probe: a separate connection keeps another account's cache
     // inspectable without touching the active binding or opening a socket.
     MailDatabase probe;

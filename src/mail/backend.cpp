@@ -366,6 +366,25 @@ Message compose(const Account &a, const Draft &d)
 }
 } // namespace
 
+InboxStats MailioBackend::inboxStats(const Account &a)
+{
+    try {
+        accountValid(a, false);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        // Read-only SELECT plus one STATUS: no message bodies or headers are fetched.
+        imap.select(std::string("INBOX"), true);
+        const auto stat = imap.statistics(std::string("INBOX"),
+            Imap::mailbox_stat_t::DEFAULT | Imap::mailbox_stat_t::UNSEEN
+            | Imap::mailbox_stat_t::UID_VALIDITY | Imap::mailbox_stat_t::UID_NEXT);
+        InboxStats result;
+        result.uidValidity = stat.uid_validity ? QString::number(stat.uid_validity) : QString{};
+        result.messages = int(std::min<unsigned long>(stat.messages_no, std::numeric_limits<int>::max()));
+        result.unseen = int(std::min<unsigned long>(stat.messages_unseen, std::numeric_limits<int>::max()));
+        result.maxUid = QString::number(stat.uid_next > 0 ? stat.uid_next - 1 : 0);
+        return result;
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to read inbox statistics. Check account, connection and trusted TLS certificate."); }
+}
 QList<Folder> MailioBackend::folders(const Account &a)
 {
     try {

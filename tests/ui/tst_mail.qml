@@ -50,6 +50,7 @@ TestCase {
         function foldersFor(accountId) { return folders }
         property var folderUnreadMap: ({})
         function folderUnread() { return folderUnreadMap }
+        property int accountUnreadRevision: 0
         function accountUnread(accountId) { return 0 }
         property var favorites: ([])
         property var favoriteKeys: ({})

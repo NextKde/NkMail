@@ -11,10 +11,18 @@ public:
     explicit BackendError(const char *message) : std::runtime_error(message) {}
 };
 
+struct InboxStats {
+    QString uidValidity;
+    int messages = 0;
+    int unseen = 0;
+    QString maxUid;
+};
+
 // Blocking operations: invoke on a dedicated caller-owned worker thread, never
 // the GUI thread. TLS verification is mandatory; no plaintext fallback/retry.
 class MailioBackend final {
 public:
+    static InboxStats inboxStats(const Account &account);
     static QList<Folder> folders(const Account &account);
     static Page page(const Account &account, const QString &folder,
                      int offset, int limit = 50);

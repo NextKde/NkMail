@@ -743,6 +743,7 @@ ApplicationWindow {
                     anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                     text: {
                         window.unreadRevision
+                        window.mail.accountUnreadRevision
                         const count = window.mail.accountUnread(header.accountId)
                         return count > 0 ? String(count) : ""
                     }
