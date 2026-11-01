@@ -1491,6 +1491,7 @@ ApplicationWindow {
         objectName: "messageDetailsPopover"
         sourceItem: chromePlanes
         anchorItem: messageOptionsGroup
+        anchorRect: Qt.rect(0, 76, messageOptionsGroup.width, 0)
         preferredSide: "bottom"
         width: Math.min(360, window.width - 16)
         implicitHeight: Math.min(360, detailsColumn.implicitHeight + topPadding + bottomPadding)
