@@ -61,6 +61,21 @@ ApplicationWindow {
         else next[key] = true
         collapsedThreads = next
     }
+    property var collapsedAccounts: ({})     // 账号 id -> true
+    function toggleAccountCollapsed(id) {
+        const next = Object.assign({}, collapsedAccounts)
+        if (next[id]) delete next[id]
+        else next[id] = true
+        collapsedAccounts = next
+    }
+    // The demo/preview account is not persisted in the accounts table, so fall
+    // back to the active account while the cache has no account rows yet.
+    readonly property var sidebarAccounts: {
+        const list = (window.mail.accounts || [])
+        if (list.length > 0) return list
+        const current = window.mail.account
+        return (current && String(current.address || "").length > 0) ? [current] : []
+    }
     onDraftsVisibleChanged: {
         listOptions.close()
         if (draftsVisible) readerHeader.closeSearch()
@@ -178,6 +193,14 @@ ApplicationWindow {
         target: mail
         function onSelectionChanged() { if (window.narrow && window.hasMessage) window.readerVisible = true }
         function onFolderChanged() { window.clearSelection() }
+        function onAccountChanged() {
+            // switchAccount() already empties the message model; the per-row menus
+            // live inside those delegates and are torn down with them.
+            window.selectionIndices = ({})
+            window.selectionAnchor = -1
+            window.collapsedThreads = ({})
+            listOptions.close()
+        }
     }
     Connections {
         target: mail.messages
@@ -629,6 +652,57 @@ ApplicationWindow {
             }
         }
 
+        // Sidebar account row: same interaction shell as MailboxAction, but the
+        // title colour distinguishes the active account from the others.
+        component AccountHeader: LiquidNavigationButton {
+            id: header
+            property string accountId: ""
+            property bool current: false
+            property bool collapsed: false
+            Layout.fillWidth: true
+            specificationForm: true
+            specificationFontSize: 12
+            specificationSelectedVerticalInset: 2
+            specificationHoverFillColor: AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd"
+            checkable: false
+            checked: false
+            font.weight: current ? Font.DemiBold : Font.Medium
+            rightPadding: 12 + chevron.implicitWidth + 8
+            contentItem: Item {
+                implicitHeight: Math.max(title.implicitHeight, 16)
+                VectorIcon {
+                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                    name: "id"; size: 16; color: header.current ? AppTheme.text : AppTheme.mutedText
+                }
+                Text {
+                    id: title
+                    anchors.fill: parent; anchors.leftMargin: 26
+                    anchors.rightMargin: chevron.implicitWidth + 8
+                    text: header.text
+                    color: header.current ? AppTheme.text : AppTheme.mutedText
+                    font: header.font
+                    verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+                }
+            }
+            VectorIcon {
+                id: chevron
+                anchors.right: parent.right; anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                name: "chevron"; size: 12
+                color: header.current ? AppTheme.text : AppTheme.mutedText
+                rotation: header.collapsed ? -90 : 0
+                Behavior on rotation {
+                    NumberAnimation { duration: AppTheme.reduceMotion ? 0 : AppTheme.motionFast }
+                }
+            }
+            MouseArea {
+                // Dedicated hit area so collapsing a section never switches accounts.
+                anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
+                width: chevron.implicitWidth + 24
+                onClicked: window.toggleAccountCollapsed(header.accountId)
+            }
+        }
+
         Item {
                 id: sidebar
                 objectName: "sidebarBody"
@@ -638,46 +712,87 @@ ApplicationWindow {
                 anchors.bottom: statusStrip.top
                 width: sidebarPlane.width
                 z: 1
-                ColumnLayout {
+                Flickable {
+                    id: mailboxNavigation
                     objectName: "mailboxNavigation"
                     anchors.fill: parent
                     anchors.leftMargin: 14; anchors.rightMargin: 14
                     anchors.bottomMargin: 14; anchors.topMargin: 4
-                    spacing: 0
-                    Text {
-                        objectName: "mailboxGroupTitle"
-                        text: qsTr("MAILBOXES"); color: window.muted
-                        font.pixelSize: 11; font.weight: Font.DemiBold
-                        topPadding: 0; bottomPadding: 6
-                    }
-                    Repeater {
-                        objectName: "mailboxFolders"
-                        model: mail.folders
-                        delegate: MailboxAction {
-                            required property var modelData
-                            objectName: "mailboxFolder_" + modelData.id
-                            text: window.mailboxTitle(modelData)
-                            iconName: "folder"
-                            countText: modelData.total >= 0 ? String(modelData.total) : ""
-                            checked: !window.draftsVisible && mail.currentFolder === modelData.id
-                            Accessible.name: window.mailboxTitle(modelData)
-                            onClicked: {
-                                window.draftsVisible = false; window.readerVisible = false
-                                mail.selectFolder(modelData.id)
-                                if (window.width < 1080) window.sidebarExpanded = false
+                    clip: true
+                    contentWidth: width
+                    contentHeight: mailboxColumn.implicitHeight
+                    boundsBehavior: Flickable.StopAtBounds
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                    ColumnLayout {
+                        id: mailboxColumn
+                        width: parent.width
+                        spacing: 0
+                        Repeater {
+                            model: window.sidebarAccounts
+                            delegate: ColumnLayout {
+                                id: accountSection
+                                required property var modelData
+                                readonly property string accountId: modelData.id
+                                readonly property bool current: window.mail.currentAccountId === accountId
+                                readonly property bool collapsed: window.collapsedAccounts[accountId] === true
+                                Layout.fillWidth: true
+                                spacing: 0
+                                AccountHeader {
+                                    objectName: "accountHeader_" + accountSection.accountId
+                                    accountId: accountSection.accountId
+                                    current: accountSection.current
+                                    collapsed: accountSection.collapsed
+                                    text: accountSection.modelData.name || accountSection.modelData.address
+                                    Accessible.name: text
+                                    onClicked: {
+                                        if (!accountSection.current) window.mail.switchAccount(accountSection.accountId)
+                                    }
+                                }
+                                Repeater {
+                                    // Synchronous cache read; it is not re-evaluated when
+                                    // the active account changes, only when the section folds.
+                                    objectName: accountSection.current ? "mailboxFolders" : "mailboxFolders_" + accountSection.accountId
+                                    model: accountSection.collapsed ? [] : (window.mail.foldersFor(accountSection.accountId) || [])
+                                    delegate: MailboxAction {
+                                        required property var modelData
+                                        // Keep the historical name for the active account; scope
+                                        // other accounts so their identical folder ids stay unique.
+                                        objectName: accountSection.current
+                                            ? "mailboxFolder_" + modelData.id
+                                            : "mailboxFolder_" + accountSection.accountId + "_" + modelData.id
+                                        text: window.mailboxTitle(modelData)
+                                        iconName: "folder"
+                                        countText: modelData.total >= 0 ? String(modelData.total) : ""
+                                        checked: accountSection.current && !window.draftsVisible && window.mail.currentFolder === modelData.id
+                                        Accessible.name: window.mailboxTitle(modelData)
+                                        onClicked: {
+                                            if (!accountSection.current) {
+                                                window.mail.switchAccount(accountSection.accountId)
+                                                if (window.mail.currentAccountId !== accountSection.accountId) return
+                                            }
+                                            window.draftsVisible = false; window.readerVisible = false
+                                            window.mail.selectFolder(modelData.id)
+                                            if (window.width < 1080) window.sidebarExpanded = false
+                                        }
+                                    }
+                                }
                             }
                         }
+                        MailboxAction {
+                            objectName: "draftFolderButton"
+                            text: qsTr("Drafts")
+                            iconName: "editRounded"
+                            countText: window.mail.drafts.length ? String(window.mail.drafts.length) : ""
+                            checked: window.draftsVisible
+                            Accessible.name: qsTr("Local drafts")
+                            onClicked: { window.draftsVisible = true; window.readerVisible = false; if (window.width < 1080) window.sidebarExpanded = false }
+                        }
+                        MailAction {
+                            objectName: "addAccountButton"
+                            text: qsTr("添加账号")
+                            onClicked: accountDialog.editAccount()
+                        }
                     }
-                    MailboxAction {
-                        objectName: "draftFolderButton"
-                        text: qsTr("Drafts")
-                        iconName: "editRounded"
-                        countText: mail.drafts.length ? String(mail.drafts.length) : ""
-                        checked: window.draftsVisible
-                        Accessible.name: qsTr("Local drafts")
-                        onClicked: { window.draftsVisible = true; window.readerVisible = false; if (window.width < 1080) window.sidebarExpanded = false }
-                    }
-                    Item { Layout.fillHeight: true }
                 }
         }
 

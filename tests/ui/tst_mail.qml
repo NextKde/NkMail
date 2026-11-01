@@ -17,6 +17,8 @@ TestCase {
         property var folders: [{id: "INBOX", title: "Inbox", total: 1}]
         property var drafts: []
         property var account: ({id: "example", name: "Alex Example", address: "alex@example.invalid"})
+        property var accounts: ([{ id: "default", name: "Alex Example", address: "alex@example.invalid" }])
+        property string currentAccountId: "default"
         property var selectedMessage: ({uid: "1", uidValidity: "1", sender: "Studio Example", senderAddress: "studio@example.invalid", subject: "A quieter inbox", date: "2026-10-29T09:00:00Z", to: "alex@example.invalid", cc: "", messageId: "<one@example.invalid>", text: "<img src=https://example.invalid/tracker>\nPlain text only.", attachments: []})
         property string selectedUid: "1"
         property string currentFolder: "INBOX"
@@ -44,6 +46,8 @@ TestCase {
         function configureAccount(config, password, remember) {}
         function refresh() { refreshCount++ }
         function selectFolder(folder) { currentFolder = folder }
+        function foldersFor(accountId) { return folders }
+        function switchAccount(accountId) { currentAccountId = accountId }
         function loadMore() {}
         function openMessage(uid, validity) { selectedUid = uid }
         function newDraft(mode) { return {id: "test-draft", to: "", cc: "", bcc: "", subject: "", body: "", inReplyTo: "", references: "", state: "draft", attachments: []} }

@@ -64,6 +64,9 @@ public:
     // Multi-account scope: only the current account is polled or pushed. There is
     // deliberately no unified inbox/search and no concurrent connection per account.
     Q_INVOKABLE void switchAccount(const QString &id);
+    // Read-only cache probe: lists another account's folders without touching the
+    // active account or opening a connection.
+    Q_INVOKABLE QVariantList foldersFor(const QString &accountId) const;
     Q_INVOKABLE void removeAccount(const QString &id);
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void searchServer();

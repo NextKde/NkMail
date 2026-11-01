@@ -354,6 +354,15 @@ void MailController::switchAccount(const QString &id) {
     emit searchChanged(); emit folderChanged();
     setStatus(configured() ? tr("Offline · cached mail") : tr("Add your email account to get started"));
 }
+QVariantList MailController::foldersFor(const QString &accountId) const {
+    QVariantList out;
+    MailDatabase probe;
+    if (!probe.open(m_root, accountId)) return out;
+    for (const auto &folder : probe.folders())
+        out.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
+    probe.close();
+    return out;
+}
 void MailController::removeAccount(const QString &id) {
     if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return; }
     if (m_busy || m_sending || m_mutating) { setStatus(tr("Finish the current operation before switching accounts")); return; }
