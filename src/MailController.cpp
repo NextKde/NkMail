@@ -30,6 +30,20 @@ QString localPath(const QString &url) {
 QString cleanSubject(const QString &prefix, const QString &subject) {
     return subject.startsWith(prefix, Qt::CaseInsensitive) ? subject : prefix + subject;
 }
+QString escapeHtml(const QString &text)
+{
+    QString out; out.reserve(text.size());
+    for (const auto ch : text) {
+        switch (ch.unicode()) {
+        case u'&': out += QStringLiteral("&amp;"); break;
+        case u'<': out += QStringLiteral("&lt;"); break;
+        case u'>': out += QStringLiteral("&gt;"); break;
+        case u'"': out += QStringLiteral("&quot;"); break;
+        default: out += ch;
+        }
+    }
+    return out;
+}
 // Deliberately bounded mailbox-list subset for automatic reply generation. We
 // extract addr-specs, never display-name fragments. Unsupported RFC groups,
 // comments, quoted local parts and malformed input fail closed for manual review.
@@ -523,6 +537,13 @@ QVariantMap MailController::newDraft(const QString &mode) {
         }
         draft.body = QStringLiteral("\n\n— %1 · %2 —\n").arg(s.sender, s.date);
         for (const auto &line : m_content.text.split('\n')) draft.body += "> " + line + '\n';
+        QString quoted = m_content.html;
+        if (quoted.isEmpty()) {
+            quoted = escapeHtml(m_content.text);
+            quoted.replace(QStringLiteral("\n"), QStringLiteral("<br>"));
+        }
+        draft.html = QStringLiteral("<p></p><p>— %1 · %2 —</p><blockquote>%3</blockquote>")
+                         .arg(escapeHtml(s.sender), escapeHtml(s.date), quoted);
         if (mode == "forward") for (const auto &attachment : m_content.attachments) {
             const auto path = QDir(m_root).filePath("attachments/" + QUuid::createUuid().toString(QUuid::WithoutBraces));
             QDir().mkpath(QFileInfo(path).absolutePath()); QSaveFile file(path);
