@@ -227,10 +227,14 @@ TestCase {
         wait(30)
         compare(findChild(app, "detailsButton"), null)   // 窄宽下「详情」已并入「更多」，不再有独立按钮
         app.showReview("details")
-        const details = findChild(app, "messageDetailsPopover")
+        const details = findChild(app, "messageDetailsPanel")
+        verify(details !== null)
         tryCompare(details, "visible", true)
-        compare(details.anchorItem, findChild(app, "messageOptionsGroup"))
-        details.close()
+        // 内联面板：展开时把正文往下推，关闭后高度归零
+        verify(details.height > 0)
+        app.detailsVisible = false
+        wait(30)
+        compare(details.visible, false)
         keyClick(Qt.Key_F, Qt.ControlModifier)
         compare(app.readerVisible, false)
         const search = findChild(app, "searchField")

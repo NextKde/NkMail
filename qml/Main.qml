@@ -79,6 +79,7 @@ ApplicationWindow {
     // Cache counters are read on demand; this bump makes the sidebar bindings
     // re-query them whenever the controller reports a change.
     property int unreadRevision: 0
+    property bool detailsVisible: false
     Connections {
         target: window.mail
         function onFolderUnreadChanged() { window.unreadRevision++ }
@@ -87,7 +88,7 @@ ApplicationWindow {
         listOptions.close()
         if (draftsVisible) readerHeader.closeSearch()
     }
-    onReaderVisibleChanged: { listOptions.close(); moreMenu.close(); details.close() }
+    onReaderVisibleChanged: { listOptions.close(); moreMenu.close(); window.detailsVisible = false }
     function focusWithin(item) {
         let focused = activeFocusItem
         while (focused) {
@@ -173,7 +174,7 @@ ApplicationWindow {
     // Capture helper is deliberately unavailable for real accounts.
     function showReview(scenario) {
         if (!mail.demo) return
-        moreMenu.close(); listOptions.close(); details.close(); accountDialog.close()
+        moreMenu.close(); listOptions.close(); window.detailsVisible = false; accountDialog.close()
         if (composer.visible && !composer.finishEditing()) return
         draftsVisible = false
         if (scenario === "compose") {
@@ -185,7 +186,7 @@ ApplicationWindow {
             composer.editDraft(mail.saveDraft(sample))
         }
         else if (scenario === "account") accountDialog.editAccount()
-        else if (scenario === "details" && hasMessage) details.open()
+        else if (scenario === "details" && hasMessage) window.detailsVisible = true
         else if (scenario === "search") readerHeader.openSearch()
         else if (scenario === "options") { readerVisible = false; Qt.callLater(() => listOptions.open()) }
         else if (scenario === "unread") { mail.unreadOnly = true; readerVisible = false }
@@ -217,6 +218,7 @@ ApplicationWindow {
             window.selectionIndices = ({})
             window.selectionAnchor = -1
             window.collapsedThreads = ({})
+            window.detailsVisible = false
             listOptions.close()
         }
     }
@@ -399,7 +401,7 @@ ApplicationWindow {
                     if (window.focusWithin(replyActions)) moreButton.forceActiveFocus()
                 }
                 function openSearch() {
-                    listOptions.close(); moreMenu.close(); details.close()
+                    listOptions.close(); moreMenu.close(); window.detailsVisible = false
                     window.draftsVisible = false
                     window.readerVisible = false
                     if (window.narrow) window.sidebarExpanded = false
@@ -544,7 +546,7 @@ ApplicationWindow {
                         materialForm: !window.liquidControls
                         onTriggered: index => {
                             if (index === 0) listOptions.open()
-                            else if (index === 1) details.open()
+                            else if (index === 1) window.detailsVisible = true
                             else moreMenu.openAtAnchor()
                         }
                     }
@@ -1206,6 +1208,72 @@ ApplicationWindow {
                                 Layout.maximumWidth: Math.max(0, Math.min(MailStyle.readerMaximumWidth, readerScroll.availableWidth - (window.width < 1100 ? 48 : 72)))
                                 Layout.minimumWidth: 0
                                 spacing: 14
+                                Item {
+                                    id: detailsPanel
+                                    objectName: "messageDetailsPanel"
+                                    Layout.fillWidth: true
+                                    readonly property real contentHeight: Math.max(140, Math.min(320, detailsColumn.implicitHeight + 24))
+                                    visible: window.detailsVisible
+                                    implicitHeight: visible ? contentHeight : 0
+                                    Layout.preferredHeight: implicitHeight
+                                    clip: true
+                                    RowLayout {
+                                        id: detailsHeader
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 12
+                                        anchors.topMargin: 12
+                                        height: 28
+                                        spacing: 8
+                                        Text { text: qsTr("Message details"); color: window.ink; font.pixelSize: 15; font.weight: Font.DemiBold; Layout.fillWidth: true }
+                                        MailAction { stacked: true; stackedText: qsTr("关闭"); iconName: "close"; accessibleText: qsTr("Close message details"); onClicked: window.detailsVisible = false }
+                                    }
+                                    ScrollView {
+                                        id: detailsScroll
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.top: detailsHeader.bottom
+                                        anchors.bottom: parent.bottom
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 12
+                                        anchors.topMargin: 8
+                                        anchors.bottomMargin: 12
+                                        contentWidth: availableWidth
+                                        clip: true
+                                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                                        ColumnLayout {
+                                            id: detailsColumn
+                                            width: parent.width
+                                            spacing: 8
+                                            Repeater {
+                                                model: [ {title: qsTr("From"), value: window.value(window.message, "senderAddress")},
+                                                    {title: qsTr("To"), value: window.value(window.message, "to")},
+                                                    {title: qsTr("Cc"), value: window.value(window.message, "cc")},
+                                                    {title: qsTr("Date"), value: window.dateLabel(window.message.date)},
+                                                    {title: qsTr("Message ID"), value: window.value(window.message, "messageId")} ]
+                                                delegate: ColumnLayout {
+                                                    id: detailsEntry
+                                                    required property var modelData
+                                                    visible: modelData.value.length > 0
+                                                    Layout.fillWidth: true; spacing: 3
+                                                    Text { text: detailsEntry.modelData.title; color: window.muted; font.pixelSize: 11 }
+                                                    TextEdit { text: detailsEntry.modelData.value; color: window.ink; font.pixelSize: 13; readOnly: true; selectByMouse: true; textFormat: TextEdit.PlainText; wrapMode: TextEdit.WrapAnywhere; Layout.fillWidth: true }
+                                                }
+                                            }
+                                            Text { text: qsTr("Read-only mailbox · no server flags are changed."); color: window.muted; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                                        }
+                                    }
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        height: 1
+                                        color: window.rule
+                                    }
+                                }
                                 Text {
                                     text: window.value(window.message, "subject") || qsTr("(No subject)")
                                     color: window.ink; font.pixelSize: 25; font.weight: Font.Bold
@@ -1469,7 +1537,7 @@ ApplicationWindow {
         LiquidPopoverItem { text: qsTr("Reply"); iconName: "undo"; enabled: !mail.sending; onTriggered: window.compose("reply") }
         LiquidPopoverItem { objectName: "moreReplyAll"; text: qsTr("Reply to all"); iconName: "arrows"; enabled: window.hasMessage && !mail.sending; onTriggered: window.compose("replyAll") }
         LiquidPopoverItem { text: qsTr("Forward"); iconName: "forward"; enabled: !mail.sending; onTriggered: window.compose("forward") }
-        LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: details.open() }
+        LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: window.detailsVisible = true }
         LiquidPopoverItem {
             text: qsTr("删除"); iconName: "trash"
             enabled: window.hasMessage && window.width < 1100
@@ -1484,50 +1552,6 @@ ApplicationWindow {
             text: window.message.flagged ? qsTr("取消旗标") : qsTr("标为旗标"); iconName: "flag"
             enabled: window.hasMessage && window.width < 1100
             onTriggered: mail.toggleFlagged(window.selectedIndex())
-        }
-    }
-    LiquidContentPopover {
-        id: details
-        objectName: "messageDetailsPopover"
-        sourceItem: chromePlanes
-        anchorItem: messageOptionsGroup
-        anchorRect: Qt.rect(0, 76, messageOptionsGroup.width, 0)
-        preferredSide: "bottom"
-        width: Math.min(360, window.width - 16)
-        implicitHeight: Math.min(360, detailsColumn.implicitHeight + topPadding + bottomPadding)
-        height: implicitHeight
-        contentItem: ScrollView {
-            id: detailsScroll
-            contentWidth: availableWidth
-            clip: true
-            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-            ScrollBar.vertical.policy: ScrollBar.AsNeeded
-            ColumnLayout {
-                id: detailsColumn
-                width: detailsScroll.availableWidth
-                spacing: 8
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text { text: qsTr("Message details"); color: window.ink; font.pixelSize: 15; font.weight: Font.DemiBold; Layout.fillWidth: true }
-                    MailAction { stacked: true; stackedText: qsTr("关闭"); iconName: "close"; accessibleText: qsTr("Close message details"); onClicked: details.close() }
-                }
-                Repeater {
-                    model: [ {title: qsTr("From"), value: window.value(window.message, "senderAddress")},
-                        {title: qsTr("To"), value: window.value(window.message, "to")},
-                        {title: qsTr("Cc"), value: window.value(window.message, "cc")},
-                        {title: qsTr("Date"), value: window.dateLabel(window.message.date)},
-                        {title: qsTr("Message ID"), value: window.value(window.message, "messageId")} ]
-                    delegate: ColumnLayout {
-                        id: detailsEntry
-                        required property var modelData
-                        visible: modelData.value.length > 0
-                        Layout.fillWidth: true; spacing: 3
-                        Text { text: detailsEntry.modelData.title; color: window.muted; font.pixelSize: 11 }
-                        TextEdit { text: detailsEntry.modelData.value; color: window.ink; font.pixelSize: 13; readOnly: true; selectByMouse: true; textFormat: TextEdit.PlainText; wrapMode: TextEdit.WrapAnywhere; Layout.fillWidth: true }
-                    }
-                }
-                Text { text: qsTr("Read-only mailbox · no server flags are changed."); color: window.muted; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap }
-            }
         }
     }
     MailComposer { id: composer; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
@@ -1579,9 +1603,10 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+F"; enabled: !composer.visible && !accountDialog.visible; onActivated: readerHeader.openSearch() }
     Shortcut {
         sequence: "Escape"
-        enabled: !composer.visible && !accountDialog.visible && !details.visible && !moreMenu.visible
+        enabled: !composer.visible && !accountDialog.visible && !window.detailsVisible && !moreMenu.visible
         onActivated: {
             if (window.selectionSize > 0) { window.clearSelection(); return }
+            if (window.detailsVisible) { window.detailsVisible = false; return }
             if (window.width < 1080 && window.sidebarExpanded) window.sidebarExpanded = false
             else if (window.narrow && window.readerVisible) window.readerVisible = false
             else if (toolbarSearch.active) readerHeader.closeSearch()
