@@ -199,6 +199,7 @@ ApplicationWindow {
     }
     Component.onCompleted: {
         AppTheme.compactDesign = true
+        mail.sendDelay = 8
         if (typeof reviewAppearance !== "undefined" && (reviewAppearance === "light" || reviewAppearance === "dark"))
             AppTheme.appearanceMode = reviewAppearance
     }

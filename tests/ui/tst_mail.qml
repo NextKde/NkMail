@@ -30,6 +30,8 @@ TestCase {
         property bool unreadOnly: false
         property bool notifyEnabled: true
         property bool sending: false
+        property int sendDelay: 0
+        property bool sendPending: false
         property bool configured: true
         property bool demo: true
         property bool hasMore: false
@@ -80,6 +82,7 @@ TestCase {
         function addAttachment(url) { return ({}) }
         function saveAttachment(index, url) {}
         function sendDraft(draft) { sending = true }
+        function cancelSend() { sendPending = false }
         function clearError() { error = "" }
         function disconnectAccount() { configured = false }
     }

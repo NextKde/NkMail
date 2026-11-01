@@ -38,6 +38,8 @@ class MailController : public QObject {
     Q_PROPERTY(bool unreadOnly READ unreadOnly WRITE setUnreadOnly NOTIFY unreadOnlyChanged)
     Q_PROPERTY(bool notifyEnabled READ notifyEnabled WRITE setNotifyEnabled NOTIFY notifyEnabledChanged)
     Q_PROPERTY(int refreshInterval READ refreshInterval WRITE setRefreshInterval NOTIFY refreshIntervalChanged)
+    Q_PROPERTY(int sendDelay READ sendDelay WRITE setSendDelay NOTIFY sendDelayChanged)
+    Q_PROPERTY(bool sendPending READ sendPending NOTIFY sendPendingChanged)
     Q_PROPERTY(int accountUnreadRevision READ accountUnreadRevision NOTIFY accountUnreadChanged)
 public:
     explicit MailController(bool demo, const QString &dataRoot, QObject *parent = nullptr);
@@ -75,6 +77,9 @@ public:
     void setNotifyEnabled(bool enabled);
     int refreshInterval() const { return m_refreshInterval; }
     void setRefreshInterval(int seconds);
+    int sendDelay() const { return m_sendDelay; }
+    void setSendDelay(int seconds);
+    bool sendPending() const { return m_sendPending; }
     int accountUnreadRevision() const { return m_accountUnreadRevision; }
     Q_INVOKABLE void configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
     // Multi-account scope: only the current account is polled or pushed. There is
@@ -101,6 +106,7 @@ public:
     Q_INVOKABLE QVariantMap addAttachment(const QString &url);
     Q_INVOKABLE void saveAttachment(int index, const QString &url);
     Q_INVOKABLE void sendDraft(const QVariantMap &draft);
+    Q_INVOKABLE void cancelSend();
     Q_INVOKABLE void clearError();
     Q_INVOKABLE void disconnectAccount();
     Q_INVOKABLE void setMessageRead(int index, bool read);
@@ -127,6 +133,8 @@ signals:
     void unreadOnlyChanged();
     void notifyEnabledChanged();
     void refreshIntervalChanged();
+    void sendDelayChanged();
+    void sendPendingChanged();
     void accountUnreadChanged();
     void draftAccepted(const QString &id);
 private:
@@ -139,6 +147,8 @@ private:
     void setStatus(const QString &status, const QString &error = {});
     void present(const Content &content);
     void moveMessagesTo(const QVariantList &indices, const QString &destination, bool archive);
+    void submitDraft(const Draft &draft);
+    void clearPendingSend();
     QString credentialKey() const;
     QString credentialKey(const Account &account) const;
     QStringList favoriteEntries() const;
@@ -153,6 +163,10 @@ private:
     bool m_unreadOnly = false;
     bool m_notifyEnabled = true;
     int m_refreshInterval = 300; // Seconds, clamped to at least 60.
+    int m_sendDelay = 0; // Seconds to wait before sending; 0 sends immediately.
+    bool m_sendPending = false;
+    Draft m_pendingSend;
+    QTimer m_sendTimer;
     QTimer m_refreshTimer;
     QHash<QString, int> m_accountUnread; // Network-reported INBOX unread per account.
     int m_accountUnreadRevision = 0;

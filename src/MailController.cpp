@@ -162,6 +162,14 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     m_pool.setMaxThreadCount(1);
     m_pool.setExpiryTimeout(-1);
     m_refreshTimer.setTimerType(Qt::VeryCoarseTimer);
+    m_sendTimer.setSingleShot(true);
+    connect(&m_sendTimer, &QTimer::timeout, this, [this] {
+        const auto draft = m_pendingSend;
+        m_pendingSend = {};
+        m_sendPending = false;
+        emit sendPendingChanged();
+        submitDraft(draft);
+    });
     connect(&m_refreshTimer, &QTimer::timeout, this, [this] {
         if (m_busy || m_sending || m_demo || !configured() || m_account.password.isEmpty()) return;
         fetchPage(false, true);
@@ -241,7 +249,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     });
     QTimer::singleShot(0, this, &MailController::initialize);
 }
-MailController::~MailController() { m_pool.clear(); m_pool.waitForDone(); }
+MailController::~MailController() { m_sendTimer.stop(); m_pendingSend = {}; m_sendPending = false; m_pool.clear(); m_pool.waitForDone(); }
 QObject *MailController::messages() const { return m_messages; }
 bool MailController::configured() const { return !m_account.address.isEmpty() && !m_account.imapHost.isEmpty(); }
 QVariantMap MailController::account() const { return accountMap(m_account); }
@@ -450,6 +458,7 @@ void MailController::switchAccount(const QString &id) {
         if (account.id == accountId) { exists = true; break; }
     if (!exists) return;
 
+    clearPendingSend();
     ++m_generation; ++m_selectionGeneration;
     m_database->close();
     if (!m_database->open(m_root, accountId)) {
@@ -644,6 +653,12 @@ void MailController::setRefreshInterval(int seconds) {
     m_refreshInterval = seconds;
     if (m_refreshTimer.isActive()) m_refreshTimer.start(seconds * 1000);
     emit refreshIntervalChanged();
+}
+void MailController::setSendDelay(int seconds) {
+    seconds = qMax(0, seconds);
+    if (m_sendDelay == seconds) return;
+    m_sendDelay = seconds;
+    emit sendDelayChanged();
 }
 void MailController::startRefreshTimer() {
     if (m_demo || !configured()) { m_refreshTimer.stop(); return; }
@@ -990,6 +1005,7 @@ void MailController::saveAttachment(int index, const QString &url) {
 void MailController::sendDraft(const QVariantMap &map) {
     if (m_demo) { setStatus(tr("Preview mode"), tr("Sending is disabled. Your draft is saved locally.")); saveDraft(map); return; }
     if (m_sending || m_busy) return;
+    if (m_sendPending) { setStatus(tr("A send is already pending")); return; }
     if (!configured() || m_account.password.isEmpty()) { setStatus(tr("Account needs attention"), tr("Enter an application password before sending.")); return; }
     const auto existing = loadDraft(map.value("id").toString());
     const auto existingState = existing.value("state").toString();
@@ -1000,6 +1016,15 @@ void MailController::sendDraft(const QVariantMap &map) {
     const auto draft = draftFromMap(saved);
     if (draft.state == "accepted" || draft.state == "sending" || draft.state == "unknown") { setStatus(tr("This draft may already have been sent"), tr("Create a new draft rather than automatically retransmitting it.")); return; }
     if (draft.to.trimmed().isEmpty() && draft.cc.trimmed().isEmpty() && draft.bcc.trimmed().isEmpty()) { setStatus(tr("Add a recipient")); return; }
+    if (m_sendDelay <= 0) { submitDraft(draft); return; }
+    // Hold the draft at "draft" until the delay expires, so a cancel leaves the
+    // saved draft intact and nothing reaches the SMTP server.
+    m_pendingSend = draft; m_sendPending = true;
+    m_sendTimer.start(m_sendDelay * 1000);
+    setStatus(tr("Sending in %1 s").arg(m_sendDelay));
+    emit sendPendingChanged();
+}
+void MailController::submitDraft(const Draft &draft) {
     if (!m_database->markDraftState(draft.id, "sending")) { setStatus(tr("Could not persist send state"), m_database->error()); return; }
     emit draftsChanged(); m_sending = true; setStatus(tr("Submitting to SMTP server…"));
     const auto account = m_account; QPointer<MailController> self(this);
@@ -1038,9 +1063,23 @@ void MailController::sendDraft(const QVariantMap &map) {
         }, Qt::QueuedConnection);
     });
 }
+void MailController::cancelSend() {
+    if (!m_sendPending) return;
+    m_sendTimer.stop();
+    m_pendingSend = {}; m_sendPending = false;
+    setStatus(tr("Send cancelled"));
+    emit sendPendingChanged();
+}
+void MailController::clearPendingSend() {
+    m_sendTimer.stop();
+    const bool wasPending = !m_pendingSend.id.isEmpty();
+    m_pendingSend = {}; m_sendPending = false;
+    if (wasPending) emit sendPendingChanged();
+}
 void MailController::clearError() { m_error.clear(); emit statusChanged(); }
 void MailController::disconnectAccount() {
     if (m_sending) return;
+    clearPendingSend();
     ++m_generation; ++m_selectionGeneration; m_pool.clear(); m_account.password.clear(); m_busy = false; m_restorePending = false; m_switchCredentialPending = false; m_cachedOnly = true;
     m_refreshTimer.stop();
     QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);

@@ -267,12 +267,12 @@ LiquidDialog {
             LiquidDialogButton { text: qsTr("Save draft & close"); enabled: !root.mail.sending; onClicked: root.finishEditing() }
             LiquidDialogButton {
                 objectName: "sendDraftButton"
-                text: root.mail.sending ? qsTr("Sending…") : qsTr("Send")
-                primaryAction: true
-                enabled: !root.mail.sending && !root.mail.busy && !root.mail.demo && root.mail.configured
+                text: root.mail.sendPending ? qsTr("撤销发送") : (root.mail.sending ? qsTr("Sending…") : qsTr("Send"))
+                primaryAction: !root.mail.sendPending
+                enabled: root.mail.sendPending ? true : (!root.mail.sending && !root.mail.busy && !root.mail.demo && root.mail.configured
                     && (toField.text.trim().length > 0 || ccField.text.trim().length > 0 || bccField.text.trim().length > 0)
-                    && ["unknown", "accepted", "sending"].indexOf(root.draft.state) < 0
-                onClicked: { if (root.persist()) root.mail.sendDraft(root.currentDraft()) }
+                    && ["unknown", "accepted", "sending"].indexOf(root.draft.state) < 0)
+                onClicked: { if (root.mail.sendPending) root.mail.cancelSend(); else { if (root.persist()) root.mail.sendDraft(root.currentDraft()) } }
             }
         }
     }
