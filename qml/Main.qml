@@ -436,17 +436,39 @@ ApplicationWindow {
                         stacked: true
                         buttonSize: 38
                         visible: !window.draftsVisible && window.selectionSize > 0
-                        icons: ["envelope", "flag", "archive", "trash"]
-                        labels: [qsTr("已读"), qsTr("旗标"), qsTr("归档"), qsTr("删除")]
+                        icons: ["envelope", "flag", "archive", "trash", "folder"]
+                        labels: [qsTr("已读"), qsTr("旗标"), qsTr("归档"), qsTr("删除"), qsTr("移动")]
                         backdrop: chromeBackdrop
                         materialForm: !window.liquidControls
                         onTriggered: index => {
-                            const rows = window.selectedIndexList()
-                            if (index === 0) mail.setMessagesRead(rows, true)
-                            else if (index === 1) mail.setMessagesFlagged(rows, true)
-                            else if (index === 2) mail.archiveMessages(rows)
-                            else if (index === 3) mail.deleteMessages(rows)
-                            if (index >= 2) window.clearSelection()
+                            if (index === 0) mail.setMessagesRead(window.selectedIndexList(), true)
+                            else if (index === 1) mail.setMessagesFlagged(window.selectedIndexList(), true)
+                            else if (index === 2) {
+                                mail.archiveMessages(window.selectedIndexList())
+                                window.clearSelection()
+                            } else if (index === 3) {
+                                mail.deleteMessages(window.selectedIndexList())
+                                window.clearSelection()
+                            } else if (index === 4) selectionMoveMenu.openAtAnchor()
+                        }
+                    }
+                    LiquidPopover {
+                        id: selectionMoveMenu
+                        objectName: "selectionMoveMenu"
+                        sourceItem: chromePlanes
+                        anchorItem: selectionOpsGroup
+                        closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
+                        Repeater {
+                            model: mail.folders.filter(f => f.id !== mail.currentFolder)
+                            LiquidPopoverItem {
+                                text: modelData.title || modelData.id
+                                iconName: "folder"
+                                onTriggered: {
+                                    selectionMoveMenu.close()
+                                    mail.moveMessages(window.selectedIndexList(), modelData.id)
+                                    window.clearSelection()
+                                }
+                            }
                         }
                     }
                     LiquidActionButtonGroup {
