@@ -144,6 +144,9 @@ ApplicationWindow {
         if (starts("junk") || name.indexOf("垃圾") >= 0) return "flag"
         return "folder"
     }
+    function folderDepth(id) {
+        return String(id || "").split("/").length - 1
+    }
     function draftStateLabel(state) {
         switch (state) {
         case "draft": return qsTr("Draft")
@@ -649,13 +652,16 @@ ApplicationWindow {
             id: action
             property string countText: ""
             property string unreadText: ""
+            property string accountLabel: ""
+            property int depth: 0
             Layout.fillWidth: true
-            Layout.preferredHeight: 28
+            Layout.preferredHeight: 26
+            leftPadding: 12 + depth * 12
             specificationForm: true
             specificationFontSize: 12
             specificationSelectedVerticalInset: 2
-            specificationSelectedFillColor: AppTheme.dark ? Qt.rgba(0.31, 0.56, 0.96, 0.28) : "#DCE9FB"
-            specificationSelectedTextColor: AppTheme.dark ? "#EAF1FF" : AppTheme.accent
+            specificationSelectedFillColor: AppTheme.withAlpha(AppTheme.accent, AppTheme.dark ? 0.22 : 0.13)
+            specificationSelectedTextColor: AppTheme.accent
             specificationHoverFillColor: AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd"
             font.weight: Font.Medium
             checkable: false
@@ -669,13 +675,26 @@ ApplicationWindow {
                 VectorIcon {
                     anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                     visible: action.iconName.length > 0
-                    name: action.iconName; size: 14; color: action.iconColor
+                    name: action.iconName; size: 16; color: action.iconColor
+                }
+                Text {
+                    id: accountLabel
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    visible: action.accountLabel.length > 0
+                    width: Math.min(implicitWidth, parent.width * 0.5)
+                    text: action.accountLabel
+                    color: AppTheme.mutedText
+                    opacity: 0.75
+                    font.pixelSize: 11
+                    verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
                 }
                 Text {
                     id: caption
-                    anchors.left: parent.left; anchors.right: unread.visible ? unread.left : parent.right
+                    anchors.left: parent.left
+                    anchors.right: accountLabel.visible ? accountLabel.left
+                        : unread.visible ? unread.left : parent.right
                     anchors.leftMargin: action.iconName.length ? 24 : 0
-                    anchors.rightMargin: unread.visible ? 6 : 0
+                    anchors.rightMargin: (accountLabel.visible || unread.visible) ? 6 : 0
                     anchors.verticalCenter: parent.verticalCenter
                     text: action.text
                     color: action.checked ? action.specificationSelectedTextColor
@@ -686,7 +705,9 @@ ApplicationWindow {
                 Text {
                     id: unread
                     objectName: "mailboxUnread"
-                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: accountLabel.visible ? accountLabel.left : parent.right
+                    anchors.rightMargin: accountLabel.visible ? 6 : 0
+                    anchors.verticalCenter: parent.verticalCenter
                     visible: text.length > 0
                     text: action.unreadText
                     font: action.font
@@ -712,7 +733,7 @@ ApplicationWindow {
             property bool current: false
             property bool collapsed: false
             Layout.fillWidth: true
-            Layout.preferredHeight: 28
+            Layout.preferredHeight: 26
             specificationForm: true
             specificationFontSize: 12
             specificationSelectedVerticalInset: 2
@@ -782,10 +803,16 @@ ApplicationWindow {
                         spacing: 0
                         Text {
                             objectName: "favoritesTitle"
-                            visible: (mail.favorites || []).length > 0
-                            text: qsTr("收藏"); color: window.muted
+                            text: qsTr("收藏"); color: AppTheme.mutedText
                             font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.4
                             topPadding: 0; bottomPadding: 6
+                        }
+                        Text {
+                            objectName: "favoritesEmptyHint"
+                            visible: (mail.favorites || []).length === 0
+                            text: qsTr("右键文件夹可加入收藏"); color: AppTheme.mutedText
+                            font.pixelSize: 11; opacity: 0.8
+                            leftPadding: 12; bottomPadding: 8
                         }
                         Repeater {
                             objectName: "favoritesList"
@@ -794,19 +821,23 @@ ApplicationWindow {
                                 required property var modelData
                                 text: modelData.title
                                 iconName: window.folderIcon(modelData.folderId)
+                                accountLabel: modelData.accountName || ""
                                 countText: ""
                                 onClicked: mail.openFavorite(modelData.accountId, modelData.folderId)
                             }
                         }
+                        Item { Layout.preferredHeight: 8 }
                         Repeater {
                             model: window.sidebarAccounts
                             delegate: ColumnLayout {
                                 id: accountSection
                                 required property var modelData
+                                required property int index
                                 readonly property string accountId: modelData.id
                                 readonly property bool current: window.mail.currentAccountId === accountId
                                 readonly property bool collapsed: window.collapsedAccounts[accountId] === true
                                 Layout.fillWidth: true
+                                Layout.topMargin: index > 0 ? 8 : 0
                                 spacing: 0
                                 AccountHeader {
                                     id: accountRow
@@ -868,7 +899,8 @@ ApplicationWindow {
                                             ? "mailboxFolder_" + modelData.id
                                             : "mailboxFolder_" + accountSection.accountId + "_" + modelData.id
                                         text: window.mailboxTitle(modelData)
-                                        iconName: window.folderIcon(modelData.id)
+                                        depth: window.folderDepth(modelData.id)
+                                        iconName: depth > 0 ? "folder" : window.folderIcon(modelData.id)
                                         countText: ""
                                         unreadText: {
                                             window.unreadRevision
@@ -926,7 +958,7 @@ ApplicationWindow {
                             objectName: "addAccountButton"
                             Accessible.name: qsTr("添加账号")
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 28
+                            Layout.preferredHeight: 26
                             Layout.topMargin: 6
                             readonly property bool hovered: addAccountMouse.containsMouse
                             Rectangle {
