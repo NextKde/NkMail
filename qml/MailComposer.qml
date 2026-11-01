@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import Kos.Ui
+import NextKde.Mail.Editor 1.0
 
 LiquidDialog {
     id: root
@@ -36,7 +37,7 @@ LiquidDialog {
         ccField.text = String(draft.cc || "")
         bccField.text = String(draft.bcc || "")
         subjectField.text = String(draft.subject || "")
-        bodyField.text = String(draft.body || "")
+        bodyField.text = draft.html ? String(draft.html) : String(draft.body || "")
         showCc = ccField.text.length > 0
         showBcc = bccField.text.length > 0
         dirty = false; saveFailed = false
@@ -55,7 +56,9 @@ LiquidDialog {
     function currentDraft() {
         const value = copy(draft)
         value.to = toField.text; value.cc = ccField.text; value.bcc = bccField.text
-        value.subject = subjectField.text; value.body = bodyField.text
+        value.subject = subjectField.text
+        value.body = richEditor.toPlainText(bodyField.textDocument)
+        value.html = richEditor.toHtml(bodyField.textDocument)
         return value
     }
     function persist() {
@@ -79,6 +82,7 @@ LiquidDialog {
         return true
     }
     Timer { id: autosave; interval: 800; onTriggered: root.persist() }
+    RichTextEditor { id: richEditor }
     Connections {
         target: root.mail
         function onDraftsChanged() {
@@ -135,8 +139,38 @@ LiquidDialog {
                     elevation: 0
                 }
             }
+            RowLayout {
+                id: formatBar
+                anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                anchors.leftMargin: 12; anchors.rightMargin: 12; anchors.topMargin: 8
+                spacing: 4
+                MailAction {
+                    text: "B"; accessibleText: qsTr("Bold"); toolbarAction: false
+                    implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.bold: true
+                    enabled: !root.mail.sending
+                    onClicked: { richEditor.toggleBold(bodyField.textDocument); root.changed() }
+                }
+                MailAction {
+                    text: "I"; accessibleText: qsTr("Italic"); toolbarAction: false
+                    implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.italic: true
+                    enabled: !root.mail.sending
+                    onClicked: { richEditor.toggleItalic(bodyField.textDocument); root.changed() }
+                }
+                MailAction {
+                    text: "U"; accessibleText: qsTr("Underline"); toolbarAction: false
+                    implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.underline: true
+                    enabled: !root.mail.sending
+                    onClicked: { richEditor.toggleUnderline(bodyField.textDocument); root.changed() }
+                }
+                MailAction {
+                    text: qsTr("• 列表"); accessibleText: qsTr("Bullet list"); toolbarAction: false
+                    implicitWidth: 56; implicitHeight: 22; font.pixelSize: 11
+                    enabled: !root.mail.sending
+                    onClicked: { richEditor.toggleBulletList(bodyField.textDocument); root.changed() }
+                }
+            }
             ScrollView {
-                anchors.fill: parent; anchors.margins: 12
+                anchors.fill: parent; anchors.margins: 12; anchors.topMargin: 42
                 contentWidth: availableWidth
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                 KosTextArea {
@@ -147,7 +181,7 @@ LiquidDialog {
                     placeholderText: qsTr("Write something thoughtful…")
                     font.pixelSize: 14
                     wrapMode: TextEdit.Wrap
-                    textFormat: TextEdit.PlainText
+                    textFormat: TextEdit.RichText
                     selectByMouse: true
                     Accessible.name: qsTr("Message body")
                     padding: 0

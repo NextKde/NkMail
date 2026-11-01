@@ -322,7 +322,7 @@ TestCase {
         mock.failSave = true
         keyClick(Qt.Key_Escape)
         compare(dialog.visible, true)
-        compare(body.text, "Do not discard on Escape.")
+        compare(body.getText(0, body.length), "Do not discard on Escape.")
         mock.failSave = false
         keyClick(Qt.Key_Escape)
         tryCompare(dialog, "visible", false)
@@ -360,7 +360,7 @@ TestCase {
         mock.failSave = true
         verify(!dialog.finishEditing())
         compare(dialog.visible, true)
-        compare(body.text, "Keep this local draft.")
+        compare(body.getText(0, body.length), "Keep this local draft.")
         mock.failSave = false
         verify(dialog.finishEditing())
         compare(mock.lastSaved.body, "Keep this local draft.")
