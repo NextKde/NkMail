@@ -132,6 +132,17 @@ ApplicationWindow {
         if (title === "Trash") return qsTr("Trash")
         return title
     }
+    function folderIcon(id) {
+        const name = String(id || "").split(/[\/\\]/).pop().toLowerCase()
+        const starts = (prefix) => name.indexOf(prefix) === 0
+        if (starts("inbox") || name.indexOf("收件") >= 0) return "envelope"
+        if (starts("sent") || name.indexOf("已发送") >= 0 || name.indexOf("发送") >= 0) return "forward"
+        if (starts("draft") || name.indexOf("草稿") >= 0) return "editRounded"
+        if (starts("archive") || name.indexOf("归档") >= 0) return "archive"
+        if (starts("trash") || name.indexOf("删除") >= 0) return "trash"
+        if (starts("junk") || name.indexOf("垃圾") >= 0) return "flag"
+        return "folder"
+    }
     function draftStateLabel(state) {
         switch (state) {
         case "draft": return qsTr("Draft")
@@ -636,6 +647,7 @@ ApplicationWindow {
             property string countText: ""
             property string unreadText: ""
             Layout.fillWidth: true
+            Layout.preferredHeight: 28
             specificationForm: true
             specificationFontSize: 12
             specificationSelectedVerticalInset: 2
@@ -646,35 +658,50 @@ ApplicationWindow {
             checkable: false
             checked: false
             iconColor: checked ? specificationSelectedTextColor : AppTheme.mutedText
-            rightPadding: 12 + (count.visible ? count.implicitWidth + 8 : 0)
-                + (unread.visible ? unread.implicitWidth + 4 : 0)
-            Text {
-                id: count
-                objectName: "mailboxCount"
-                anchors.right: parent.right; anchors.rightMargin: 12
-                anchors.verticalCenter: parent.verticalCenter
-                visible: text.length > 0
-                text: action.countText
-                font: action.font
-                color: action.checked ? action.specificationSelectedTextColor : AppTheme.mutedText
-                textFormat: Text.PlainText
-            }
-            Text {
-                id: unread
-                objectName: "mailboxUnread"
-                anchors.right: count.visible ? count.left : parent.right
-                anchors.rightMargin: count.visible ? 10 : 12
-                anchors.verticalCenter: parent.verticalCenter
-                visible: text.length > 0
-                text: action.unreadText
-                font: action.font
-                color: action.checked ? action.specificationSelectedTextColor : AppTheme.accent
-                opacity: action.checked ? 0.9 : 1
-                textFormat: Text.PlainText
+            contentItem: Item {
+                implicitWidth: caption.implicitWidth
+                    + (action.iconName.length ? 24 : 0)
+                    + (unread.visible ? unread.implicitWidth + 6 : 0)
+                implicitHeight: Math.max(caption.implicitHeight, 16)
+                VectorIcon {
+                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                    visible: action.iconName.length > 0
+                    name: action.iconName; size: 14; color: action.iconColor
+                }
+                Text {
+                    id: caption
+                    anchors.left: parent.left; anchors.right: unread.visible ? unread.left : parent.right
+                    anchors.leftMargin: action.iconName.length ? 24 : 0
+                    anchors.rightMargin: unread.visible ? 6 : 0
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: action.text
+                    color: action.checked ? action.specificationSelectedTextColor
+                        : AppTheme.dark ? Qt.rgba(1, 1, 1, .92) : Qt.rgba(0, 0, 0, .92)
+                    font: action.font
+                    verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+                }
+                Text {
+                    id: unread
+                    objectName: "mailboxUnread"
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    visible: text.length > 0
+                    text: action.unreadText
+                    font: action.font
+                    color: action.checked ? action.specificationSelectedTextColor : AppTheme.accent
+                    textFormat: Text.PlainText
+                }
+                Text {
+                    id: count
+                    objectName: "mailboxCount"
+                    visible: false
+                    text: action.countText
+                    font: action.font
+                    textFormat: Text.PlainText
+                }
             }
         }
 
-        // Sidebar account row: same interaction shell as MailboxAction, but the
+        // Sidebar account row: a disclosure chevron plus the account title. The
         // title colour distinguishes the active account from the others.
         component AccountHeader: LiquidNavigationButton {
             id: header
@@ -682,26 +709,38 @@ ApplicationWindow {
             property bool current: false
             property bool collapsed: false
             Layout.fillWidth: true
+            Layout.preferredHeight: 28
             specificationForm: true
             specificationFontSize: 12
             specificationSelectedVerticalInset: 2
             specificationHoverFillColor: AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd"
             checkable: false
             checked: false
-            font.weight: current ? Font.DemiBold : Font.Medium
-            rightPadding: 12 + chevron.implicitWidth + 8
             contentItem: Item {
                 implicitHeight: Math.max(title.implicitHeight, 16)
                 VectorIcon {
+                    id: chevron
                     anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                    name: "id"; size: 16; color: header.current ? AppTheme.text : AppTheme.mutedText
+                    name: "chevron"; size: 12
+                    color: header.current ? AppTheme.text : AppTheme.mutedText
+                    rotation: header.collapsed ? -90 : 0
+                    Behavior on rotation {
+                        NumberAnimation { duration: AppTheme.reduceMotion ? 0 : AppTheme.motionFast }
+                    }
+                }
+                Text {
+                    id: title
+                    anchors.fill: parent; anchors.leftMargin: 24
+                    text: header.text
+                    color: header.current ? AppTheme.text : AppTheme.mutedText
+                    font.pixelSize: 13; font.weight: Font.DemiBold
+                    verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
                 }
                 Text {
                     id: accountUnread
                     objectName: "accountUnread_" + header.accountId
-                    anchors.right: parent.right; anchors.rightMargin: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: text.length > 0
+                    visible: false
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                     text: {
                         window.unreadRevision
                         const count = window.mail.accountUnread(header.accountId)
@@ -710,32 +749,6 @@ ApplicationWindow {
                     color: AppTheme.mutedText; font.pixelSize: 11
                     textFormat: Text.PlainText
                 }
-                Text {
-                    id: title
-                    anchors.fill: parent; anchors.leftMargin: 26
-                    anchors.rightMargin: chevron.implicitWidth + 8 + (accountUnread.visible ? accountUnread.implicitWidth + 6 : 0)
-                    text: header.text
-                    color: header.current ? AppTheme.text : AppTheme.mutedText
-                    font: header.font
-                    verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
-                }
-            }
-            VectorIcon {
-                id: chevron
-                anchors.right: parent.right; anchors.rightMargin: 12
-                anchors.verticalCenter: parent.verticalCenter
-                name: "chevron"; size: 12
-                color: header.current ? AppTheme.text : AppTheme.mutedText
-                rotation: header.collapsed ? -90 : 0
-                Behavior on rotation {
-                    NumberAnimation { duration: AppTheme.reduceMotion ? 0 : AppTheme.motionFast }
-                }
-            }
-            MouseArea {
-                // Dedicated hit area so collapsing a section never switches accounts.
-                anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
-                width: chevron.implicitWidth + 24
-                onClicked: window.toggleAccountCollapsed(header.accountId)
             }
         }
 
@@ -767,7 +780,7 @@ ApplicationWindow {
                             objectName: "favoritesTitle"
                             visible: (mail.favorites || []).length > 0
                             text: qsTr("收藏"); color: window.muted
-                            font.pixelSize: 11; font.weight: Font.DemiBold
+                            font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.4
                             topPadding: 0; bottomPadding: 6
                         }
                         Repeater {
@@ -776,7 +789,7 @@ ApplicationWindow {
                             delegate: MailboxAction {
                                 required property var modelData
                                 text: modelData.title
-                                iconName: "folder"
+                                iconName: window.folderIcon(modelData.folderId)
                                 countText: ""
                                 onClicked: mail.openFavorite(modelData.accountId, modelData.folderId)
                             }
@@ -800,7 +813,13 @@ ApplicationWindow {
                                     text: accountSection.modelData.name || accountSection.modelData.address
                                     Accessible.name: text
                                     onClicked: {
-                                        if (!accountSection.current) window.mail.switchAccount(accountSection.accountId)
+                                        if (accountSection.current) {
+                                            window.toggleAccountCollapsed(accountSection.accountId)
+                                        } else {
+                                            window.mail.switchAccount(accountSection.accountId)
+                                            if (accountSection.collapsed)
+                                                window.toggleAccountCollapsed(accountSection.accountId)
+                                        }
                                     }
                                     TapHandler {
                                         acceptedButtons: Qt.RightButton
@@ -845,13 +864,13 @@ ApplicationWindow {
                                             ? "mailboxFolder_" + modelData.id
                                             : "mailboxFolder_" + accountSection.accountId + "_" + modelData.id
                                         text: window.mailboxTitle(modelData)
-                                        iconName: "folder"
-                                        countText: modelData.total >= 0 ? String(modelData.total) : ""
+                                        iconName: window.folderIcon(modelData.id)
+                                        countText: ""
                                         unreadText: {
                                             window.unreadRevision
                                             const count = accountSection.current
                                                 ? (window.mail.folderUnread()[modelData.id] || 0) : 0
-                                            return count > 0 ? "· " + count : ""
+                                            return count > 0 ? String(count) : ""
                                         }
                                         checked: accountSection.current && !window.draftsVisible && window.mail.currentFolder === modelData.id
                                         Accessible.name: window.mailboxTitle(modelData)
@@ -894,15 +913,54 @@ ApplicationWindow {
                             objectName: "draftFolderButton"
                             text: qsTr("Drafts")
                             iconName: "editRounded"
-                            countText: window.mail.drafts.length ? String(window.mail.drafts.length) : ""
                             checked: window.draftsVisible
                             Accessible.name: qsTr("Local drafts")
                             onClicked: { window.draftsVisible = true; window.readerVisible = false; if (window.width < 1080) window.sidebarExpanded = false }
                         }
-                        MailAction {
+                        Item {
+                            id: addAccountRow
                             objectName: "addAccountButton"
-                            text: qsTr("添加账号")
-                            onClicked: accountDialog.editAccount()
+                            Accessible.name: qsTr("添加账号")
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            Layout.topMargin: 6
+                            readonly property bool hovered: addAccountMouse.containsMouse
+                            Rectangle {
+                                anchors.fill: parent; radius: 8
+                                color: addAccountRow.hovered
+                                    ? (AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd") : "transparent"
+                                Behavior on color {
+                                    ColorAnimation { duration: AppTheme.reduceMotion ? 0 : AppTheme.motionFast }
+                                }
+                            }
+                            Item {
+                                anchors.left: parent.left; anchors.leftMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: addIcon.implicitWidth + 5 + addLabel.implicitWidth
+                                height: 16
+                                VectorIcon {
+                                    id: addIcon
+                                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                                    name: "plus"; size: 13
+                                    color: addAccountRow.hovered ? AppTheme.text : AppTheme.mutedText
+                                }
+                                Text {
+                                    id: addLabel
+                                    anchors.left: addIcon.right; anchors.leftMargin: 5
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: qsTr("添加账号")
+                                    color: addAccountRow.hovered ? AppTheme.text : AppTheme.mutedText
+                                    font.pixelSize: 12
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                            }
+                            MouseArea {
+                                id: addAccountMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: accountDialog.editAccount()
+                            }
                         }
                     }
                 }
