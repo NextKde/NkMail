@@ -31,6 +31,7 @@ ApplicationWindow {
     property bool draftsVisible: false
     property bool showSummary: true
     property bool groupThreads: true
+    property bool showRichText: true
     property var selectionIndices: ({})      // 行号 -> true
     property int selectionAnchor: -1
     readonly property int selectionSize: Object.keys(selectionIndices).length
@@ -938,19 +939,37 @@ ApplicationWindow {
                                 }
                                 Text { text: window.dateLabel(window.message.date); color: window.muted; font.pixelSize: 11; Layout.fillWidth: true }
                                 Rectangle { Layout.fillWidth: true; height: 1; color: window.rule; Layout.topMargin: 4; Layout.bottomMargin: 6 }
-                                // Never interpret message HTML, links, images or remote resources.
+                                // Render only the backend-sanitized html field; fall back to plain text.
                                 TextEdit {
                                     id: messageBody
                                     objectName: "messageBody"
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: Math.max(200, contentHeight)
-                                    text: window.value(window.message, "text")
-                                    textFormat: TextEdit.PlainText
+                                    readonly property string richHtml: window.value(window.message, "html") || ""
+                                    readonly property bool asRich: window.showRichText && String(richHtml).length > 0
+                                    text: asRich ? String(richHtml) : window.value(window.message, "text")
+                                    textFormat: asRich ? TextEdit.RichText : TextEdit.PlainText
                                     readOnly: true; selectByMouse: true
                                     wrapMode: TextEdit.Wrap
                                     color: window.ink
                                     selectionColor: AppTheme.accent; selectedTextColor: "white"
                                     font.pixelSize: 14
+                                    onLinkActivated: function(link) {
+                                        if (!/^(https?:|mailto:)/i.test(String(link))) return
+                                        linkClip.text = String(link)
+                                        linkClip.selectAll(); linkClip.copy()
+                                        mail.clearError()
+                                        statusHint.show(qsTr("Link copied to clipboard"))
+                                    }
+                                }
+                                TextEdit { id: linkClip; visible: false }
+                                Text {
+                                    id: statusHint
+                                    visible: false
+                                    text: ""
+                                    color: window.muted; font.pixelSize: 11
+                                    function show(message) { text = message; visible = true; hintTimer.restart() }
+                                    Timer { id: hintTimer; interval: 2500; onTriggered: statusHint.visible = false }
                                 }
                                 Repeater {
                                     model: window.message.attachments || []
@@ -1130,6 +1149,13 @@ ApplicationWindow {
                 text: qsTr("Show message summaries")
                 checked: window.showSummary
                 onToggled: window.showSummary = checked
+            }
+            LiquidCheckBox {
+                objectName: "richTextCheck"
+                Layout.fillWidth: true
+                text: qsTr("富文本显示")
+                checked: window.showRichText
+                onToggled: window.showRichText = checked
             }
             LiquidPopoverItem {
                 objectName: "overflowRefresh"
