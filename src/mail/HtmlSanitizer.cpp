@@ -35,9 +35,7 @@ const QSet<QString> &allowedTags()
         QStringLiteral("ul"), QStringLiteral("ol"), QStringLiteral("li"),
         QStringLiteral("a"), QStringLiteral("h1"), QStringLiteral("h2"),
         QStringLiteral("h3"), QStringLiteral("h4"), QStringLiteral("h5"),
-        QStringLiteral("h6"), QStringLiteral("table"), QStringLiteral("thead"),
-        QStringLiteral("tbody"), QStringLiteral("tr"), QStringLiteral("td"),
-        QStringLiteral("th"), QStringLiteral("pre"), QStringLiteral("code"),
+        QStringLiteral("h6"), QStringLiteral("pre"), QStringLiteral("code"),
         QStringLiteral("hr")};
     return set;
 }
@@ -62,6 +60,13 @@ const QSet<QString> &dropVoidTags()
 bool isVoidAllowed(const QString &name)
 {
     return name == QStringLiteral("br") || name == QStringLiteral("hr");
+}
+// Table structure that Qt rich text cannot wrap; degraded to row text instead.
+bool isTableLayoutTag(const QString &name)
+{
+    return name == QStringLiteral("table") || name == QStringLiteral("thead")
+           || name == QStringLiteral("tbody") || name == QStringLiteral("tr")
+           || name == QStringLiteral("td") || name == QStringLiteral("th");
 }
 
 QString truncateToBytes(const QString &input, qsizetype maxBytes)
@@ -371,7 +376,20 @@ QString sanitizeMailHtml(const QString &input)
                 continue;
             }
             if (!tag.name.isEmpty()) {
-                if (tag.closing) {
+                if (isTableLayoutTag(tag.name)) {
+                    // Qt rich text does not wrap inside tables, so wide tables
+                    // overflow the reading pane. Degrade the structure to plain
+                    // row text: rows become lines, cells are pipe-separated.
+                    if (tag.name == QStringLiteral("tr")) {
+                        if (!tag.closing)
+                            out += QLatin1String("<br>");
+                    } else if (tag.name == QStringLiteral("td")
+                               || tag.name == QStringLiteral("th")) {
+                        if (tag.closing)
+                            out += QLatin1String(" | ");
+                    }
+                    // table, thead, tbody: drop the tag, keep the content.
+                } else if (tag.closing) {
                     if (!openTags.isEmpty() && openTags.last() == tag.name) {
                         out += QLatin1String("</");
                         out += tag.name;
