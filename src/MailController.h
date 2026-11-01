@@ -100,6 +100,7 @@ private:
     QString credentialKey() const;
     void run(std::function<void()> task);
     bool m_demo = false, m_busy = false, m_sending = false, m_restorePending = false, m_hasMore = false;
+    bool m_serverSearching = false; // Server search is in flight, but must not block paging.
     bool m_mutating = false; // One mailbox write operation at a time.
     bool m_cachedOnly = true; // Query offsets stay local until a successful unfiltered header fetch.
     bool m_unreadOnly = false;

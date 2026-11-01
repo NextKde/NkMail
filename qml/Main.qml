@@ -367,6 +367,7 @@ ApplicationWindow {
                         buttonSize: MailStyle.toolbarButtonHeight
                         icons: ["refreshRounded", "editRounded"]
                         labels: [qsTr("收取"), qsTr("撰写")]
+                        objectNames: ["refreshButton", "headerComposeButton"]
                         enabledActions: [!mail.busy && !window.draftsVisible && (mail.configured || mail.demo), mail.configured || mail.demo]
                         backdrop: chromeBackdrop
                         materialForm: !window.liquidControls
@@ -404,6 +405,7 @@ ApplicationWindow {
                         buttonSize: MailStyle.toolbarButtonHeight
                         icons: readerHeader.fullReplyGroup ? ["undo", "arrows", "forward"] : ["undo", "forward"]
                         labels: readerHeader.fullReplyGroup ? [qsTr("回复"), qsTr("全部回复"), qsTr("转发")] : [qsTr("回复"), qsTr("转发")]
+                        objectNames: readerHeader.fullReplyGroup ? ["replyButton", "replyAllButton", "forwardButton"] : ["replyButton", "forwardButton"]
                         enabledActions: [window.hasMessage && !mail.sending, window.hasMessage && !mail.sending, window.hasMessage && !mail.sending]
                         backdrop: chromeBackdrop
                         materialForm: !window.liquidControls
@@ -419,6 +421,7 @@ ApplicationWindow {
                         buttonSize: 38
                         icons: readerHeader.wideSearch ? ["sliders", "info", "more"] : ["sliders", "more"]
                         labels: readerHeader.wideSearch ? [qsTr("显示"), qsTr("详情"), qsTr("更多")] : [qsTr("显示"), qsTr("更多")]
+                        objectNames: readerHeader.wideSearch ? ["listOptionsButton", "detailsButton", "moreButton"] : ["listOptionsButton", "moreButton"]
                         enabledActions: [true, window.hasMessage, window.hasMessage]
                         backdrop: chromeBackdrop
                         materialForm: !window.liquidControls
@@ -606,7 +609,7 @@ ApplicationWindow {
             anchors.left: sidebar.right
             anchors.right: parent.right
             anchors.top: floatingHeader.bottom
-            anchors.bottom: parent.bottom
+            anchors.bottom: statusStrip.top
             spacing: 0
             z: 1
 
@@ -652,7 +655,8 @@ ApplicationWindow {
                             implicitHeight: visible ? MailStyle.messageRowHeight : 0
                             hoverEnabled: true
                             readonly property bool selected: mail.selectedUid === uid
-                            readonly property int messageIndex: mail.messages.indexOf(mail.currentFolder, uidValidity, uid)
+                            readonly property int messageIndex: (mail.messages && typeof mail.messages.indexOf === "function")
+                                ? mail.messages.indexOf(mail.currentFolder, uidValidity, uid) : -1
                             function selectRow() { mail.openMessage(uid, uidValidity); window.readerVisible = true }
                             function openRow() {
                                 selectRow()
@@ -870,7 +874,7 @@ ApplicationWindow {
             x: contentScene.x + messagePane.x + messagePane.width - width
             y: 0
             width: 1
-            height: parent.height
+            height: statusStrip.y - y
             color: window.rule
             visible: !window.narrow
             z: 2
@@ -885,7 +889,7 @@ ApplicationWindow {
             property int startWidth: 0
             width: 8
             y: floatingHeader.height
-            height: parent.height - y
+            height: statusStrip.y - y
             z: 4
             cursorShape: Qt.SplitHCursor
             hoverEnabled: true
@@ -930,6 +934,26 @@ ApplicationWindow {
             sidebarHandle: false
             visible: !window.narrow
             x: contentScene.x + messagePane.x + messagePane.width - width / 2
+        }
+
+        Rectangle {
+            id: statusStrip
+            objectName: "statusStrip"
+            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+            height: mail.error ? 44 : 29
+            color: mail.error ? (AppTheme.dark ? "#452f30" : "#fff1ef") : window.sidebarColor
+            Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: window.rule }
+            RowLayout {
+                anchors.fill: parent; anchors.leftMargin: 18; anchors.rightMargin: 14; spacing: 10
+                Rectangle { width: 5; height: 5; radius: 3; color: mail.error ? AppTheme.destructive : mail.busy ? AppTheme.accent : window.muted }
+                Text {
+                    text: mail.error || (mail.demo ? qsTr("Demo · synthetic mail only · sending disabled") : mail.status || qsTr("Ready"))
+                    color: mail.error ? AppTheme.destructive : window.muted; font.pixelSize: 10
+                    Layout.fillWidth: true; elide: Text.ElideRight
+                }
+                MailAction { visible: !!mail.error; implicitHeight: 24; text: qsTr("Dismiss"); onClicked: mail.clearError() }
+                MailAction { implicitHeight: 24; iconOnly: true; iconName: "theme"; accessibleText: qsTr("Switch light / dark appearance"); onClicked: AppTheme.appearanceMode = AppTheme.dark ? "light" : "dark" }
+            }
         }
 
     }
@@ -1091,7 +1115,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+F"; enabled: !composer.visible && !accountDialog.visible; onActivated: readerHeader.openSearch() }
     Shortcut {
         sequence: "Escape"
-        enabled: !composer.visible && !accountDialog.visible && !details.visible && !moreMenu.visible && !listOptions.visible
+        enabled: !composer.visible && !accountDialog.visible && !details.visible && !moreMenu.visible
         onActivated: {
             if (window.width < 1080 && window.sidebarExpanded) window.sidebarExpanded = false
             else if (window.narrow && window.readerVisible) window.readerVisible = false

@@ -23,6 +23,8 @@ TestCase {
         property string status: "Demo"
         property string error: ""
         property bool busy: false
+        property bool unreadOnly: false
+        property bool notifyEnabled: true
         property bool sending: false
         property bool configured: true
         property bool demo: true
@@ -36,7 +38,7 @@ TestCase {
         signal draftAccepted(string id)
         ListModel {
             id: messageModel
-            ListElement { uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false }
+            ListElement { uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false; threadKey: ""; threadCount: 1; threadFirst: true }
         }
         function configureAccount(config, password, remember) {}
         function refresh() { refreshCount++ }
@@ -189,11 +191,11 @@ TestCase {
         app.sidebarPreferredWidth = 340
         app.readerVisible = true
         wait(30)
-        compare(findChild(app, "detailsButton").visible, false)
+        compare(findChild(app, "detailsButton"), null)   // 窄宽下「详情」已并入「更多」，不再有独立按钮
         app.showReview("details")
         const details = findChild(app, "messageDetailsPopover")
         tryCompare(details, "visible", true)
-        compare(details.anchorItem, findChild(app, "moreButton"))
+        compare(details.anchorItem, findChild(app, "messageOptionsGroup"))
         details.close()
         keyClick(Qt.Key_F, Qt.ControlModifier)
         compare(app.readerVisible, false)

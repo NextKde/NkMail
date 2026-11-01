@@ -309,7 +309,7 @@ void MailController::searchServer() {
     if (query.isEmpty() || !configured() || m_demo || m_account.password.isEmpty() || m_uidValidity.isEmpty()) return;
     const auto generation = m_generation; const auto account = m_account;
     const auto folder = m_folder; const auto validity = m_uidValidity;
-    m_busy = true; setStatus(tr("Searching server…"));
+    m_serverSearching = true; setStatus(tr("Searching server…"));
     QPointer<MailController> self(this);
     run([self, account, folder, validity, query, generation] {
         QList<QVariantMap> matches;
@@ -317,8 +317,9 @@ void MailController::searchServer() {
         try { matches = MailioBackend::search(account, folder, validity, query, pageSize); }
         catch (...) { ok = false; }
         if (self) QMetaObject::invokeMethod(self, [self, matches, ok, generation] {
-            if (!self || generation != self->m_generation) return;
-            self->m_busy = false;
+            if (!self) return;
+            self->m_serverSearching = false;
+            if (generation != self->m_generation) return;
             if (!ok) { self->setStatus(MailController::tr("Search · server unavailable")); return; }
             QSet<QString> seen;
             for (int row = 0; row < self->m_messages->count(); ++row) {
