@@ -144,29 +144,34 @@ LiquidDialog {
                 anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
                 anchors.leftMargin: 12; anchors.rightMargin: 12; anchors.topMargin: 8
                 spacing: 4
-                MailAction {
-                    text: "B"; accessibleText: qsTr("Bold"); toolbarAction: false
-                    implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.bold: true
-                    enabled: !root.mail.sending
-                    onClicked: { richEditor.toggleBold(bodyField.textDocument); root.changed() }
-                }
-                MailAction {
-                    text: "I"; accessibleText: qsTr("Italic"); toolbarAction: false
-                    implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.italic: true
-                    enabled: !root.mail.sending
-                    onClicked: { richEditor.toggleItalic(bodyField.textDocument); root.changed() }
-                }
-                MailAction {
-                    text: "U"; accessibleText: qsTr("Underline"); toolbarAction: false
-                    implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.underline: true
-                    enabled: !root.mail.sending
-                    onClicked: { richEditor.toggleUnderline(bodyField.textDocument); root.changed() }
-                }
-                MailAction {
-                    text: qsTr("• 列表"); accessibleText: qsTr("Bullet list"); toolbarAction: false
-                    implicitWidth: 56; implicitHeight: 22; font.pixelSize: 11
-                    enabled: !root.mail.sending
-                    onClicked: { richEditor.toggleBulletList(bodyField.textDocument); root.changed() }
+                Row {
+                    spacing: 4
+                    Layout.alignment: Qt.AlignLeft
+                    Layout.preferredHeight: 22
+                    MailAction {
+                        text: "B"; accessibleText: qsTr("Bold"); toolbarAction: false
+                        implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.bold: true
+                        enabled: !root.mail.sending
+                        onClicked: { richEditor.toggleBold(bodyField.textDocument); root.changed() }
+                    }
+                    MailAction {
+                        text: "I"; accessibleText: qsTr("Italic"); toolbarAction: false
+                        implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.italic: true
+                        enabled: !root.mail.sending
+                        onClicked: { richEditor.toggleItalic(bodyField.textDocument); root.changed() }
+                    }
+                    MailAction {
+                        text: "U"; accessibleText: qsTr("Underline"); toolbarAction: false
+                        implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.underline: true
+                        enabled: !root.mail.sending
+                        onClicked: { richEditor.toggleUnderline(bodyField.textDocument); root.changed() }
+                    }
+                    MailAction {
+                        text: qsTr("• 列表"); accessibleText: qsTr("Bullet list"); toolbarAction: false
+                        implicitWidth: 56; implicitHeight: 22; font.pixelSize: 11
+                        enabled: !root.mail.sending
+                        onClicked: { richEditor.toggleBulletList(bodyField.textDocument); root.changed() }
+                    }
                 }
             }
             ScrollView {
