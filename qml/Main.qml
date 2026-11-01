@@ -653,8 +653,8 @@ ApplicationWindow {
             specificationForm: true
             specificationFontSize: 12
             specificationSelectedVerticalInset: 2
-            specificationSelectedFillColor: AppTheme.accent
-            specificationSelectedTextColor: "#ffffff"
+            specificationSelectedFillColor: AppTheme.dark ? Qt.rgba(0.31, 0.56, 0.96, 0.28) : "#DCE9FB"
+            specificationSelectedTextColor: AppTheme.dark ? "#EAF1FF" : AppTheme.accent
             specificationHoverFillColor: AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd"
             font.weight: Font.Medium
             checkable: false
@@ -732,7 +732,7 @@ ApplicationWindow {
                 }
                 Text {
                     id: title
-                    anchors.fill: parent; anchors.leftMargin: 24
+                    anchors.fill: parent; anchors.leftMargin: 18
                     text: header.text
                     color: header.current ? AppTheme.text : AppTheme.mutedText
                     font.pixelSize: 13; font.weight: Font.DemiBold
@@ -1212,7 +1212,7 @@ ApplicationWindow {
                                     id: detailsPanel
                                     objectName: "messageDetailsPanel"
                                     Layout.fillWidth: true
-                                    readonly property real contentHeight: Math.max(140, Math.min(320, detailsColumn.implicitHeight + 24))
+                                    readonly property real contentHeight: Math.max(140, Math.min(380, detailsColumn.implicitHeight + 40))
                                     visible: window.detailsVisible
                                     implicitHeight: visible ? contentHeight : 0
                                     Layout.preferredHeight: implicitHeight
