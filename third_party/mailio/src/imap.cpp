@@ -543,7 +543,12 @@ void imap::append(const string& folder_name, const message& msg, const list<stri
 {
     string msg_str;
     msg.format(msg_str, message_format_options_t{true, false});
+    append(folder_name, msg_str, flags);
+}
 
+
+void imap::append(const string& folder_name, const string& msg_str, const list<string>& flags)
+{
     string cmd = "APPEND " + to_astring(folder_name);
     if (!flags.empty())
     {

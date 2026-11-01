@@ -87,7 +87,7 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
     { QMutexLocker lock(&synthetic::callsMutex); synthetic::contentUids.append(uid); }
     return synthetic::content(a, folder, validity, uid);
 }
-SendResult MailioBackend::send(const Account &a, const Draft &d)
+SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *)
 {
     ++synthetic::sendCalls;
     return synthetic::send(a, d);
@@ -96,7 +96,7 @@ QString MailioBackend::sentFolder(const Account &)
 {
     return QStringLiteral("Sent");
 }
-void MailioBackend::appendSent(const Account &, const QString &, const Draft &)
+void MailioBackend::appendSent(const Account &, const QString &, const QByteArray &)
 {
 }
 QList<QVariantMap> MailioBackend::search(const Account &, const QString &, const QString &, const QString &, int)

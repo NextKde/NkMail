@@ -401,9 +401,19 @@ public:
     @param folder_name Folder to append the message.
     @param msg         Message to append.
     @param flags       Flags to set on the appended message.
-    @throw *           `append(const std::string&, const message&)`.
+    @throw *           `append(const std::string&, const std::string&, const std::list<std::string>&)`.
     **/
     void append(const std::string& folder_name, const message& msg, const std::list<std::string>& flags);
+
+    /**
+    Appending an already formatted message to the given folder with the given flags.
+
+    @param folder_name Folder to append the message.
+    @param msg_str     Formatted message to append.
+    @param flags       Flags to set on the appended message.
+    @throw imap_error  `Message appending failure.`, `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
+    **/
+    void append(const std::string& folder_name, const std::string& msg_str, const std::list<std::string>& flags);
 
     /**
     Getting the mailbox statistics.

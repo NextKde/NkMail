@@ -448,12 +448,17 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError("Unable to read message. Check account, connection and trusted TLS certificate."); }
 }
-SendResult MailioBackend::send(const Account &a, const Draft &d)
+SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *raw)
 {
     bool submitting = false;
     try {
         accountValid(a, true);
         const auto m = compose(a, d);
+        // Format once and reuse the exact bytes for both submission and the Sent
+        // copy, so the Date and Message-ID match what the recipient receives.
+        std::string str;
+        m.format(str, {true, false});
+        if (raw) *raw = QByteArray::fromStdString(str);
         mailio::smtp smtp(utf8(a.smtpHost), a.smtpPort, Timeout);
         smtp.ssl_options(tlsOptions(a)); smtp.start_tls(a.smtpStartTls);
         smtp.source_hostname("nkmail.invalid");
@@ -511,13 +516,12 @@ QString MailioBackend::sentFolder(const Account &a)
         return {};
     } catch (...) { return {}; }
 }
-void MailioBackend::appendSent(const Account &a, const QString &folder, const Draft &d)
+void MailioBackend::appendSent(const Account &a, const QString &folder, const QByteArray &raw)
 {
     try {
         accountValid(a, false); folderValid(folder);
-        const auto m = compose(a, d);
         Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
-        imap.append(utf8(folder), m, {"\\Seen"});
+        imap.append(utf8(folder), std::string(raw.constData(), size_t(raw.size())), {"\\Seen"});
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError("Unable to save a copy to the Sent folder. Check account, connection and trusted TLS certificate."); }
 }
