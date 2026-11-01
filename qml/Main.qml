@@ -31,6 +31,29 @@ ApplicationWindow {
     property bool draftsVisible: false
     property bool showSummary: true
     property bool groupThreads: true
+    property bool showRichText: true
+    property var selectionIndices: ({})      // 行号 -> true
+    property int selectionAnchor: -1
+    readonly property int selectionSize: Object.keys(selectionIndices).length
+    function isRowSelected(row) { return selectionIndices[row] === true }
+    function clearSelection() { selectionIndices = ({}); selectionAnchor = -1 }
+    function toggleRow(row) {
+        const next = Object.assign({}, selectionIndices)
+        if (next[row]) delete next[row]; else next[row] = true
+        selectionIndices = next
+        selectionAnchor = row
+    }
+    function selectRangeTo(row) {
+        if (selectionAnchor < 0 || selectionAnchor === row) { toggleRow(row); return }
+        const from = Math.min(selectionAnchor, row), to = Math.max(selectionAnchor, row)
+        const next = Object.assign({}, selectionIndices)
+        for (let i = from; i <= to; ++i) next[i] = true
+        selectionIndices = next
+    }
+    function selectedIndexList() {
+        const rows = Object.keys(selectionIndices).map(Number).sort((a, b) => a - b)
+        return rows
+    }
     property var collapsedThreads: ({})
     function toggleThread(key) {
         const next = Object.assign({}, collapsedThreads)
@@ -38,11 +61,34 @@ ApplicationWindow {
         else next[key] = true
         collapsedThreads = next
     }
+    property var collapsedAccounts: ({})     // 账号 id -> true
+    function toggleAccountCollapsed(id) {
+        const next = Object.assign({}, collapsedAccounts)
+        if (next[id]) delete next[id]
+        else next[id] = true
+        collapsedAccounts = next
+    }
+    // The demo/preview account is not persisted in the accounts table, so fall
+    // back to the active account while the cache has no account rows yet.
+    readonly property var sidebarAccounts: {
+        const list = (window.mail.accounts || [])
+        if (list.length > 0) return list
+        const current = window.mail.account
+        return (current && String(current.address || "").length > 0) ? [current] : []
+    }
+    // Cache counters are read on demand; this bump makes the sidebar bindings
+    // re-query them whenever the controller reports a change.
+    property int unreadRevision: 0
+    property bool detailsVisible: false
+    Connections {
+        target: window.mail
+        function onFolderUnreadChanged() { window.unreadRevision++ }
+    }
     onDraftsVisibleChanged: {
         listOptions.close()
         if (draftsVisible) readerHeader.closeSearch()
     }
-    onReaderVisibleChanged: { listOptions.close(); moreMenu.close(); details.close() }
+    onReaderVisibleChanged: { listOptions.close(); moreMenu.close(); window.detailsVisible = false }
     function focusWithin(item) {
         let focused = activeFocusItem
         while (focused) {
@@ -87,6 +133,17 @@ ApplicationWindow {
         if (title === "Trash") return qsTr("Trash")
         return title
     }
+    function folderIcon(id) {
+        const name = String(id || "").split(/[\/\\]/).pop().toLowerCase()
+        const starts = (prefix) => name.indexOf(prefix) === 0
+        if (starts("inbox") || name.indexOf("收件") >= 0) return "envelope"
+        if (starts("sent") || name.indexOf("已发送") >= 0 || name.indexOf("发送") >= 0) return "forward"
+        if (starts("draft") || name.indexOf("草稿") >= 0) return "editRounded"
+        if (starts("archive") || name.indexOf("归档") >= 0) return "archive"
+        if (starts("trash") || name.indexOf("删除") >= 0) return "trash"
+        if (starts("junk") || name.indexOf("垃圾") >= 0) return "flag"
+        return "folder"
+    }
     function draftStateLabel(state) {
         switch (state) {
         case "draft": return qsTr("Draft")
@@ -117,7 +174,7 @@ ApplicationWindow {
     // Capture helper is deliberately unavailable for real accounts.
     function showReview(scenario) {
         if (!mail.demo) return
-        moreMenu.close(); listOptions.close(); details.close(); accountDialog.close()
+        moreMenu.close(); listOptions.close(); window.detailsVisible = false; accountDialog.close()
         if (composer.visible && !composer.finishEditing()) return
         draftsVisible = false
         if (scenario === "compose") {
@@ -129,7 +186,7 @@ ApplicationWindow {
             composer.editDraft(mail.saveDraft(sample))
         }
         else if (scenario === "account") accountDialog.editAccount()
-        else if (scenario === "details" && hasMessage) details.open()
+        else if (scenario === "details" && hasMessage) window.detailsVisible = true
         else if (scenario === "search") readerHeader.openSearch()
         else if (scenario === "options") { readerVisible = false; Qt.callLater(() => listOptions.open()) }
         else if (scenario === "unread") { mail.unreadOnly = true; readerVisible = false }
@@ -142,6 +199,7 @@ ApplicationWindow {
     }
     Component.onCompleted: {
         AppTheme.compactDesign = true
+        mail.sendDelay = 8
         if (typeof reviewAppearance !== "undefined" && (reviewAppearance === "light" || reviewAppearance === "dark"))
             AppTheme.appearanceMode = reviewAppearance
     }
@@ -154,6 +212,20 @@ ApplicationWindow {
     Connections {
         target: mail
         function onSelectionChanged() { if (window.narrow && window.hasMessage) window.readerVisible = true }
+        function onFolderChanged() { window.clearSelection() }
+        function onAccountChanged() {
+            // switchAccount() already empties the message model; the per-row menus
+            // live inside those delegates and are torn down with them.
+            window.selectionIndices = ({})
+            window.selectionAnchor = -1
+            window.collapsedThreads = ({})
+            window.detailsVisible = false
+            listOptions.close()
+        }
+    }
+    Connections {
+        target: mail.messages
+        function onModelReset() { window.clearSelection() }
     }
     Item {
         id: mailScene
@@ -330,7 +402,7 @@ ApplicationWindow {
                     if (window.focusWithin(replyActions)) moreButton.forceActiveFocus()
                 }
                 function openSearch() {
-                    listOptions.close(); moreMenu.close(); details.close()
+                    listOptions.close(); moreMenu.close(); window.detailsVisible = false
                     window.draftsVisible = false
                     window.readerVisible = false
                     if (window.narrow) window.sidebarExpanded = false
@@ -380,7 +452,7 @@ ApplicationWindow {
                         id: messageOpsGroup
                         objectName: "messageOpsGroup"
                         Layout.rightMargin: 8
-                        visible: !window.draftsVisible && window.width >= 1100
+                        visible: !window.draftsVisible && window.width >= 1100 && window.selectionSize === 0
                         stacked: true
                         buttonSize: 38
                         icons: ["trash", "archive", "flag"]
@@ -394,6 +466,54 @@ ApplicationWindow {
                             if (index === 0) mail.deleteMessage(row)
                             else if (index === 1) mail.archiveMessage(row)
                             else mail.toggleFlagged(row)
+                        }
+                    }
+                    Text {
+                        objectName: "selectionCountLabel"
+                        visible: window.selectionSize > 0
+                        text: qsTr("%1 selected").arg(window.selectionSize)
+                        color: window.muted; font.pixelSize: 11
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    LiquidActionButtonGroup {
+                        id: selectionOpsGroup
+                        objectName: "selectionOpsGroup"
+                        stacked: true
+                        buttonSize: 38
+                        visible: !window.draftsVisible && window.selectionSize > 0
+                        icons: ["envelope", "flag", "archive", "trash", "folder"]
+                        labels: [qsTr("已读"), qsTr("旗标"), qsTr("归档"), qsTr("删除"), qsTr("移动")]
+                        backdrop: chromeBackdrop
+                        materialForm: !window.liquidControls
+                        onTriggered: index => {
+                            if (index === 0) mail.setMessagesRead(window.selectedIndexList(), true)
+                            else if (index === 1) mail.setMessagesFlagged(window.selectedIndexList(), true)
+                            else if (index === 2) {
+                                mail.archiveMessages(window.selectedIndexList())
+                                window.clearSelection()
+                            } else if (index === 3) {
+                                mail.deleteMessages(window.selectedIndexList())
+                                window.clearSelection()
+                            } else if (index === 4) selectionMoveMenu.openAtAnchor()
+                        }
+                    }
+                    LiquidPopover {
+                        id: selectionMoveMenu
+                        objectName: "selectionMoveMenu"
+                        sourceItem: chromePlanes
+                        anchorItem: selectionOpsGroup
+                        closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
+                        Repeater {
+                            model: mail.folders.filter(f => f.id !== mail.currentFolder)
+                            LiquidPopoverItem {
+                                text: modelData.title || modelData.id
+                                iconName: "folder"
+                                onTriggered: {
+                                    selectionMoveMenu.close()
+                                    mail.moveMessages(window.selectedIndexList(), modelData.id)
+                                    window.clearSelection()
+                                }
+                            }
                         }
                     }
                     LiquidActionButtonGroup {
@@ -427,7 +547,7 @@ ApplicationWindow {
                         materialForm: !window.liquidControls
                         onTriggered: index => {
                             if (index === 0) listOptions.open()
-                            else if (index === 1) details.open()
+                            else if (index === 1) window.detailsVisible = true
                             else moreMenu.openAtAnchor()
                         }
                     }
@@ -528,28 +648,111 @@ ApplicationWindow {
         component MailboxAction: LiquidNavigationButton {
             id: action
             property string countText: ""
+            property string unreadText: ""
             Layout.fillWidth: true
+            Layout.preferredHeight: 28
             specificationForm: true
             specificationFontSize: 12
             specificationSelectedVerticalInset: 2
-            specificationSelectedFillColor: AppTheme.accent
-            specificationSelectedTextColor: "#ffffff"
+            specificationSelectedFillColor: AppTheme.dark ? Qt.rgba(0.31, 0.56, 0.96, 0.28) : "#DCE9FB"
+            specificationSelectedTextColor: AppTheme.dark ? "#EAF1FF" : AppTheme.accent
             specificationHoverFillColor: AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd"
             font.weight: Font.Medium
             checkable: false
             checked: false
             iconColor: checked ? specificationSelectedTextColor : AppTheme.mutedText
-            rightPadding: 12 + (count.visible ? count.implicitWidth + 8 : 0)
-            Text {
-                id: count
-                objectName: "mailboxCount"
-                anchors.right: parent.right; anchors.rightMargin: 12
-                anchors.verticalCenter: parent.verticalCenter
-                visible: text.length > 0
-                text: action.countText
-                font: action.font
-                color: action.checked ? action.specificationSelectedTextColor : AppTheme.mutedText
-                textFormat: Text.PlainText
+            contentItem: Item {
+                implicitWidth: caption.implicitWidth
+                    + (action.iconName.length ? 24 : 0)
+                    + (unread.visible ? unread.implicitWidth + 6 : 0)
+                implicitHeight: Math.max(caption.implicitHeight, 16)
+                VectorIcon {
+                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                    visible: action.iconName.length > 0
+                    name: action.iconName; size: 14; color: action.iconColor
+                }
+                Text {
+                    id: caption
+                    anchors.left: parent.left; anchors.right: unread.visible ? unread.left : parent.right
+                    anchors.leftMargin: action.iconName.length ? 24 : 0
+                    anchors.rightMargin: unread.visible ? 6 : 0
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: action.text
+                    color: action.checked ? action.specificationSelectedTextColor
+                        : AppTheme.dark ? Qt.rgba(1, 1, 1, .92) : Qt.rgba(0, 0, 0, .92)
+                    font: action.font
+                    verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+                }
+                Text {
+                    id: unread
+                    objectName: "mailboxUnread"
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    visible: text.length > 0
+                    text: action.unreadText
+                    font: action.font
+                    color: action.checked ? action.specificationSelectedTextColor : AppTheme.accent
+                    textFormat: Text.PlainText
+                }
+                Text {
+                    id: count
+                    objectName: "mailboxCount"
+                    visible: false
+                    text: action.countText
+                    font: action.font
+                    textFormat: Text.PlainText
+                }
+            }
+        }
+
+        // Sidebar account row: a disclosure chevron plus the account title. The
+        // title colour distinguishes the active account from the others.
+        component AccountHeader: LiquidNavigationButton {
+            id: header
+            property string accountId: ""
+            property bool current: false
+            property bool collapsed: false
+            Layout.fillWidth: true
+            Layout.preferredHeight: 28
+            specificationForm: true
+            specificationFontSize: 12
+            specificationSelectedVerticalInset: 2
+            specificationHoverFillColor: AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd"
+            checkable: false
+            checked: false
+            contentItem: Item {
+                implicitHeight: Math.max(title.implicitHeight, 16)
+                VectorIcon {
+                    id: chevron
+                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                    name: "chevron"; size: 12
+                    color: header.current ? AppTheme.text : AppTheme.mutedText
+                    rotation: header.collapsed ? -90 : 0
+                    Behavior on rotation {
+                        NumberAnimation { duration: AppTheme.reduceMotion ? 0 : AppTheme.motionFast }
+                    }
+                }
+                Text {
+                    id: title
+                    anchors.fill: parent; anchors.leftMargin: 18
+                    text: header.text
+                    color: header.current ? AppTheme.text : AppTheme.mutedText
+                    font.pixelSize: 13; font.weight: Font.DemiBold
+                    verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+                }
+                Text {
+                    id: accountUnread
+                    objectName: "accountUnread_" + header.accountId
+                    visible: false
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    text: {
+                        window.unreadRevision
+                        window.mail.accountUnreadRevision
+                        const count = window.mail.accountUnread(header.accountId)
+                        return count > 0 ? String(count) : ""
+                    }
+                    color: AppTheme.mutedText; font.pixelSize: 11
+                    textFormat: Text.PlainText
+                }
             }
         }
 
@@ -562,46 +765,208 @@ ApplicationWindow {
                 anchors.bottom: statusStrip.top
                 width: sidebarPlane.width
                 z: 1
-                ColumnLayout {
+                Flickable {
+                    id: mailboxNavigation
                     objectName: "mailboxNavigation"
                     anchors.fill: parent
                     anchors.leftMargin: 14; anchors.rightMargin: 14
                     anchors.bottomMargin: 14; anchors.topMargin: 4
-                    spacing: 0
-                    Text {
-                        objectName: "mailboxGroupTitle"
-                        text: qsTr("MAILBOXES"); color: window.muted
-                        font.pixelSize: 11; font.weight: Font.DemiBold
-                        topPadding: 0; bottomPadding: 6
-                    }
-                    Repeater {
-                        objectName: "mailboxFolders"
-                        model: mail.folders
-                        delegate: MailboxAction {
-                            required property var modelData
-                            objectName: "mailboxFolder_" + modelData.id
-                            text: window.mailboxTitle(modelData)
-                            iconName: "folder"
-                            countText: modelData.total >= 0 ? String(modelData.total) : ""
-                            checked: !window.draftsVisible && mail.currentFolder === modelData.id
-                            Accessible.name: window.mailboxTitle(modelData)
-                            onClicked: {
-                                window.draftsVisible = false; window.readerVisible = false
-                                mail.selectFolder(modelData.id)
-                                if (window.width < 1080) window.sidebarExpanded = false
+                    clip: true
+                    contentWidth: width
+                    contentHeight: mailboxColumn.implicitHeight
+                    boundsBehavior: Flickable.StopAtBounds
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                    ColumnLayout {
+                        id: mailboxColumn
+                        width: parent.width
+                        spacing: 0
+                        Text {
+                            objectName: "favoritesTitle"
+                            visible: (mail.favorites || []).length > 0
+                            text: qsTr("收藏"); color: window.muted
+                            font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.4
+                            topPadding: 0; bottomPadding: 6
+                        }
+                        Repeater {
+                            objectName: "favoritesList"
+                            model: mail.favorites || []
+                            delegate: MailboxAction {
+                                required property var modelData
+                                text: modelData.title
+                                iconName: window.folderIcon(modelData.folderId)
+                                countText: ""
+                                onClicked: mail.openFavorite(modelData.accountId, modelData.folderId)
+                            }
+                        }
+                        Repeater {
+                            model: window.sidebarAccounts
+                            delegate: ColumnLayout {
+                                id: accountSection
+                                required property var modelData
+                                readonly property string accountId: modelData.id
+                                readonly property bool current: window.mail.currentAccountId === accountId
+                                readonly property bool collapsed: window.collapsedAccounts[accountId] === true
+                                Layout.fillWidth: true
+                                spacing: 0
+                                AccountHeader {
+                                    id: accountRow
+                                    objectName: "accountHeader_" + accountSection.accountId
+                                    accountId: accountSection.accountId
+                                    current: accountSection.current
+                                    collapsed: accountSection.collapsed
+                                    text: accountSection.modelData.name || accountSection.modelData.address
+                                    Accessible.name: text
+                                    onClicked: {
+                                        if (accountSection.current) {
+                                            window.toggleAccountCollapsed(accountSection.accountId)
+                                        } else {
+                                            window.mail.switchAccount(accountSection.accountId)
+                                            if (accountSection.collapsed)
+                                                window.toggleAccountCollapsed(accountSection.accountId)
+                                        }
+                                    }
+                                    TapHandler {
+                                        acceptedButtons: Qt.RightButton
+                                        onTapped: accountMenu.openAtAnchor()
+                                    }
+                                    LiquidPopover {
+                                        id: accountMenu
+                                        objectName: "accountMenu"
+                                        sourceItem: chromePlanes
+                                        anchorItem: accountRow
+                                        closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
+                                        LiquidPopoverItem {
+                                            text: qsTr("编辑账号"); iconName: "settings"
+                                            onTriggered: {
+                                                accountMenu.close()
+                                                accountDialog.editAccount(accountSection.modelData)
+                                            }
+                                        }
+                                        LiquidPopoverItem {
+                                            text: qsTr("删除账号"); iconName: "trash"
+                                            onTriggered: {
+                                                accountMenu.close()
+                                                deleteAccountDialog.targetId = accountSection.accountId
+                                                deleteAccountDialog.targetName = accountSection.modelData.name
+                                                    || accountSection.modelData.address || ""
+                                                deleteAccountDialog.open()
+                                            }
+                                        }
+                                    }
+                                }
+                                Repeater {
+                                    // Synchronous cache read; it is not re-evaluated when
+                                    // the active account changes, only when the section folds.
+                                    objectName: accountSection.current ? "mailboxFolders" : "mailboxFolders_" + accountSection.accountId
+                                    model: accountSection.collapsed ? [] : (window.mail.foldersFor(accountSection.accountId) || [])
+                                    delegate: MailboxAction {
+                                        id: folderRow
+                                        required property var modelData
+                                        // Keep the historical name for the active account; scope
+                                        // other accounts so their identical folder ids stay unique.
+                                        objectName: accountSection.current
+                                            ? "mailboxFolder_" + modelData.id
+                                            : "mailboxFolder_" + accountSection.accountId + "_" + modelData.id
+                                        text: window.mailboxTitle(modelData)
+                                        iconName: window.folderIcon(modelData.id)
+                                        countText: ""
+                                        unreadText: {
+                                            window.unreadRevision
+                                            const count = accountSection.current
+                                                ? (window.mail.folderUnread()[modelData.id] || 0) : 0
+                                            return count > 0 ? String(count) : ""
+                                        }
+                                        checked: accountSection.current && !window.draftsVisible && window.mail.currentFolder === modelData.id
+                                        Accessible.name: window.mailboxTitle(modelData)
+                                        onClicked: {
+                                            if (!accountSection.current) {
+                                                window.mail.switchAccount(accountSection.accountId)
+                                                if (window.mail.currentAccountId !== accountSection.accountId) return
+                                            }
+                                            window.draftsVisible = false; window.readerVisible = false
+                                            window.mail.selectFolder(modelData.id)
+                                            if (window.width < 1080) window.sidebarExpanded = false
+                                        }
+                                        TapHandler {
+                                            acceptedButtons: Qt.RightButton
+                                            onTapped: folderMenu.openAtAnchor()
+                                        }
+                                        LiquidPopover {
+                                            id: folderMenu
+                                            objectName: "folderMenu"
+                                            sourceItem: chromePlanes
+                                            anchorItem: folderRow
+                                            closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
+                                            LiquidPopoverItem {
+                                                // Touching mail.favorites keeps the label in sync when
+                                                // the list changes; isFavorite() itself is not tracked.
+                                                text: (mail.favorites, mail.isFavorite(accountSection.accountId, folderRow.modelData.id))
+                                                    ? qsTr("从收藏移除") : qsTr("添加到收藏")
+                                                iconName: "heart"
+                                                onTriggered: {
+                                                    mail.toggleFavorite(accountSection.accountId, folderRow.modelData.id,
+                                                        window.mailboxTitle(folderRow.modelData))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        MailboxAction {
+                            objectName: "draftFolderButton"
+                            text: qsTr("Drafts")
+                            iconName: "editRounded"
+                            checked: window.draftsVisible
+                            Accessible.name: qsTr("Local drafts")
+                            onClicked: { window.draftsVisible = true; window.readerVisible = false; if (window.width < 1080) window.sidebarExpanded = false }
+                        }
+                        Item {
+                            id: addAccountRow
+                            objectName: "addAccountButton"
+                            Accessible.name: qsTr("添加账号")
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            Layout.topMargin: 6
+                            readonly property bool hovered: addAccountMouse.containsMouse
+                            Rectangle {
+                                anchors.fill: parent; radius: 8
+                                color: addAccountRow.hovered
+                                    ? (AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd") : "transparent"
+                                Behavior on color {
+                                    ColorAnimation { duration: AppTheme.reduceMotion ? 0 : AppTheme.motionFast }
+                                }
+                            }
+                            Item {
+                                anchors.left: parent.left; anchors.leftMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: addIcon.implicitWidth + 5 + addLabel.implicitWidth
+                                height: 16
+                                VectorIcon {
+                                    id: addIcon
+                                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                                    name: "plus"; size: 13
+                                    color: addAccountRow.hovered ? AppTheme.text : AppTheme.mutedText
+                                }
+                                Text {
+                                    id: addLabel
+                                    anchors.left: addIcon.right; anchors.leftMargin: 5
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: qsTr("添加账号")
+                                    color: addAccountRow.hovered ? AppTheme.text : AppTheme.mutedText
+                                    font.pixelSize: 12
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                            }
+                            MouseArea {
+                                id: addAccountMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: accountDialog.editAccount()
                             }
                         }
                     }
-                    MailboxAction {
-                        objectName: "draftFolderButton"
-                        text: qsTr("Drafts")
-                        iconName: "editRounded"
-                        countText: mail.drafts.length ? String(mail.drafts.length) : ""
-                        checked: window.draftsVisible
-                        Accessible.name: qsTr("Local drafts")
-                        onClicked: { window.draftsVisible = true; window.readerVisible = false; if (window.width < 1080) window.sidebarExpanded = false }
-                    }
-                    Item { Layout.fillHeight: true }
                 }
         }
 
@@ -637,6 +1002,7 @@ ApplicationWindow {
                         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
                         delegate: AbstractButton {
                             id: messageRow
+                            required property int index
                             required property string uid
                             required property string uidValidity
                             required property string sender
@@ -657,6 +1023,7 @@ ApplicationWindow {
                             implicitHeight: visible ? MailStyle.messageRowHeight : 0
                             hoverEnabled: true
                             readonly property bool selected: mail.selectedUid === uid
+                            readonly property bool multiSelected: window.isRowSelected(index)
                             readonly property int messageIndex: (mail.messages && typeof mail.messages.indexOf === "function")
                                 ? mail.messages.indexOf(mail.currentFolder, uidValidity, uid) : -1
                             function selectRow() { mail.openMessage(uid, uidValidity); window.readerVisible = true }
@@ -665,7 +1032,18 @@ ApplicationWindow {
                                 if (unread) mail.setMessageRead(messageIndex, true)
                             }
                             Accessible.name: sender + ". " + subject + (window.showSummary ? ". " + preview : "")
-                            onClicked: openRow()
+                            onClicked: {}   // 鼠标点击由 TapHandler 处理；键盘见下方 Keys
+                            Keys.onReturnPressed: openRow()
+                            Keys.onEnterPressed: openRow()
+                            Keys.onSpacePressed: openRow()
+                            TapHandler {
+                                acceptedButtons: Qt.LeftButton
+                                onTapped: function(point) {
+                                    if (point.modifiers & Qt.ShiftModifier) window.selectRangeTo(index)
+                                    else if (point.modifiers & (Qt.ControlModifier | Qt.MetaModifier)) window.toggleRow(index)
+                                    else { window.clearSelection(); messageRow.openRow() }
+                                }
+                            }
                             TapHandler {
                                 acceptedButtons: Qt.RightButton
                                 onTapped: { messageRow.selectRow(); rowMenu.openAtAnchor() }
@@ -687,11 +1065,36 @@ ApplicationWindow {
                                     iconName: "flag"
                                     onTriggered: mail.toggleFlagged(messageRow.messageIndex)
                                 }
+                                LiquidPopoverItem {
+                                    objectName: "moveToMenuItem"
+                                    text: qsTr("移动到…")
+                                    iconName: "folder"
+                                    enabled: mail.folders.filter(f => f.id !== mail.currentFolder).length > 0
+                                    onTriggered: { rowMenu.close(); messageMoveMenu.openAtAnchor() }
+                                }
                                 LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; onTriggered: mail.archiveMessage(messageRow.messageIndex) }
                                 LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; onTriggered: mail.deleteMessage(messageRow.messageIndex) }
                             }
+                            LiquidPopover {
+                                id: messageMoveMenu
+                                objectName: "messageMoveMenu"
+                                sourceItem: chromePlanes
+                                anchorItem: messageRow
+                                closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
+                                Repeater {
+                                    model: mail.folders.filter(f => f.id !== mail.currentFolder)
+                                    LiquidPopoverItem {
+                                        text: modelData.title || modelData.id
+                                        iconName: "folder"
+                                        onTriggered: {
+                                            messageMoveMenu.close()
+                                            mail.moveMessage(messageRow.messageIndex, modelData.id)
+                                        }
+                                    }
+                                }
+                            }
                             background: Rectangle {
-                                color: messageRow.selected ? window.selectedSurface : messageRow.hovered ? window.hoverSurface : "transparent"
+                                color: messageRow.multiSelected ? window.selectedSurface : messageRow.selected ? window.selectedSurface : messageRow.hovered ? window.hoverSurface : "transparent"
                                 border.width: messageRow.activeFocus ? 1 : 0
                                 border.color: AppTheme.focusRing
                                 Rectangle { height: 1; anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.leftMargin: 19; anchors.right: parent.right; color: window.rule }
@@ -806,6 +1209,72 @@ ApplicationWindow {
                                 Layout.maximumWidth: Math.max(0, Math.min(MailStyle.readerMaximumWidth, readerScroll.availableWidth - (window.width < 1100 ? 48 : 72)))
                                 Layout.minimumWidth: 0
                                 spacing: 14
+                                Item {
+                                    id: detailsPanel
+                                    objectName: "messageDetailsPanel"
+                                    Layout.fillWidth: true
+                                    readonly property real contentHeight: Math.max(140, Math.min(380, detailsColumn.implicitHeight + 40))
+                                    visible: window.detailsVisible
+                                    implicitHeight: visible ? contentHeight : 0
+                                    Layout.preferredHeight: implicitHeight
+                                    clip: true
+                                    RowLayout {
+                                        id: detailsHeader
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 12
+                                        anchors.topMargin: 12
+                                        height: 28
+                                        spacing: 8
+                                        Text { text: qsTr("Message details"); color: window.ink; font.pixelSize: 15; font.weight: Font.DemiBold; Layout.fillWidth: true }
+                                        MailAction { stacked: true; stackedText: qsTr("关闭"); iconName: "close"; accessibleText: qsTr("Close message details"); onClicked: window.detailsVisible = false }
+                                    }
+                                    ScrollView {
+                                        id: detailsScroll
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.top: detailsHeader.bottom
+                                        anchors.bottom: parent.bottom
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 12
+                                        anchors.topMargin: 8
+                                        anchors.bottomMargin: 12
+                                        contentWidth: availableWidth
+                                        clip: true
+                                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                                        ColumnLayout {
+                                            id: detailsColumn
+                                            width: parent.width
+                                            spacing: 8
+                                            Repeater {
+                                                model: [ {title: qsTr("From"), value: window.value(window.message, "senderAddress")},
+                                                    {title: qsTr("To"), value: window.value(window.message, "to")},
+                                                    {title: qsTr("Cc"), value: window.value(window.message, "cc")},
+                                                    {title: qsTr("Date"), value: window.dateLabel(window.message.date)},
+                                                    {title: qsTr("Message ID"), value: window.value(window.message, "messageId")} ]
+                                                delegate: ColumnLayout {
+                                                    id: detailsEntry
+                                                    required property var modelData
+                                                    visible: modelData.value.length > 0
+                                                    Layout.fillWidth: true; spacing: 3
+                                                    Text { text: detailsEntry.modelData.title; color: window.muted; font.pixelSize: 11 }
+                                                    TextEdit { text: detailsEntry.modelData.value; color: window.ink; font.pixelSize: 13; readOnly: true; selectByMouse: true; textFormat: TextEdit.PlainText; wrapMode: TextEdit.WrapAnywhere; Layout.fillWidth: true }
+                                                }
+                                            }
+                                            Text { text: qsTr("Read-only mailbox · no server flags are changed."); color: window.muted; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                                        }
+                                    }
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        height: 1
+                                        color: window.rule
+                                    }
+                                }
                                 Text {
                                     text: window.value(window.message, "subject") || qsTr("(No subject)")
                                     color: window.ink; font.pixelSize: 25; font.weight: Font.Bold
@@ -825,19 +1294,53 @@ ApplicationWindow {
                                 }
                                 Text { text: window.dateLabel(window.message.date); color: window.muted; font.pixelSize: 11; Layout.fillWidth: true }
                                 Rectangle { Layout.fillWidth: true; height: 1; color: window.rule; Layout.topMargin: 4; Layout.bottomMargin: 6 }
-                                // Never interpret message HTML, links, images or remote resources.
+                                RowLayout {
+                                    objectName: "blockedImagesBar"
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    visible: window.mail.blockedImageCount > 0
+                                    Text {
+                                        text: qsTr("%1 张远程图片已隐藏").arg(window.mail.blockedImageCount)
+                                        color: window.muted; font.pixelSize: 11
+                                        Layout.fillWidth: true
+                                    }
+                                    MailAction {
+                                        stacked: true; stackedText: qsTr("显示图片"); iconName: "download"
+                                        accessibleText: qsTr("Load remote images")
+                                        onClicked: window.mail.loadRemoteImages()
+                                    }
+                                }
+                                // Render only the backend-sanitized html field; fall back to plain text.
                                 TextEdit {
                                     id: messageBody
                                     objectName: "messageBody"
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: Math.max(200, contentHeight)
-                                    text: window.value(window.message, "text")
-                                    textFormat: TextEdit.PlainText
+                                    readonly property string richHtml: window.value(window.message, "html") || ""
+                                    readonly property bool asRich: window.showRichText && String(richHtml).length > 0
+                                    text: asRich ? String(richHtml) : window.value(window.message, "text")
+                                    textFormat: asRich ? TextEdit.RichText : TextEdit.PlainText
                                     readOnly: true; selectByMouse: true
                                     wrapMode: TextEdit.Wrap
                                     color: window.ink
                                     selectionColor: AppTheme.accent; selectedTextColor: "white"
                                     font.pixelSize: 14
+                                    onLinkActivated: function(link) {
+                                        if (!/^(https?:|mailto:)/i.test(String(link))) return
+                                        linkClip.text = String(link)
+                                        linkClip.selectAll(); linkClip.copy()
+                                        mail.clearError()
+                                        statusHint.show(qsTr("Link copied to clipboard"))
+                                    }
+                                }
+                                TextEdit { id: linkClip; visible: false }
+                                Text {
+                                    id: statusHint
+                                    visible: false
+                                    text: ""
+                                    color: window.muted; font.pixelSize: 11
+                                    function show(message) { text = message; visible = true; hintTimer.restart() }
+                                    Timer { id: hintTimer; interval: 2500; onTriggered: statusHint.visible = false }
                                 }
                                 Repeater {
                                     model: window.message.attachments || []
@@ -1018,6 +1521,13 @@ ApplicationWindow {
                 checked: window.showSummary
                 onToggled: window.showSummary = checked
             }
+            LiquidCheckBox {
+                objectName: "richTextCheck"
+                Layout.fillWidth: true
+                text: qsTr("富文本显示")
+                checked: window.showRichText
+                onToggled: window.showRichText = checked
+            }
             LiquidPopoverItem {
                 objectName: "overflowRefresh"
                 Layout.fillWidth: true
@@ -1044,7 +1554,7 @@ ApplicationWindow {
         LiquidPopoverItem { text: qsTr("Reply"); iconName: "undo"; enabled: !mail.sending; onTriggered: window.compose("reply") }
         LiquidPopoverItem { objectName: "moreReplyAll"; text: qsTr("Reply to all"); iconName: "arrows"; enabled: window.hasMessage && !mail.sending; onTriggered: window.compose("replyAll") }
         LiquidPopoverItem { text: qsTr("Forward"); iconName: "forward"; enabled: !mail.sending; onTriggered: window.compose("forward") }
-        LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: details.open() }
+        LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: window.detailsVisible = true }
         LiquidPopoverItem {
             text: qsTr("删除"); iconName: "trash"
             enabled: window.hasMessage && window.width < 1100
@@ -1061,51 +1571,44 @@ ApplicationWindow {
             onTriggered: mail.toggleFlagged(window.selectedIndex())
         }
     }
-    LiquidContentPopover {
-        id: details
-        objectName: "messageDetailsPopover"
-        sourceItem: chromePlanes
-        anchorItem: messageOptionsGroup
-        preferredSide: "bottom"
-        width: Math.min(360, window.width - 16)
-        implicitHeight: Math.min(360, detailsColumn.implicitHeight + topPadding + bottomPadding)
-        height: implicitHeight
-        contentItem: ScrollView {
-            id: detailsScroll
-            contentWidth: availableWidth
-            clip: true
-            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-            ScrollBar.vertical.policy: ScrollBar.AsNeeded
-            ColumnLayout {
-                id: detailsColumn
-                width: detailsScroll.availableWidth
+    MailComposer { id: composer; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
+    AccountDialog { id: accountDialog; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
+    LiquidDialog {
+        id: deleteAccountDialog
+        objectName: "deleteAccountDialog"
+        parent: Overlay.overlay
+        property string targetId: ""
+        property string targetName: ""
+        width: Math.min(420, window.width - 32)
+        anchors.centerIn: parent
+        title: qsTr("删除账号？")
+        contentItem: Text {
+            text: qsTr("%1 的本地缓存和记住的口令会被删除，服务器上的邮件不受影响。").arg(deleteAccountDialog.targetName)
+            color: AppTheme.text
+            width: deleteAccountDialog.availableWidth
+            wrapMode: Text.Wrap
+        }
+        footer: Item {
+            implicitHeight: MailStyle.footerHeight
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 12; anchors.bottomMargin: 20
                 spacing: 8
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text { text: qsTr("Message details"); color: window.ink; font.pixelSize: 15; font.weight: Font.DemiBold; Layout.fillWidth: true }
-                    MailAction { stacked: true; stackedText: qsTr("关闭"); iconName: "close"; accessibleText: qsTr("Close message details"); onClicked: details.close() }
-                }
-                Repeater {
-                    model: [ {title: qsTr("From"), value: window.value(window.message, "senderAddress")},
-                        {title: qsTr("To"), value: window.value(window.message, "to")},
-                        {title: qsTr("Cc"), value: window.value(window.message, "cc")},
-                        {title: qsTr("Date"), value: window.dateLabel(window.message.date)},
-                        {title: qsTr("Message ID"), value: window.value(window.message, "messageId")} ]
-                    delegate: ColumnLayout {
-                        id: detailsEntry
-                        required property var modelData
-                        visible: modelData.value.length > 0
-                        Layout.fillWidth: true; spacing: 3
-                        Text { text: detailsEntry.modelData.title; color: window.muted; font.pixelSize: 11 }
-                        TextEdit { text: detailsEntry.modelData.value; color: window.ink; font.pixelSize: 13; readOnly: true; selectByMouse: true; textFormat: TextEdit.PlainText; wrapMode: TextEdit.WrapAnywhere; Layout.fillWidth: true }
+                Item { Layout.fillWidth: true }
+                LiquidDialogButton { text: qsTr("取消"); onClicked: deleteAccountDialog.close() }
+                LiquidDialogButton {
+                    objectName: "deleteAccountButton"
+                    text: qsTr("删除")
+                    destructive: true
+                    onClicked: {
+                        const id = deleteAccountDialog.targetId
+                        deleteAccountDialog.close()
+                        window.mail.removeAccount(id)
                     }
                 }
-                Text { text: qsTr("Read-only mailbox · no server flags are changed."); color: window.muted; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap }
             }
         }
     }
-    MailComposer { id: composer; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
-    AccountDialog { id: accountDialog; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
     FileDialog {
         id: saveAttachmentDialog
         property int attachmentIndex: -1
@@ -1117,8 +1620,10 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+F"; enabled: !composer.visible && !accountDialog.visible; onActivated: readerHeader.openSearch() }
     Shortcut {
         sequence: "Escape"
-        enabled: !composer.visible && !accountDialog.visible && !details.visible && !moreMenu.visible
+        enabled: !composer.visible && !accountDialog.visible && !window.detailsVisible && !moreMenu.visible
         onActivated: {
+            if (window.selectionSize > 0) { window.clearSelection(); return }
+            if (window.detailsVisible) { window.detailsVisible = false; return }
             if (window.width < 1080 && window.sidebarExpanded) window.sidebarExpanded = false
             else if (window.narrow && window.readerVisible) window.readerVisible = false
             else if (toolbarSearch.active) readerHeader.closeSearch()

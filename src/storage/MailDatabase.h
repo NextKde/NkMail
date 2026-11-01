@@ -1,5 +1,6 @@
 #pragma once
 #include "MailTypes.h"
+#include <QMap>
 #include <QSqlDatabase>
 #include <optional>
 
@@ -14,19 +15,24 @@ public:
     MailDatabase(const MailDatabase &) = delete;
     MailDatabase &operator=(const MailDatabase &) = delete;
 
-    bool open(const QString &root);
+    bool open(const QString &root, const QString &accountId = QStringLiteral("default"));
     void close();
     bool isOpen() const;
     QString error() const { return m_error; }
     QString errorString() const { return m_error; }
+    QString accountId() const { return m_accountId; }
+    QList<Account> accounts() const;
     Account account() const;
     bool saveAccount(const Account &account);
+    bool removeAccount(const QString &id);
     QList<Folder> folders() const;
     bool saveFolders(const QList<Folder> &folders);
     bool invalidateUidValidity(const QString &folder, const QString &uidValidity);
     bool savePage(const Page &page);
     Page cachedPage(const QString &folder, int offset = 0, int limit = 50,
                     const QString &search = {}, bool unreadOnly = false) const;
+    QMap<QString, int> unreadCounts() const;
+
     bool saveContent(const Content &content);
     std::optional<Content> content(const QString &folder, const QString &uidValidity,
                                    const QString &uid) const;
@@ -48,6 +54,7 @@ private:
     QString validity(const QString &folder) const;
     QThread *m_thread;
     QString m_connection;
+    QString m_accountId = QStringLiteral("default");
     QSqlDatabase m_db;
     mutable QString m_error;
 };

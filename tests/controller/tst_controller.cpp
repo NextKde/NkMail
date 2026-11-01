@@ -87,10 +87,17 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
     { QMutexLocker lock(&synthetic::callsMutex); synthetic::contentUids.append(uid); }
     return synthetic::content(a, folder, validity, uid);
 }
-SendResult MailioBackend::send(const Account &a, const Draft &d)
+SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *)
 {
     ++synthetic::sendCalls;
     return synthetic::send(a, d);
+}
+QString MailioBackend::sentFolder(const Account &)
+{
+    return QStringLiteral("Sent");
+}
+void MailioBackend::appendSent(const Account &, const QString &, const QByteArray &)
+{
 }
 QList<QVariantMap> MailioBackend::search(const Account &, const QString &, const QString &, const QString &, int)
 {
@@ -104,6 +111,19 @@ void MailioBackend::copyTo(const Account &, const QString &, const QString &, co
 }
 void MailioBackend::expunge(const Account &, const QString &, const QString &, const QString &, bool *)
 {
+}
+void MailioBackend::storeFlagsMany(const Account &, const QString &, const QString &, const QStringList &, const QStringList &, bool)
+{
+}
+void MailioBackend::copyMany(const Account &, const QString &, const QString &, const QStringList &, const QString &)
+{
+}
+void MailioBackend::expungeMany(const Account &, const QString &, const QString &, const QStringList &, bool *)
+{
+}
+InboxStats MailioBackend::inboxStats(const Account &)
+{
+    return {};
 }
 CredentialStore::CredentialStore(QObject *parent) : CredentialStore(QStringLiteral("synthetic"), parent) {}
 CredentialStore::CredentialStore(const QString &service, QObject *parent) : QObject(parent), m_service(service) {}

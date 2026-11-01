@@ -25,10 +25,11 @@ add_library(nkmail_core STATIC
     src/FolderListModel.cpp src/FolderListModel.h
     src/storage/MailDatabase.cpp src/storage/MailDatabase.h
     src/storage/CredentialStore.cpp src/storage/CredentialStore.h
-    src/mail/backend.cpp src/mail/backend.h)
+    src/mail/backend.cpp src/mail/backend.h
+    src/mail/HtmlSanitizer.cpp src/mail/HtmlSanitizer.h)
 target_include_directories(nkmail_core PUBLIC src)
 target_link_libraries(nkmail_core PUBLIC Qt6::Core Qt6::Gui Qt6::Sql Qt6Keychain::Qt6Keychain mailio)
-qt_add_executable(nkmail src/main.cpp src/MailController.cpp src/MailController.h src/NotificationService.cpp src/NotificationService.h)
+qt_add_executable(nkmail src/main.cpp src/MailController.cpp src/MailController.h src/NotificationService.cpp src/NotificationService.h src/RichTextEditor.cpp src/RichTextEditor.h)
 set_source_files_properties(qml/MailStyle.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(nkmail
     URI NextKde.Mail VERSION 1.0 RESOURCE_PREFIX /qt/qml
@@ -49,7 +50,7 @@ if(NKMAIL_BUILD_TESTS)
     add_test(NAME nkmail_cli COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/cli/check_cli.py" $<TARGET_FILE:nkmail>)
     set_tests_properties(nkmail_cli PROPERTIES TIMEOUT 60)
     find_package(Qt6 REQUIRED COMPONENTS QuickTest)
-    qt_add_executable(nkmail_ui_tests tests/ui/main.cpp)
+    qt_add_executable(nkmail_ui_tests tests/ui/main.cpp src/RichTextEditor.cpp src/RichTextEditor.h)
     qt_add_qml_module(nkmail_ui_tests
         URI NextKde.Mail.TestViews VERSION 1.0 RESOURCE_PREFIX /qt/qml
         QML_FILES qml/Main.qml qml/WindowChrome.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)

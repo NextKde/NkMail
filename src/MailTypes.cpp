@@ -53,6 +53,7 @@ QVariantMap contentMap(const Content &c)
     QVariantMap m = summaryMap(c.summary);
     m.insert("summary", summaryMap(c.summary));
     m.insert("text", c.text);
+    m.insert("html", c.html);
     m.insert("messageId", c.messageId);
     m.insert("replyTo", c.replyTo);
     m.insert("to", c.to);
@@ -63,7 +64,7 @@ QVariantMap contentMap(const Content &c)
 QVariantMap draftMap(const Draft &d)
 {
     return {{"id", d.id}, {"to", d.to}, {"cc", d.cc}, {"bcc", d.bcc},
-            {"subject", d.subject}, {"body", d.body}, {"inReplyTo", d.inReplyTo},
+            {"subject", d.subject}, {"body", d.body}, {"html", d.html}, {"inReplyTo", d.inReplyTo},
             {"references", d.references}, {"attachments", attachmentMaps(d.attachments)},
             {"state", d.state}, {"updated", d.updated.toUTC().toString(Qt::ISODateWithMs)}};
 }
@@ -76,6 +77,7 @@ Draft draftFromMap(const QVariantMap &m)
     d.bcc = m.value("bcc").toString();
     d.subject = m.value("subject").toString();
     d.body = m.value("body").toString();
+    d.html = m.value("html").toString();
     d.inReplyTo = m.value("inReplyTo").toString();
     d.references = m.value("references").toString();
     d.state = m.value("state", QStringLiteral("draft")).toString();

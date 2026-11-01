@@ -396,6 +396,26 @@ public:
     void append(const std::string& folder_name, const message& msg);
 
     /**
+    Appending a message to the given folder with the given flags.
+
+    @param folder_name Folder to append the message.
+    @param msg         Message to append.
+    @param flags       Flags to set on the appended message.
+    @throw *           `append(const std::string&, const std::string&, const std::list<std::string>&)`.
+    **/
+    void append(const std::string& folder_name, const message& msg, const std::list<std::string>& flags);
+
+    /**
+    Appending an already formatted message to the given folder with the given flags.
+
+    @param folder_name Folder to append the message.
+    @param msg_str     Formatted message to append.
+    @param flags       Flags to set on the appended message.
+    @throw imap_error  `Message appending failure.`, `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
+    **/
+    void append(const std::string& folder_name, const std::string& msg_str, const std::list<std::string>& flags);
+
+    /**
     Getting the mailbox statistics.
 
     The server might not support unseen, uidnext, or uidvalidity, which will cause an exception, so those parameters are optional.
@@ -529,6 +549,43 @@ public:
     @throw *          `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
     **/
     void expunge(unsigned long message_no, bool is_uid);
+
+    /**
+    Storing flags on a set of messages from an already selected mailbox.
+
+    The `uid_set` is sent verbatim as a comma separated UID set (RFC 3501), e.g. `12,13,20`.
+
+    @param uid_set Comma separated message UID set.
+    @param flags   Flags to add or remove.
+    @param add     True to add the flags, false to remove them.
+    @throw imap_error Storing message flags failure.
+    @throw imap_error Parsing failure.
+    @throw *          `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
+    **/
+    void store_flags(const std::string& uid_set, const std::list<std::string>& flags, bool add);
+
+    /**
+    Copying a set of messages from an already selected mailbox to another mailbox.
+
+    @param uid_set             Comma separated message UID set.
+    @param destination_mailbox Mailbox to copy the messages to.
+    @throw imap_error          Copying message failure.
+    @throw imap_error          Parsing failure.
+    @throw *                   `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
+    **/
+    void copy(const std::string& uid_set, const std::string& destination_mailbox);
+
+    /**
+    Expunging a set of messages from an already selected mailbox.
+
+    The `UID EXPUNGE` command defined by RFC 4315 is sent, which needs the server to advertise the `UIDPLUS` capability.
+
+    @param uid_set Comma separated message UID set.
+    @throw imap_error Expunging messages failure.
+    @throw imap_error Parsing failure.
+    @throw *          `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
+    **/
+    void expunge(const std::string& uid_set);
 
     /**
     Querying the capabilities advertised by the server.

@@ -24,7 +24,7 @@ struct Summary {
 struct Attachment { QString name, mimeType, path; qint64 size = 0; QByteArray bytes; };
 struct Content {
     Summary summary;
-    QString text, messageId, replyTo, to, cc;
+    QString text, html, messageId, replyTo, to, cc;
     QList<Attachment> attachments;
 };
 struct Page {
@@ -34,7 +34,7 @@ struct Page {
     int nextOffset = 0;
 };
 struct Draft {
-    QString id, to, cc, bcc, subject, body, inReplyTo, references;
+    QString id, to, cc, bcc, subject, body, html, inReplyTo, references;
     QList<Attachment> attachments;
     QString state = QStringLiteral("draft");
     QDateTime updated;

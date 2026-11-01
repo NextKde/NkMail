@@ -1,5 +1,7 @@
 #include "backend.h"
 
+#include "HtmlSanitizer.h"
+
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QFile>
@@ -82,6 +84,16 @@ std::list<std::string> flagList(const QStringList &flags)
         wire.push_back(utf8(flag));
     }
     return wire;
+}
+std::string uidSet(const QStringList &uids)
+{
+    if (uids.size() > 500) throw BackendError("Too many messages selected.");
+    std::string set;
+    for (const auto &uid : uids) {
+        if (!set.empty()) set += ',';
+        set += std::to_string(identity(uid));
+    }
+    return set;
 }
 mailio::dialog_ssl::ssl_options_t tlsOptions(const Account &a)
 {
@@ -196,7 +208,7 @@ QString mimeType(Mime::content_type_t type)
     }
     return major + u'/' + (type.media_subtype().empty() ? QStringLiteral("octet-stream") : unicode(type.media_subtype()));
 }
-struct Decoded { QStringList plain, html; QList<Attachment> attachments; qint64 bytes = 0; int nodes = 0; };
+struct Decoded { QStringList plain, html, rawHtml; QList<Attachment> attachments; qint64 bytes = 0; int nodes = 0; };
 void decodePart(Mime part, Decoded &out, int depth = 0)
 {
     if (depth > 24 || ++out.nodes > 500) throw BackendError("Message MIME structure exceeds safety limits.");
@@ -216,8 +228,10 @@ void decodePart(Mime part, Decoded &out, int depth = 0)
     }
     if (type.media_type() == Mime::media_type_t::TEXT || type.media_type() == Mime::media_type_t::NONE) {
         const auto text = unicode(data, type.charset().buffer);
-        if (QString::fromStdString(type.media_subtype()).compare(QStringLiteral("html"), Qt::CaseInsensitive) == 0)
+        if (QString::fromStdString(type.media_subtype()).compare(QStringLiteral("html"), Qt::CaseInsensitive) == 0) {
+            out.rawHtml << text;
             out.html << htmlText(text);
+        }
         else if (type.media_subtype().empty() || QString::fromStdString(type.media_subtype()).compare(QStringLiteral("plain"), Qt::CaseInsensitive) == 0)
             out.plain << text;
     }
@@ -270,7 +284,7 @@ void addIds(const QString &field, const std::function<void(const std::string &)>
 Message compose(const Account &a, const Draft &d)
 {
     singleLine(a.address); singleLine(a.name); singleLine(d.subject);
-    if (d.subject.size() > 16384 || d.body.toUtf8().size() > MaxDecoded || d.attachments.size() > 100)
+    if (d.subject.size() > 16384 || d.body.toUtf8().size() + d.html.toUtf8().size() > MaxDecoded || d.attachments.size() > 100)
         throw BackendError("Draft exceeds safety limits.");
     Message m;
     m.line_policy(mailio::codec::line_len_policy_t::RECOMMENDED);
@@ -292,15 +306,39 @@ Message compose(const Account &a, const Draft &d)
     body.content_type(Mime::media_type_t::TEXT, "plain", "UTF-8");
     body.content_transfer_encoding(Mime::content_transfer_encoding_t::BASE_64);
     body.content(utf8(d.body));
-    if (d.attachments.empty()) {
-        m.content_type(Mime::media_type_t::TEXT, "plain", "UTF-8");
-        m.content_transfer_encoding(Mime::content_transfer_encoding_t::BASE_64);
-        m.content(utf8(d.body));
-    } else {
-        m.content_type(Mime::media_type_t::MULTIPART, "mixed");
+    Mime htmlPart;
+    if (!d.html.isEmpty()) {
+        htmlPart.content_type(Mime::media_type_t::TEXT, "html", "UTF-8");
+        htmlPart.content_transfer_encoding(Mime::content_transfer_encoding_t::BASE_64);
+        htmlPart.content(utf8(d.html));
+    }
+    if (d.html.isEmpty()) {
+        if (d.attachments.empty()) {
+            m.content_type(Mime::media_type_t::TEXT, "plain", "UTF-8");
+            m.content_transfer_encoding(Mime::content_transfer_encoding_t::BASE_64);
+            m.content(utf8(d.body));
+        } else {
+            m.content_type(Mime::media_type_t::MULTIPART, "mixed");
+            m.content_type().boundary(m.content_type().make_boundary());
+            m.add_part(body);
+        }
+    } else if (d.attachments.empty()) {
+        m.content_type(Mime::media_type_t::MULTIPART, "alternative");
         m.content_type().boundary(m.content_type().make_boundary());
         m.add_part(body);
-        qint64 total = d.body.toUtf8().size();
+        m.add_part(htmlPart);
+    } else {
+        Mime alternative;
+        alternative.content_type(Mime::media_type_t::MULTIPART, "alternative");
+        alternative.content_type().boundary(alternative.content_type().make_boundary());
+        alternative.add_part(body);
+        alternative.add_part(htmlPart);
+        m.content_type(Mime::media_type_t::MULTIPART, "mixed");
+        m.content_type().boundary(m.content_type().make_boundary());
+        m.add_part(alternative);
+    }
+    if (!d.attachments.empty()) {
+        qint64 total = d.body.toUtf8().size() + d.html.toUtf8().size();
         for (const auto &a : d.attachments) {
             QByteArray bytes = a.bytes;
             if (bytes.isEmpty() && !a.path.isEmpty()) {
@@ -328,6 +366,25 @@ Message compose(const Account &a, const Draft &d)
 }
 } // namespace
 
+InboxStats MailioBackend::inboxStats(const Account &a)
+{
+    try {
+        accountValid(a, false);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        // Read-only SELECT plus one STATUS: no message bodies or headers are fetched.
+        imap.select(std::string("INBOX"), true);
+        const auto stat = imap.statistics(std::string("INBOX"),
+            Imap::mailbox_stat_t::DEFAULT | Imap::mailbox_stat_t::UNSEEN
+            | Imap::mailbox_stat_t::UID_VALIDITY | Imap::mailbox_stat_t::UID_NEXT);
+        InboxStats result;
+        result.uidValidity = stat.uid_validity ? QString::number(stat.uid_validity) : QString{};
+        result.messages = int(std::min<unsigned long>(stat.messages_no, std::numeric_limits<int>::max()));
+        result.unseen = int(std::min<unsigned long>(stat.messages_unseen, std::numeric_limits<int>::max()));
+        result.maxUid = QString::number(stat.uid_next > 0 ? stat.uid_next - 1 : 0);
+        return result;
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to read inbox statistics. Check account, connection and trusted TLS certificate."); }
+}
 QList<Folder> MailioBackend::folders(const Account &a)
 {
     try {
@@ -441,6 +498,7 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
         c.to = addressList(m.recipients()); c.cc = addressList(m.cc_recipients());
         Decoded decoded; decodePart(m, decoded);
         c.text = (decoded.plain.isEmpty() ? decoded.html : decoded.plain).join(QStringLiteral("\n\n"));
+        c.html = sanitizeMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
         c.attachments = std::move(decoded.attachments);
         c.summary.hasAttachments = !c.attachments.isEmpty();
         c.summary.preview = c.text.simplified().left(160);
@@ -448,12 +506,17 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError("Unable to read message. Check account, connection and trusted TLS certificate."); }
 }
-SendResult MailioBackend::send(const Account &a, const Draft &d)
+SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *raw)
 {
     bool submitting = false;
     try {
         accountValid(a, true);
         const auto m = compose(a, d);
+        // Format once and reuse the exact bytes for both submission and the Sent
+        // copy, so the Date and Message-ID match what the recipient receives.
+        std::string str;
+        m.format(str, {true, false});
+        if (raw) *raw = QByteArray::fromStdString(str);
         mailio::smtp smtp(utf8(a.smtpHost), a.smtpPort, Timeout);
         smtp.ssl_options(tlsOptions(a)); smtp.start_tls(a.smtpStartTls);
         smtp.source_hostname("nkmail.invalid");
@@ -474,6 +537,51 @@ SendResult MailioBackend::send(const Account &a, const Draft &d)
             ? SendResult{SendResult::Unknown, QStringLiteral("Submission outcome is unknown. Check Sent mail before retrying manually.")}
             : SendResult{SendResult::Rejected, QStringLiteral("Message was not submitted. Check account, connection and trusted TLS certificate.")};
     }
+}
+QString MailioBackend::sentFolder(const Account &a)
+{
+    try {
+        accountValid(a, false);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto tree = imap.list_folders(std::string());
+        const auto delimiter = unicode(imap.folder_delimiter());
+        QStringList ids, lasts;
+        int nodes = 0;
+        std::function<void(const Imap::mailbox_folder_t &, const QString &, int)> visit;
+        visit = [&](const auto &node, const QString &prefix, int depth) {
+            if (depth > 24 || nodes > 1000) return;
+            for (const auto &[name, child] : node.folders) {
+                if (++nodes > 1000) return;
+                const auto id = prefix.isEmpty() ? unicode(name) : prefix + delimiter + unicode(name);
+                if (child.selectable) {
+                    ids << id;
+                    lasts << (delimiter.isEmpty() ? id : id.section(delimiter, -1));
+                }
+                visit(child, id, depth + 1);
+            }
+        };
+        visit(tree, {}, 0);
+        static const QStringList candidates{
+            QStringLiteral("sent"), QStringLiteral("sent items"), QStringLiteral("sent messages"),
+            QStringLiteral("sent mail"), QStringLiteral("sent-mail"),
+            QStringLiteral("已发送"), QStringLiteral("已发送邮件"),
+            QStringLiteral("寄件備份"), QStringLiteral("寄件备份")};
+        for (const auto &candidate : candidates)
+            for (int i = 0; i < lasts.size(); ++i)
+                if (lasts[i].compare(candidate, Qt::CaseInsensitive) == 0) return ids[i];
+        for (int i = 0; i < lasts.size(); ++i)
+            if (lasts[i] == QStringLiteral("Sent")) return ids[i];
+        return {};
+    } catch (...) { return {}; }
+}
+void MailioBackend::appendSent(const Account &a, const QString &folder, const QByteArray &raw)
+{
+    try {
+        accountValid(a, false); folderValid(folder);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        imap.append(utf8(folder), std::string(raw.constData(), size_t(raw.size())), {"\\Seen"});
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to save a copy to the Sent folder. Check account, connection and trusted TLS certificate."); }
 }
 void MailioBackend::storeFlags(const Account &a, const QString &folder, const QString &validity,
                                const QString &uid, const QStringList &flags, bool add)
@@ -520,6 +628,58 @@ void MailioBackend::expunge(const Account &a, const QString &folder, const QStri
             }
             if (usedFullExpunge) *usedFullExpunge = true;
         }
+        imap.expunge();
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to expunge deleted messages. Check account, connection and trusted TLS certificate."); }
+}
+void MailioBackend::storeFlagsMany(const Account &a, const QString &folder, const QString &validity,
+                                   const QStringList &uids, const QStringList &flags, bool add)
+{
+    if (uids.isEmpty()) return;
+    try {
+        accountValid(a, false); folderValid(folder);
+        const auto expected = identity(validity);
+        const auto wire = flagList(flags);
+        const auto set = uidSet(uids);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), false);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        imap.store_flags(set, wire, add);
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to update message flags. Check account, connection and trusted TLS certificate."); }
+}
+void MailioBackend::copyMany(const Account &a, const QString &folder, const QString &validity,
+                             const QStringList &uids, const QString &destination)
+{
+    if (uids.isEmpty()) return;
+    try {
+        accountValid(a, false); folderValid(folder); folderValid(destination);
+        const auto expected = identity(validity);
+        const auto set = uidSet(uids);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), false);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        imap.copy(set, utf8(destination));
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to copy message. Check account, connection and trusted TLS certificate."); }
+}
+void MailioBackend::expungeMany(const Account &a, const QString &folder, const QString &validity,
+                                const QStringList &uids, bool *usedFullExpunge)
+{
+    if (usedFullExpunge) *usedFullExpunge = false;
+    if (uids.isEmpty()) return;
+    try {
+        accountValid(a, false); folderValid(folder);
+        const auto expected = identity(validity);
+        const auto set = uidSet(uids);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), false);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        if (imap.capabilities().count("UIDPLUS")) {
+            imap.expunge(set);
+            return;
+        }
+        if (usedFullExpunge) *usedFullExpunge = true;
         imap.expunge();
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError("Unable to expunge deleted messages. Check account, connection and trusted TLS certificate."); }

@@ -17,8 +17,12 @@ TestCase {
         property var folders: [{id: "INBOX", title: "Inbox", total: 1}]
         property var drafts: []
         property var account: ({id: "example", name: "Alex Example", address: "alex@example.invalid"})
+        property var accounts: ([{ id: "default", name: "Alex Example", address: "alex@example.invalid" }])
+        property string currentAccountId: "default"
         property var selectedMessage: ({uid: "1", uidValidity: "1", sender: "Studio Example", senderAddress: "studio@example.invalid", subject: "A quieter inbox", date: "2026-10-29T09:00:00Z", to: "alex@example.invalid", cc: "", messageId: "<one@example.invalid>", text: "<img src=https://example.invalid/tracker>\nPlain text only.", attachments: []})
         property string selectedUid: "1"
+        property int blockedImageCount: 0
+        function loadRemoteImages() {}
         property string currentFolder: "INBOX"
         property string status: "Demo"
         property string error: ""
@@ -26,6 +30,8 @@ TestCase {
         property bool unreadOnly: false
         property bool notifyEnabled: true
         property bool sending: false
+        property int sendDelay: 0
+        property bool sendPending: false
         property bool configured: true
         property bool demo: true
         property bool hasMore: false
@@ -35,6 +41,8 @@ TestCase {
         property int saveCount: 0
         property var lastSaved: ({})
         signal selectionChanged()
+        signal folderChanged()
+        signal folderUnreadChanged()
         signal draftAccepted(string id)
         ListModel {
             id: messageModel
@@ -43,6 +51,23 @@ TestCase {
         function configureAccount(config, password, remember) {}
         function refresh() { refreshCount++ }
         function selectFolder(folder) { currentFolder = folder }
+        function foldersFor(accountId) { return folders }
+        property var folderUnreadMap: ({})
+        function folderUnread() { return folderUnreadMap }
+        property int accountUnreadRevision: 0
+        function accountUnread(accountId) { return 0 }
+        property var favorites: ([])
+        property var favoriteKeys: ({})
+        function isFavorite(accountId, folderId) { return favoriteKeys[accountId + "|" + folderId] === true }
+        function toggleFavorite(accountId, folderId, title) {
+            const key = accountId + "|" + folderId
+            const next = Object.assign({}, favoriteKeys)
+            if (next[key]) delete next[key]; else next[key] = true
+            favoriteKeys = next
+            favorites = Object.keys(next).map(k => ({ accountId: k.split("|")[0], folderId: k.split("|")[1], title: title || k.split("|")[1], accountName: "" }))
+        }
+        function openFavorite(accountId, folderId) { currentAccountId = accountId }
+        function switchAccount(accountId) { currentAccountId = accountId }
         function loadMore() {}
         function openMessage(uid, validity) { selectedUid = uid }
         function newDraft(mode) { return {id: "test-draft", to: "", cc: "", bcc: "", subject: "", body: "", inReplyTo: "", references: "", state: "draft", attachments: []} }
@@ -57,6 +82,7 @@ TestCase {
         function addAttachment(url) { return ({}) }
         function saveAttachment(index, url) {}
         function sendDraft(draft) { sending = true }
+        function cancelSend() { sendPending = false }
         function clearError() { error = "" }
         function disconnectAccount() { configured = false }
     }
@@ -206,10 +232,14 @@ TestCase {
         wait(30)
         compare(findChild(app, "detailsButton"), null)   // 窄宽下「详情」已并入「更多」，不再有独立按钮
         app.showReview("details")
-        const details = findChild(app, "messageDetailsPopover")
+        const details = findChild(app, "messageDetailsPanel")
+        verify(details !== null)
         tryCompare(details, "visible", true)
-        compare(details.anchorItem, findChild(app, "messageOptionsGroup"))
-        details.close()
+        // 内联面板：展开时把正文往下推，关闭后高度归零
+        verify(details.height > 0)
+        app.detailsVisible = false
+        wait(30)
+        compare(details.visible, false)
         keyClick(Qt.Key_F, Qt.ControlModifier)
         compare(app.readerVisible, false)
         const search = findChild(app, "searchField")
@@ -321,7 +351,7 @@ TestCase {
         mock.failSave = true
         keyClick(Qt.Key_Escape)
         compare(dialog.visible, true)
-        compare(body.text, "Do not discard on Escape.")
+        compare(body.getText(0, body.length), "Do not discard on Escape.")
         mock.failSave = false
         keyClick(Qt.Key_Escape)
         tryCompare(dialog, "visible", false)
@@ -359,7 +389,7 @@ TestCase {
         mock.failSave = true
         verify(!dialog.finishEditing())
         compare(dialog.visible, true)
-        compare(body.text, "Keep this local draft.")
+        compare(body.getText(0, body.length), "Keep this local draft.")
         mock.failSave = false
         verify(dialog.finishEditing())
         compare(mock.lastSaved.body, "Keep this local draft.")
