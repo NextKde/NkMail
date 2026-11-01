@@ -23,6 +23,9 @@ public:
     static QList<QVariantMap> search(const Account &account, const QString &folder,
                                      const QString &uidValidity, const QString &query, int limit);
     static SendResult send(const Account &account, const Draft &draft);
+    static QString sentFolder(const Account &account);
+    static void appendSent(const Account &account, const QString &folder,
+                           const Draft &draft);
     static void storeFlags(const Account &account, const QString &folder,
                            const QString &uidValidity, const QString &uid,
                            const QStringList &flags, bool add);

@@ -535,10 +535,27 @@ void imap::append(const list<string>& folder_name, const message& msg)
 
 void imap::append(const string& folder_name, const message& msg)
 {
+    append(folder_name, msg, {});
+}
+
+
+void imap::append(const string& folder_name, const message& msg, const list<string>& flags)
+{
     string msg_str;
     msg.format(msg_str, message_format_options_t{true, false});
 
     string cmd = "APPEND " + to_astring(folder_name);
+    if (!flags.empty())
+    {
+        string flag_str;
+        for (const auto& flag : flags)
+        {
+            if (!flag_str.empty())
+                flag_str.push_back(' ');
+            flag_str.append(flag);
+        }
+        cmd.append(" (" + flag_str + ")");
+    }
     cmd.append(" {" + to_string(msg_str.size()) + "}");
     dlg_->send(format(cmd));
     string line = dlg_->receive();

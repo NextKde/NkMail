@@ -92,6 +92,13 @@ SendResult MailioBackend::send(const Account &a, const Draft &d)
     ++synthetic::sendCalls;
     return synthetic::send(a, d);
 }
+QString MailioBackend::sentFolder(const Account &)
+{
+    return QStringLiteral("Sent");
+}
+void MailioBackend::appendSent(const Account &, const QString &, const Draft &)
+{
+}
 QList<QVariantMap> MailioBackend::search(const Account &, const QString &, const QString &, const QString &, int)
 {
     return {};

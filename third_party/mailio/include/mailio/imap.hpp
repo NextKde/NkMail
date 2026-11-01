@@ -396,6 +396,16 @@ public:
     void append(const std::string& folder_name, const message& msg);
 
     /**
+    Appending a message to the given folder with the given flags.
+
+    @param folder_name Folder to append the message.
+    @param msg         Message to append.
+    @param flags       Flags to set on the appended message.
+    @throw *           `append(const std::string&, const message&)`.
+    **/
+    void append(const std::string& folder_name, const message& msg, const std::list<std::string>& flags);
+
+    /**
     Getting the mailbox statistics.
 
     The server might not support unseen, uidnext, or uidvalidity, which will cause an exception, so those parameters are optional.

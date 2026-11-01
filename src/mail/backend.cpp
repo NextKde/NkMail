@@ -475,6 +475,52 @@ SendResult MailioBackend::send(const Account &a, const Draft &d)
             : SendResult{SendResult::Rejected, QStringLiteral("Message was not submitted. Check account, connection and trusted TLS certificate.")};
     }
 }
+QString MailioBackend::sentFolder(const Account &a)
+{
+    try {
+        accountValid(a, false);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto tree = imap.list_folders(std::string());
+        const auto delimiter = unicode(imap.folder_delimiter());
+        QStringList ids, lasts;
+        int nodes = 0;
+        std::function<void(const Imap::mailbox_folder_t &, const QString &, int)> visit;
+        visit = [&](const auto &node, const QString &prefix, int depth) {
+            if (depth > 24 || nodes > 1000) return;
+            for (const auto &[name, child] : node.folders) {
+                if (++nodes > 1000) return;
+                const auto id = prefix.isEmpty() ? unicode(name) : prefix + delimiter + unicode(name);
+                if (child.selectable) {
+                    ids << id;
+                    lasts << (delimiter.isEmpty() ? id : id.section(delimiter, -1));
+                }
+                visit(child, id, depth + 1);
+            }
+        };
+        visit(tree, {}, 0);
+        static const QStringList candidates{
+            QStringLiteral("sent"), QStringLiteral("sent items"), QStringLiteral("sent messages"),
+            QStringLiteral("sent mail"), QStringLiteral("sent-mail"),
+            QStringLiteral("已发送"), QStringLiteral("已发送邮件"),
+            QStringLiteral("寄件備份"), QStringLiteral("寄件备份")};
+        for (const auto &candidate : candidates)
+            for (int i = 0; i < lasts.size(); ++i)
+                if (lasts[i].compare(candidate, Qt::CaseInsensitive) == 0) return ids[i];
+        for (int i = 0; i < lasts.size(); ++i)
+            if (lasts[i] == QStringLiteral("Sent")) return ids[i];
+        return {};
+    } catch (...) { return {}; }
+}
+void MailioBackend::appendSent(const Account &a, const QString &folder, const Draft &d)
+{
+    try {
+        accountValid(a, false); folderValid(folder);
+        const auto m = compose(a, d);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        imap.append(utf8(folder), m, {"\\Seen"});
+    } catch (const BackendError &) { throw; }
+      catch (...) { throw BackendError("Unable to save a copy to the Sent folder. Check account, connection and trusted TLS certificate."); }
+}
 void MailioBackend::storeFlags(const Account &a, const QString &folder, const QString &validity,
                                const QString &uid, const QStringList &flags, bool add)
 {

@@ -593,13 +593,30 @@ void MailController::sendDraft(const QVariantMap &map) {
         SendResult result;
         try { result = MailioBackend::send(account, draft); }
         catch (...) { result.state = SendResult::Unknown; result.message = QStringLiteral("Connection ended before the result could be confirmed."); }
-        if (self) QMetaObject::invokeMethod(self, [self, result, id = draft.id] {
+        if (self) QMetaObject::invokeMethod(self, [self, result, account, draft, id = draft.id] {
             if (!self) return;
             self->m_sending = false;
             const QString state = result.state == SendResult::Accepted ? "accepted" : result.state == SendResult::Rejected ? "rejected" : "unknown";
             self->m_database->markDraftState(id, state); emit self->draftsChanged();
             if (result.state == SendResult::Accepted) {
                 self->setStatus(self->tr("SMTP server accepted this message · delivery not confirmed")); emit self->draftAccepted(id);
+                self->run([self, account, draft] {
+                    const auto folder = MailioBackend::sentFolder(account);
+                    if (folder.isEmpty()) {
+                        if (self) QMetaObject::invokeMethod(self, [self] {
+                            if (self) self->setStatus(self->tr("SMTP server accepted this message · no Sent folder found, no copy saved"));
+                        }, Qt::QueuedConnection);
+                        return;
+                    }
+                    bool saved = false;
+                    try { MailioBackend::appendSent(account, folder, draft); saved = true; } catch (...) { saved = false; }
+                    if (self) QMetaObject::invokeMethod(self, [self, folder, saved] {
+                        if (!self) return;
+                        self->setStatus(saved
+                            ? self->tr("SMTP server accepted this message · copy saved to %1").arg(folder)
+                            : self->tr("SMTP server accepted this message · copy could not be saved to %1").arg(folder));
+                    }, Qt::QueuedConnection);
+                });
             } else self->setStatus(result.state == SendResult::Unknown ? self->tr("Send result unknown · not retried") : self->tr("Message not accepted · draft preserved"), result.message);
         }, Qt::QueuedConnection);
     });
