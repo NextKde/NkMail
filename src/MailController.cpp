@@ -185,7 +185,7 @@ QString MailController::credentialKey() const {
 }
 void MailController::run(std::function<void()> task) { (void)QtConcurrent::run(&m_pool, std::move(task)); }
 void MailController::initialize() {
-    if (!m_database->open(m_root)) { setStatus(tr("Storage unavailable"), m_database->error()); return; }
+    if (!m_database->open(m_root, m_account.id)) { setStatus(tr("Storage unavailable"), m_database->error()); return; }
     if (m_demo) { seedDemo(); return; }
     m_account = m_database->account();
     for (const auto &folder : m_database->folders()) m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
@@ -249,8 +249,13 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
         || m_account.username != next.username || m_account.imapHost != next.imapHost
         || m_account.imapPort != next.imapPort || m_account.imapStartTls != next.imapStartTls;
     if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return; }
+    const bool accountRebound = m_account.id != next.id;
     m_restorePending = false;
     m_account = next; ++m_generation; ++m_selectionGeneration;
+    if (accountRebound && !m_database->open(m_root, m_account.id)) {
+        setStatus(tr("Storage unavailable"), m_database->error());
+        return;
+    }
     if (changedMailbox) {
         m_cachedOnly = true; m_offset = 0; m_hasMore = false;
         m_messages->clear(); m_folders.clear(); m_selected.clear(); m_selectedUid.clear(); m_content = {};

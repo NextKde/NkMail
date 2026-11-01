@@ -11,7 +11,7 @@
 
 namespace nkmail {
 namespace {
-constexpr int SchemaVersion = 3;
+constexpr int SchemaVersion = 4;
 QString json(const QVariantMap &map)
 {
     return QString::fromUtf8(QJsonDocument::fromVariant(map).toJson(QJsonDocument::Compact));
@@ -108,12 +108,13 @@ void MailDatabase::close()
         QSqlDatabase::removeDatabase(m_connection);
     m_connection.clear();
 }
-bool MailDatabase::open(const QString &root)
+bool MailDatabase::open(const QString &root, const QString &accountId)
 {
     if (QThread::currentThread() != m_thread)
         return fail(QStringLiteral("MailDatabase must be opened on its owning thread"));
     close();
     m_error.clear();
+    m_accountId = accountId.trimmed().isEmpty() ? QStringLiteral("default") : accountId;
     if (root.trimmed().isEmpty())
         return fail(QStringLiteral("An explicit storage root is required"));
     QDir dir(root);
@@ -138,7 +139,7 @@ bool MailDatabase::open(const QString &root)
         || !exec(m_db, QStringLiteral("PRAGMA synchronous=FULL"), {}, &m_error)
         || !migrate()
         // A crash during SMTP submission has an ambiguous outcome. Never retry it.
-        || !exec(m_db, QStringLiteral("UPDATE drafts SET state='unknown' WHERE state='sending'"), {}, &m_error)) {
+        || !exec(m_db, QStringLiteral("UPDATE drafts SET state='unknown' WHERE state='sending' AND account=?"), {m_accountId}, &m_error)) {
         const QString message = m_error.isEmpty() ? QStringLiteral("Cannot protect database permissions") : m_error;
         close();
         return fail(message);
@@ -196,16 +197,97 @@ bool MailDatabase::migrate()
         if (!exec(m_db, QStringLiteral("CREATE TABLE retired_validities (folder TEXT NOT NULL, uid_validity TEXT NOT NULL, PRIMARY KEY(folder,uid_validity))"), {}, &m_error))
             return false;
     }
-    if (!exec(m_db, QStringLiteral("PRAGMA user_version=3"), {}, &m_error))
+    if (version < 4) {
+        // Rebuild every table with an account scope. The pre-v4 database held a
+        // single account; stamp all of its rows with the legacy account id so the
+        // upgrade is lossless and the old behaviour is exactly preserved.
+        const QStringList v4Schema = {
+            QStringLiteral("CREATE TABLE accounts_v4 (id TEXT PRIMARY KEY, payload TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0)"),
+            QStringLiteral("CREATE TABLE folders_v4 (account TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, total INTEGER NOT NULL, position INTEGER NOT NULL, PRIMARY KEY(account,id))"),
+            QStringLiteral("CREATE TABLE folder_state_v4 (account TEXT NOT NULL, folder TEXT NOT NULL, uid_validity TEXT NOT NULL, PRIMARY KEY(account,folder))"),
+            QStringLiteral("CREATE TABLE summaries_v4 (account TEXT NOT NULL, folder TEXT NOT NULL, uid_validity TEXT NOT NULL, uid TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(account,folder,uid_validity,uid))"),
+            QStringLiteral("CREATE TABLE contents_v4 (account TEXT NOT NULL, folder TEXT NOT NULL, uid_validity TEXT NOT NULL, uid TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(account,folder,uid_validity,uid))"),
+            QStringLiteral("CREATE TABLE drafts_v4 (id TEXT PRIMARY KEY, payload TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'draft', updated TEXT NOT NULL DEFAULT '', account TEXT NOT NULL DEFAULT 'default')"),
+            QStringLiteral("CREATE TABLE retired_validities_v4 (account TEXT NOT NULL, folder TEXT NOT NULL, uid_validity TEXT NOT NULL, PRIMARY KEY(account,folder,uid_validity))")
+        };
+        for (const auto &sql : v4Schema)
+            if (!exec(m_db, sql, {}, &m_error))
+                return false;
+
+        QString legacyId = QStringLiteral("default");
+        QString legacyPayload;
+        bool hasLegacyAccount = false;
+        {
+            QSqlQuery legacy(m_db);
+            if (!legacy.exec(QStringLiteral("SELECT payload FROM accounts WHERE slot=1")))
+                return fail(legacy.lastError().text());
+            if (legacy.next()) {
+                hasLegacyAccount = true;
+                legacyPayload = legacy.value(0).toString();
+                const QString id = accountFromMap(mapFromJson(legacyPayload)).id;
+                if (!id.trimmed().isEmpty())
+                    legacyId = id;
+            }
+        }
+
+        if (!exec(m_db, QStringLiteral("INSERT INTO folders_v4(account,id,title,total,position) SELECT ?,id,title,total,position FROM folders"), {legacyId}, &m_error)
+            || !exec(m_db, QStringLiteral("INSERT INTO folder_state_v4(account,folder,uid_validity) SELECT ?,folder,uid_validity FROM folder_state"), {legacyId}, &m_error)
+            || !exec(m_db, QStringLiteral("INSERT INTO summaries_v4(account,folder,uid_validity,uid,payload) SELECT ?,folder,uid_validity,uid,payload FROM summaries"), {legacyId}, &m_error)
+            || !exec(m_db, QStringLiteral("INSERT INTO contents_v4(account,folder,uid_validity,uid,payload) SELECT ?,folder,uid_validity,uid,payload FROM contents"), {legacyId}, &m_error)
+            || !exec(m_db, QStringLiteral("INSERT INTO drafts_v4(id,payload,state,updated,account) SELECT id,payload,state,updated,? FROM drafts"), {legacyId}, &m_error)
+            || !exec(m_db, QStringLiteral("INSERT INTO retired_validities_v4(account,folder,uid_validity) SELECT ?,folder,uid_validity FROM retired_validities"), {legacyId}, &m_error))
+            return false;
+        if (hasLegacyAccount
+            && !exec(m_db, QStringLiteral("INSERT INTO accounts_v4(id,payload,position) VALUES(?,?,0)"), {legacyId, legacyPayload}, &m_error))
+            return false;
+
+        // SQLite DDL is transactional: a failure above leaves the old tables intact.
+        for (const auto &table : {"contents", "summaries", "folder_state", "retired_validities", "folders", "drafts", "accounts"})
+            if (!exec(m_db, QStringLiteral("DROP TABLE ") + QLatin1String(table), {}, &m_error))
+                return false;
+        for (const auto &table : {"accounts", "folders", "folder_state", "summaries", "contents", "drafts", "retired_validities"})
+            if (!exec(m_db, QStringLiteral("ALTER TABLE ") + QLatin1String(table) + QStringLiteral("_v4 RENAME TO ") + QLatin1String(table), {}, &m_error))
+                return false;
+
+        const QStringList v4Indexes = {
+            QStringLiteral("CREATE INDEX drafts_updated ON drafts(updated DESC,id)"),
+            QStringLiteral("CREATE INDEX summary ON summaries(folder,uid_validity)"),
+            QStringLiteral("CREATE INDEX summaries_account ON summaries(account,folder)"),
+            QStringLiteral("CREATE INDEX contents_account ON contents(account,folder)")
+        };
+        for (const auto &sql : v4Indexes)
+            if (!exec(m_db, sql, {}, &m_error))
+                return false;
+    }
+    if (!exec(m_db, QStringLiteral("PRAGMA user_version=4"), {}, &m_error))
         return false;
     return tx.commit() || fail(m_db.lastError().text());
+}
+QList<Account> MailDatabase::accounts() const
+{
+    QList<Account> result;
+    if (!check())
+        return result;
+    QSqlQuery q(m_db);
+    if (!q.exec(QStringLiteral("SELECT payload FROM accounts ORDER BY position,id"))) {
+        fail(q.lastError().text());
+        return result;
+    }
+    while (q.next()) {
+        Account a = accountFromMap(mapFromJson(q.value(0)));
+        a.password.clear();
+        result.append(a);
+    }
+    return result;
 }
 Account MailDatabase::account() const
 {
     if (!check())
         return {};
     QSqlQuery q(m_db);
-    if (!q.exec(QStringLiteral("SELECT payload FROM accounts WHERE slot=1"))) {
+    q.prepare(QStringLiteral("SELECT payload FROM accounts WHERE id=?"));
+    q.addBindValue(m_accountId);
+    if (!q.exec()) {
         fail(q.lastError().text());
         return {};
     }
@@ -215,33 +297,64 @@ Account MailDatabase::account() const
     a.password.clear();
     return a;
 }
-bool MailDatabase::saveAccount(const Account &a)
+bool MailDatabase::saveAccount(const Account &account)
 {
     if (!check())
         return false;
+    Account a = account;
+    if (a.id.trimmed().isEmpty())
+        a.id = QStringLiteral("default");
     Transaction tx(m_db);
     if (!tx.active())
         return fail(m_db.lastError().text());
-    QSqlQuery q(m_db);
-    if (!q.exec(QStringLiteral("SELECT payload FROM accounts WHERE slot=1")))
-        return fail(q.lastError().text());
-    if (q.next()) {
-        const Account previous = accountFromMap(mapFromJson(q.value(0)));
-        const bool differentMailbox = previous.id != a.id || previous.address != a.address
-            || previous.username != a.username || previous.imapHost != a.imapHost
-            || previous.imapPort != a.imapPort || previous.imapStartTls != a.imapStartTls;
-        q.finish();
-        if (differentMailbox) {
-            // Folder/UID identity is scoped to an account, never just a server UID.
-            // Keep unsent local drafts, but never show another account's cache.
-            for (const auto &table : {"contents", "summaries", "folder_state", "retired_validities", "folders"})
-                if (!exec(m_db, QStringLiteral("DELETE FROM ") + QLatin1String(table), {}, &m_error))
-                    return false;
+    int position = 0;
+    {
+        QSqlQuery existing(m_db);
+        existing.prepare(QStringLiteral("SELECT payload,position FROM accounts WHERE id=?"));
+        existing.addBindValue(a.id);
+        if (!existing.exec())
+            return fail(existing.lastError().text());
+        if (existing.next()) {
+            Account previous = accountFromMap(mapFromJson(existing.value(0)));
+            if (previous.id.trimmed().isEmpty())
+                previous.id = QStringLiteral("default");
+            position = existing.value(1).toInt();
+            const bool differentMailbox = previous.id != a.id || previous.address != a.address
+                || previous.username != a.username || previous.imapHost != a.imapHost
+                || previous.imapPort != a.imapPort || previous.imapStartTls != a.imapStartTls;
+            existing.finish();
+            if (differentMailbox) {
+                // Folder/UID identity is scoped to an account, never just a server UID.
+                // Keep unsent local drafts, but never show another account's cache.
+                for (const auto &table : {"contents", "summaries", "folder_state", "retired_validities", "folders"})
+                    if (!exec(m_db, QStringLiteral("DELETE FROM ") + QLatin1String(table) + QStringLiteral(" WHERE account=?"), {a.id}, &m_error))
+                        return false;
+            }
+        } else {
+            existing.finish();
+            QSqlQuery last(m_db);
+            if (!last.exec(QStringLiteral("SELECT COALESCE(MAX(position),-1)+1 FROM accounts")) || !last.next())
+                return fail(last.lastError().text());
+            position = last.value(0).toInt();
         }
     }
-    q.finish();
-    if (!exec(m_db, QStringLiteral("INSERT INTO accounts(slot,payload) VALUES(1,?) ON CONFLICT(slot) DO UPDATE SET payload=excluded.payload"),
-              {json(accountMap(a))}, &m_error))
+    if (!exec(m_db, QStringLiteral("INSERT INTO accounts(id,payload,position) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload"),
+              {a.id, json(accountMap(a)), position}, &m_error))
+        return false;
+    return tx.commit() || fail(m_db.lastError().text());
+}
+bool MailDatabase::removeAccount(const QString &id)
+{
+    if (!check())
+        return false;
+    const QString accountId = id.trimmed().isEmpty() ? QStringLiteral("default") : id;
+    Transaction tx(m_db);
+    if (!tx.active())
+        return fail(m_db.lastError().text());
+    for (const auto &table : {"folders", "folder_state", "summaries", "contents", "retired_validities", "drafts"})
+        if (!exec(m_db, QStringLiteral("DELETE FROM ") + QLatin1String(table) + QStringLiteral(" WHERE account=?"), {accountId}, &m_error))
+            return false;
+    if (!exec(m_db, QStringLiteral("DELETE FROM accounts WHERE id=?"), {accountId}, &m_error))
         return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
@@ -251,7 +364,9 @@ QList<Folder> MailDatabase::folders() const
     if (!check())
         return result;
     QSqlQuery q(m_db);
-    if (!q.exec(QStringLiteral("SELECT id,title,total FROM folders ORDER BY position,id"))) {
+    q.prepare(QStringLiteral("SELECT id,title,total FROM folders WHERE account=? ORDER BY position,id"));
+    q.addBindValue(m_accountId);
+    if (!q.exec()) {
         fail(q.lastError().text());
         return result;
     }
@@ -266,14 +381,14 @@ bool MailDatabase::saveFolders(const QList<Folder> &folders)
     Transaction tx(m_db);
     if (!tx.active())
         return fail(m_db.lastError().text());
-    if (!exec(m_db, QStringLiteral("DELETE FROM folders"), {}, &m_error))
+    if (!exec(m_db, QStringLiteral("DELETE FROM folders WHERE account=?"), {m_accountId}, &m_error))
         return false;
     int position = 0;
     for (const auto &f : folders) {
         if (f.id.isEmpty())
             return fail(QStringLiteral("A folder ID is required"));
-        if (!exec(m_db, QStringLiteral("INSERT INTO folders(id,title,total,position) VALUES(?,?,?,?)"),
-                  {f.id, f.title.isNull() ? QStringLiteral("") : f.title, f.total, position++}, &m_error))
+        if (!exec(m_db, QStringLiteral("INSERT INTO folders(account,id,title,total,position) VALUES(?,?,?,?,?)"),
+                  {m_accountId, f.id, f.title.isNull() ? QStringLiteral("") : f.title, f.total, position++}, &m_error))
             return false;
     }
     return tx.commit() || fail(m_db.lastError().text());
@@ -281,7 +396,8 @@ bool MailDatabase::saveFolders(const QList<Folder> &folders)
 QString MailDatabase::validity(const QString &folder) const
 {
     QSqlQuery q(m_db);
-    q.prepare(QStringLiteral("SELECT uid_validity FROM folder_state WHERE folder=?"));
+    q.prepare(QStringLiteral("SELECT uid_validity FROM folder_state WHERE account=? AND folder=?"));
+    q.addBindValue(m_accountId);
     q.addBindValue(folder);
     if (!q.exec()) {
         fail(q.lastError().text());
@@ -294,7 +410,8 @@ bool MailDatabase::setValidity(const QString &folder, const QString &uidValidity
     if (folder.isEmpty() || uidValidity.isEmpty())
         return fail(QStringLiteral("Folder and UIDVALIDITY are required"));
     QSqlQuery retired(m_db);
-    retired.prepare(QStringLiteral("SELECT 1 FROM retired_validities WHERE folder=? AND uid_validity=?"));
+    retired.prepare(QStringLiteral("SELECT 1 FROM retired_validities WHERE account=? AND folder=? AND uid_validity=?"));
+    retired.addBindValue(m_accountId);
     retired.addBindValue(folder);
     retired.addBindValue(uidValidity);
     if (!retired.exec())
@@ -306,18 +423,18 @@ bool MailDatabase::setValidity(const QString &folder, const QString &uidValidity
     if (!m_error.isEmpty())
         return false;
     if (!previous.isEmpty() && previous != uidValidity
-        && !exec(m_db, QStringLiteral("INSERT OR IGNORE INTO retired_validities(folder,uid_validity) VALUES(?,?)"),
-                 {folder, previous}, &m_error))
+        && !exec(m_db, QStringLiteral("INSERT OR IGNORE INTO retired_validities(account,folder,uid_validity) VALUES(?,?,?)"),
+                 {m_accountId, folder, previous}, &m_error))
         return false;
     // This runs inside the caller's transaction. Old bodies and summaries are
     // purged atomically with the new generation, even if a UID is reused.
-    if (!exec(m_db, QStringLiteral("DELETE FROM contents WHERE folder=? AND uid_validity<>?"),
-              {folder, uidValidity}, &m_error)
-        || !exec(m_db, QStringLiteral("DELETE FROM summaries WHERE folder=? AND uid_validity<>?"),
-                 {folder, uidValidity}, &m_error))
+    if (!exec(m_db, QStringLiteral("DELETE FROM contents WHERE account=? AND folder=? AND uid_validity<>?"),
+              {m_accountId, folder, uidValidity}, &m_error)
+        || !exec(m_db, QStringLiteral("DELETE FROM summaries WHERE account=? AND folder=? AND uid_validity<>?"),
+                 {m_accountId, folder, uidValidity}, &m_error))
         return false;
-    return exec(m_db, QStringLiteral("INSERT INTO folder_state(folder,uid_validity) VALUES(?,?) ON CONFLICT(folder) DO UPDATE SET uid_validity=excluded.uid_validity"),
-                {folder, uidValidity}, &m_error);
+    return exec(m_db, QStringLiteral("INSERT INTO folder_state(account,folder,uid_validity) VALUES(?,?,?) ON CONFLICT(account,folder) DO UPDATE SET uid_validity=excluded.uid_validity"),
+                {m_accountId, folder, uidValidity}, &m_error);
 }
 bool MailDatabase::invalidateUidValidity(const QString &folder, const QString &uidValidity)
 {
@@ -343,8 +460,8 @@ bool MailDatabase::savePage(const Page &page)
     if (!setValidity(page.folder, page.uidValidity))
         return false;
     for (const auto &s : page.messages)
-        if (!exec(m_db, QStringLiteral("INSERT INTO summaries(folder,uid_validity,uid,payload) VALUES(?,?,?,?) ON CONFLICT(folder,uid_validity,uid) DO UPDATE SET payload=excluded.payload"),
-                  {s.folder, s.uidValidity, s.uid, json(summaryMap(s))}, &m_error))
+        if (!exec(m_db, QStringLiteral("INSERT INTO summaries(account,folder,uid_validity,uid,payload) VALUES(?,?,?,?,?) ON CONFLICT(account,folder,uid_validity,uid) DO UPDATE SET payload=excluded.payload"),
+                  {m_accountId, s.folder, s.uidValidity, s.uid, json(summaryMap(s))}, &m_error))
             return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
@@ -362,11 +479,12 @@ Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, cons
     if (!m_error.isEmpty() || page.uidValidity.isEmpty())
         return page;
     QSqlQuery q(m_db);
-    QString sql = QStringLiteral("SELECT payload FROM summaries WHERE folder=? AND uid_validity=? ORDER BY length(uid) DESC,uid DESC");
+    QString sql = QStringLiteral("SELECT payload FROM summaries WHERE account=? AND folder=? AND uid_validity=? ORDER BY length(uid) DESC,uid DESC");
     const bool filtered = unreadOnly || !search.isEmpty();
     if (!filtered)
         sql += QStringLiteral(" LIMIT ? OFFSET ?");
     q.prepare(sql);
+    q.addBindValue(m_accountId);
     q.addBindValue(folder);
     q.addBindValue(page.uidValidity);
     if (!filtered) {
@@ -427,8 +545,8 @@ bool MailDatabase::saveContent(const Content &content)
                                        {"bytes", QString::fromLatin1(a.bytes.toBase64())}});
     }
     payload.insert("attachments", attachments);
-    if (!exec(m_db, QStringLiteral("INSERT INTO contents(folder,uid_validity,uid,payload) VALUES(?,?,?,?) ON CONFLICT(folder,uid_validity,uid) DO UPDATE SET payload=excluded.payload"),
-              {s.folder, s.uidValidity, s.uid, json(payload)}, &m_error))
+    if (!exec(m_db, QStringLiteral("INSERT INTO contents(account,folder,uid_validity,uid,payload) VALUES(?,?,?,?,?) ON CONFLICT(account,folder,uid_validity,uid) DO UPDATE SET payload=excluded.payload"),
+              {m_accountId, s.folder, s.uidValidity, s.uid, json(payload)}, &m_error))
         return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
@@ -439,7 +557,8 @@ std::optional<Content> MailDatabase::content(const QString &folder, const QStrin
     if (validity(folder) != uidValidity || !m_error.isEmpty())
         return std::nullopt;
     QSqlQuery q(m_db);
-    q.prepare(QStringLiteral("SELECT payload FROM contents WHERE folder=? AND uid_validity=? AND uid=?"));
+    q.prepare(QStringLiteral("SELECT payload FROM contents WHERE account=? AND folder=? AND uid_validity=? AND uid=?"));
+    q.addBindValue(m_accountId);
     q.addBindValue(folder);
     q.addBindValue(uidValidity);
     q.addBindValue(uid);
@@ -471,9 +590,9 @@ bool MailDatabase::removeMessage(const QString &folder, const QString &uidValidi
         return false;
     if (folder.isEmpty() || uidValidity.isEmpty() || uid.isEmpty())
         return fail(QStringLiteral("Folder, UIDVALIDITY and UID are required"));
-    const QVariantList identity{folder, uidValidity, uid};
-    return exec(m_db, QStringLiteral("DELETE FROM contents WHERE folder=? AND uid_validity=? AND uid=?"), identity, &m_error)
-        && exec(m_db, QStringLiteral("DELETE FROM summaries WHERE folder=? AND uid_validity=? AND uid=?"), identity, &m_error);
+    const QVariantList identity{m_accountId, folder, uidValidity, uid};
+    return exec(m_db, QStringLiteral("DELETE FROM contents WHERE account=? AND folder=? AND uid_validity=? AND uid=?"), identity, &m_error)
+        && exec(m_db, QStringLiteral("DELETE FROM summaries WHERE account=? AND folder=? AND uid_validity=? AND uid=?"), identity, &m_error);
 }
 QList<Draft> MailDatabase::drafts() const
 {
@@ -481,7 +600,9 @@ QList<Draft> MailDatabase::drafts() const
     if (!check())
         return result;
     QSqlQuery q(m_db);
-    if (!q.exec(QStringLiteral("SELECT id,payload,state,updated FROM drafts ORDER BY updated DESC,id"))) {
+    q.prepare(QStringLiteral("SELECT id,payload,state,updated FROM drafts WHERE account=? ORDER BY updated DESC,id"));
+    q.addBindValue(m_accountId);
+    if (!q.exec()) {
         fail(q.lastError().text());
         return result;
     }
@@ -507,8 +628,9 @@ bool MailDatabase::saveDraft(const Draft &draft)
     if (d.state.isEmpty())
         d.state = QStringLiteral("draft");
     QSqlQuery existing(m_db);
-    existing.prepare(QStringLiteral("SELECT state FROM drafts WHERE id=?"));
+    existing.prepare(QStringLiteral("SELECT state FROM drafts WHERE id=? AND account=?"));
     existing.addBindValue(d.id);
+    existing.addBindValue(m_accountId);
     if (!existing.exec())
         return fail(existing.lastError().text());
     if (existing.next()) {
@@ -523,8 +645,8 @@ bool MailDatabase::saveDraft(const Draft &draft)
     existing.finish();
     if (!d.updated.isValid())
         d.updated = QDateTime::currentDateTimeUtc();
-    if (!exec(m_db, QStringLiteral("INSERT INTO drafts(id,payload,state,updated) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,state=excluded.state,updated=excluded.updated"),
-              {d.id, json(draftMap(d)), d.state, d.updated.toUTC().toString(Qt::ISODateWithMs)}, &m_error))
+    if (!exec(m_db, QStringLiteral("INSERT INTO drafts(id,payload,state,updated,account) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,state=excluded.state,updated=excluded.updated"),
+              {d.id, json(draftMap(d)), d.state, d.updated.toUTC().toString(Qt::ISODateWithMs), m_accountId}, &m_error))
         return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
@@ -532,7 +654,7 @@ bool MailDatabase::deleteDraft(const QString &id)
 {
     if (!check())
         return false;
-    return exec(m_db, QStringLiteral("DELETE FROM drafts WHERE id=?"), {id}, &m_error);
+    return exec(m_db, QStringLiteral("DELETE FROM drafts WHERE id=? AND account=?"), {id, m_accountId}, &m_error);
 }
 bool MailDatabase::markDraftState(const QString &id, const QString &state)
 {
@@ -543,13 +665,14 @@ bool MailDatabase::markDraftState(const QString &id, const QString &state)
     QSqlQuery q(m_db);
     // Compare-and-set in SQL: sending may only finish, accepted/unknown may never
     // become sendable again. Starting requires draft/rejected, not sending.
-    q.prepare(QStringLiteral("UPDATE drafts SET state=?,updated=? WHERE id=? AND ("
+    q.prepare(QStringLiteral("UPDATE drafts SET state=?,updated=? WHERE id=? AND account=? AND ("
                              "(state IN ('draft','rejected') AND ? IN ('draft','rejected','sending','unknown','accepted')) OR "
                              "(state='sending' AND ? IN ('accepted','rejected','unknown')) OR "
                              "(state IN ('accepted','unknown') AND state=?))"));
     q.addBindValue(state);
     q.addBindValue(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
     q.addBindValue(id);
+    q.addBindValue(m_accountId);
     q.addBindValue(state);
     q.addBindValue(state);
     q.addBindValue(state);
