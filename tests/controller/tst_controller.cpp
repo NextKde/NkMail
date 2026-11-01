@@ -92,6 +92,19 @@ SendResult MailioBackend::send(const Account &a, const Draft &d)
     ++synthetic::sendCalls;
     return synthetic::send(a, d);
 }
+QList<QVariantMap> MailioBackend::search(const Account &, const QString &, const QString &, const QString &, int)
+{
+    return {};
+}
+void MailioBackend::storeFlags(const Account &, const QString &, const QString &, const QString &, const QStringList &, bool)
+{
+}
+void MailioBackend::copyTo(const Account &, const QString &, const QString &, const QString &, const QString &)
+{
+}
+void MailioBackend::expunge(const Account &, const QString &, const QString &, const QString &, bool *)
+{
+}
 CredentialStore::CredentialStore(QObject *parent) : CredentialStore(QStringLiteral("synthetic"), parent) {}
 CredentialStore::CredentialStore(const QString &service, QObject *parent) : QObject(parent), m_service(service) {}
 void CredentialStore::read(const QString &id)
