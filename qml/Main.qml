@@ -31,6 +31,28 @@ ApplicationWindow {
     property bool draftsVisible: false
     property bool showSummary: true
     property bool groupThreads: true
+    property var selectionIndices: ({})      // 行号 -> true
+    property int selectionAnchor: -1
+    readonly property int selectionSize: Object.keys(selectionIndices).length
+    function isRowSelected(row) { return selectionIndices[row] === true }
+    function clearSelection() { selectionIndices = ({}); selectionAnchor = -1 }
+    function toggleRow(row) {
+        const next = Object.assign({}, selectionIndices)
+        if (next[row]) delete next[row]; else next[row] = true
+        selectionIndices = next
+        selectionAnchor = row
+    }
+    function selectRangeTo(row) {
+        if (selectionAnchor < 0 || selectionAnchor === row) { toggleRow(row); return }
+        const from = Math.min(selectionAnchor, row), to = Math.max(selectionAnchor, row)
+        const next = Object.assign({}, selectionIndices)
+        for (let i = from; i <= to; ++i) next[i] = true
+        selectionIndices = next
+    }
+    function selectedIndexList() {
+        const rows = Object.keys(selectionIndices).map(Number).sort((a, b) => a - b)
+        return rows
+    }
     property var collapsedThreads: ({})
     function toggleThread(key) {
         const next = Object.assign({}, collapsedThreads)
@@ -154,6 +176,11 @@ ApplicationWindow {
     Connections {
         target: mail
         function onSelectionChanged() { if (window.narrow && window.hasMessage) window.readerVisible = true }
+        function onFolderChanged() { window.clearSelection() }
+    }
+    Connections {
+        target: mail.messages
+        function onModelReset() { window.clearSelection() }
     }
     Item {
         id: mailScene
@@ -380,7 +407,7 @@ ApplicationWindow {
                         id: messageOpsGroup
                         objectName: "messageOpsGroup"
                         Layout.rightMargin: 8
-                        visible: !window.draftsVisible && window.width >= 1100
+                        visible: !window.draftsVisible && window.width >= 1100 && window.selectionSize === 0
                         stacked: true
                         buttonSize: 38
                         icons: ["trash", "archive", "flag"]
@@ -394,6 +421,32 @@ ApplicationWindow {
                             if (index === 0) mail.deleteMessage(row)
                             else if (index === 1) mail.archiveMessage(row)
                             else mail.toggleFlagged(row)
+                        }
+                    }
+                    Text {
+                        objectName: "selectionCountLabel"
+                        visible: window.selectionSize > 0
+                        text: qsTr("%1 selected").arg(window.selectionSize)
+                        color: window.muted; font.pixelSize: 11
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    LiquidActionButtonGroup {
+                        id: selectionOpsGroup
+                        objectName: "selectionOpsGroup"
+                        stacked: true
+                        buttonSize: 38
+                        visible: !window.draftsVisible && window.selectionSize > 0
+                        icons: ["envelope", "flag", "archive", "trash"]
+                        labels: [qsTr("已读"), qsTr("旗标"), qsTr("归档"), qsTr("删除")]
+                        backdrop: chromeBackdrop
+                        materialForm: !window.liquidControls
+                        onTriggered: index => {
+                            const rows = window.selectedIndexList()
+                            if (index === 0) mail.setMessagesRead(rows, true)
+                            else if (index === 1) mail.setMessagesFlagged(rows, true)
+                            else if (index === 2) mail.archiveMessages(rows)
+                            else if (index === 3) mail.deleteMessages(rows)
+                            if (index >= 2) window.clearSelection()
                         }
                     }
                     LiquidActionButtonGroup {
@@ -637,6 +690,7 @@ ApplicationWindow {
                         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
                         delegate: AbstractButton {
                             id: messageRow
+                            required property int index
                             required property string uid
                             required property string uidValidity
                             required property string sender
@@ -657,6 +711,7 @@ ApplicationWindow {
                             implicitHeight: visible ? MailStyle.messageRowHeight : 0
                             hoverEnabled: true
                             readonly property bool selected: mail.selectedUid === uid
+                            readonly property bool multiSelected: window.isRowSelected(index)
                             readonly property int messageIndex: (mail.messages && typeof mail.messages.indexOf === "function")
                                 ? mail.messages.indexOf(mail.currentFolder, uidValidity, uid) : -1
                             function selectRow() { mail.openMessage(uid, uidValidity); window.readerVisible = true }
@@ -665,7 +720,18 @@ ApplicationWindow {
                                 if (unread) mail.setMessageRead(messageIndex, true)
                             }
                             Accessible.name: sender + ". " + subject + (window.showSummary ? ". " + preview : "")
-                            onClicked: openRow()
+                            onClicked: {}   // 鼠标点击由 TapHandler 处理；键盘见下方 Keys
+                            Keys.onReturnPressed: openRow()
+                            Keys.onEnterPressed: openRow()
+                            Keys.onSpacePressed: openRow()
+                            TapHandler {
+                                acceptedButtons: Qt.LeftButton
+                                onTapped: function(point) {
+                                    if (point.modifiers & Qt.ShiftModifier) window.selectRangeTo(index)
+                                    else if (point.modifiers & (Qt.ControlModifier | Qt.MetaModifier)) window.toggleRow(index)
+                                    else { window.clearSelection(); messageRow.openRow() }
+                                }
+                            }
                             TapHandler {
                                 acceptedButtons: Qt.RightButton
                                 onTapped: { messageRow.selectRow(); rowMenu.openAtAnchor() }
@@ -716,7 +782,7 @@ ApplicationWindow {
                                 }
                             }
                             background: Rectangle {
-                                color: messageRow.selected ? window.selectedSurface : messageRow.hovered ? window.hoverSurface : "transparent"
+                                color: messageRow.multiSelected ? window.selectedSurface : messageRow.selected ? window.selectedSurface : messageRow.hovered ? window.hoverSurface : "transparent"
                                 border.width: messageRow.activeFocus ? 1 : 0
                                 border.color: AppTheme.focusRing
                                 Rectangle { height: 1; anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.leftMargin: 19; anchors.right: parent.right; color: window.rule }
@@ -1144,6 +1210,7 @@ ApplicationWindow {
         sequence: "Escape"
         enabled: !composer.visible && !accountDialog.visible && !details.visible && !moreMenu.visible
         onActivated: {
+            if (window.selectionSize > 0) { window.clearSelection(); return }
             if (window.width < 1080 && window.sidebarExpanded) window.sidebarExpanded = false
             else if (window.narrow && window.readerVisible) window.readerVisible = false
             else if (toolbarSearch.active) readerHeader.closeSearch()

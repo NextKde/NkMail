@@ -35,6 +35,7 @@ TestCase {
         property int saveCount: 0
         property var lastSaved: ({})
         signal selectionChanged()
+        signal folderChanged()
         signal draftAccepted(string id)
         ListModel {
             id: messageModel
