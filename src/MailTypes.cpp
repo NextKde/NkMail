@@ -53,6 +53,7 @@ QVariantMap contentMap(const Content &c)
     QVariantMap m = summaryMap(c.summary);
     m.insert("summary", summaryMap(c.summary));
     m.insert("text", c.text);
+    m.insert("html", c.html);
     m.insert("messageId", c.messageId);
     m.insert("replyTo", c.replyTo);
     m.insert("to", c.to);

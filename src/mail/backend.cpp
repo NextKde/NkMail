@@ -1,5 +1,7 @@
 #include "backend.h"
 
+#include "HtmlSanitizer.h"
+
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QFile>
@@ -206,7 +208,7 @@ QString mimeType(Mime::content_type_t type)
     }
     return major + u'/' + (type.media_subtype().empty() ? QStringLiteral("octet-stream") : unicode(type.media_subtype()));
 }
-struct Decoded { QStringList plain, html; QList<Attachment> attachments; qint64 bytes = 0; int nodes = 0; };
+struct Decoded { QStringList plain, html, rawHtml; QList<Attachment> attachments; qint64 bytes = 0; int nodes = 0; };
 void decodePart(Mime part, Decoded &out, int depth = 0)
 {
     if (depth > 24 || ++out.nodes > 500) throw BackendError("Message MIME structure exceeds safety limits.");
@@ -226,8 +228,10 @@ void decodePart(Mime part, Decoded &out, int depth = 0)
     }
     if (type.media_type() == Mime::media_type_t::TEXT || type.media_type() == Mime::media_type_t::NONE) {
         const auto text = unicode(data, type.charset().buffer);
-        if (QString::fromStdString(type.media_subtype()).compare(QStringLiteral("html"), Qt::CaseInsensitive) == 0)
+        if (QString::fromStdString(type.media_subtype()).compare(QStringLiteral("html"), Qt::CaseInsensitive) == 0) {
+            out.rawHtml << text;
             out.html << htmlText(text);
+        }
         else if (type.media_subtype().empty() || QString::fromStdString(type.media_subtype()).compare(QStringLiteral("plain"), Qt::CaseInsensitive) == 0)
             out.plain << text;
     }
@@ -475,6 +479,7 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
         c.to = addressList(m.recipients()); c.cc = addressList(m.cc_recipients());
         Decoded decoded; decodePart(m, decoded);
         c.text = (decoded.plain.isEmpty() ? decoded.html : decoded.plain).join(QStringLiteral("\n\n"));
+        c.html = sanitizeMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
         c.attachments = std::move(decoded.attachments);
         c.summary.hasAttachments = !c.attachments.isEmpty();
         c.summary.preview = c.text.simplified().left(160);

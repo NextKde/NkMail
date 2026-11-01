@@ -25,7 +25,8 @@ add_library(nkmail_core STATIC
     src/FolderListModel.cpp src/FolderListModel.h
     src/storage/MailDatabase.cpp src/storage/MailDatabase.h
     src/storage/CredentialStore.cpp src/storage/CredentialStore.h
-    src/mail/backend.cpp src/mail/backend.h)
+    src/mail/backend.cpp src/mail/backend.h
+    src/mail/HtmlSanitizer.cpp src/mail/HtmlSanitizer.h)
 target_include_directories(nkmail_core PUBLIC src)
 target_link_libraries(nkmail_core PUBLIC Qt6::Core Qt6::Gui Qt6::Sql Qt6Keychain::Qt6Keychain mailio)
 qt_add_executable(nkmail src/main.cpp src/MailController.cpp src/MailController.h src/NotificationService.cpp src/NotificationService.h src/RichTextEditor.cpp src/RichTextEditor.h)
