@@ -441,7 +441,9 @@ ApplicationWindow {
                         objectName: "toolbarSearch"
                         property bool active: true
                         readonly property real wanted: 216
-                        readonly property bool shown: !window.draftsVisible && (readerHeader.wideSearch || readerHeader.searchOpen)
+                        readonly property bool shown: !window.draftsVisible
+                            && (readerHeader.wideSearch || readerHeader.searchOpen)
+                            && window.width >= 1320
                         Layout.preferredWidth: shown ? wanted : 0
                         Layout.minimumWidth: 0
                         Layout.fillHeight: true
@@ -557,7 +559,7 @@ ApplicationWindow {
                 visible: window.sidebarVisible
                 anchors.left: parent.left
                 anchors.top: floatingHeader.bottom
-                anchors.bottom: parent.bottom
+                anchors.bottom: statusStrip.top
                 width: sidebarPlane.width
                 z: 1
                 ColumnLayout {
