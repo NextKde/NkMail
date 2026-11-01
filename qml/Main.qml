@@ -727,6 +727,24 @@ ApplicationWindow {
                         id: mailboxColumn
                         width: parent.width
                         spacing: 0
+                        Text {
+                            objectName: "favoritesTitle"
+                            visible: (mail.favorites || []).length > 0
+                            text: qsTr("收藏"); color: window.muted
+                            font.pixelSize: 11; font.weight: Font.DemiBold
+                            topPadding: 0; bottomPadding: 6
+                        }
+                        Repeater {
+                            objectName: "favoritesList"
+                            model: mail.favorites || []
+                            delegate: MailboxAction {
+                                required property var modelData
+                                text: modelData.title
+                                iconName: "folder"
+                                countText: ""
+                                onClicked: mail.openFavorite(modelData.accountId, modelData.folderId)
+                            }
+                        }
                         Repeater {
                             model: window.sidebarAccounts
                             delegate: ColumnLayout {
@@ -738,6 +756,7 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 spacing: 0
                                 AccountHeader {
+                                    id: accountRow
                                     objectName: "accountHeader_" + accountSection.accountId
                                     accountId: accountSection.accountId
                                     current: accountSection.current
@@ -747,6 +766,34 @@ ApplicationWindow {
                                     onClicked: {
                                         if (!accountSection.current) window.mail.switchAccount(accountSection.accountId)
                                     }
+                                    TapHandler {
+                                        acceptedButtons: Qt.RightButton
+                                        onTapped: accountMenu.openAtAnchor()
+                                    }
+                                    LiquidPopover {
+                                        id: accountMenu
+                                        objectName: "accountMenu"
+                                        sourceItem: chromePlanes
+                                        anchorItem: accountRow
+                                        closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
+                                        LiquidPopoverItem {
+                                            text: qsTr("编辑账号"); iconName: "settings"
+                                            onTriggered: {
+                                                accountMenu.close()
+                                                accountDialog.editAccount(accountSection.modelData)
+                                            }
+                                        }
+                                        LiquidPopoverItem {
+                                            text: qsTr("删除账号"); iconName: "trash"
+                                            onTriggered: {
+                                                accountMenu.close()
+                                                deleteAccountDialog.targetId = accountSection.accountId
+                                                deleteAccountDialog.targetName = accountSection.modelData.name
+                                                    || accountSection.modelData.address || ""
+                                                deleteAccountDialog.open()
+                                            }
+                                        }
+                                    }
                                 }
                                 Repeater {
                                     // Synchronous cache read; it is not re-evaluated when
@@ -754,6 +801,7 @@ ApplicationWindow {
                                     objectName: accountSection.current ? "mailboxFolders" : "mailboxFolders_" + accountSection.accountId
                                     model: accountSection.collapsed ? [] : (window.mail.foldersFor(accountSection.accountId) || [])
                                     delegate: MailboxAction {
+                                        id: folderRow
                                         required property var modelData
                                         // Keep the historical name for the active account; scope
                                         // other accounts so their identical folder ids stay unique.
@@ -773,6 +821,28 @@ ApplicationWindow {
                                             window.draftsVisible = false; window.readerVisible = false
                                             window.mail.selectFolder(modelData.id)
                                             if (window.width < 1080) window.sidebarExpanded = false
+                                        }
+                                        TapHandler {
+                                            acceptedButtons: Qt.RightButton
+                                            onTapped: folderMenu.openAtAnchor()
+                                        }
+                                        LiquidPopover {
+                                            id: folderMenu
+                                            objectName: "folderMenu"
+                                            sourceItem: chromePlanes
+                                            anchorItem: folderRow
+                                            closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
+                                            LiquidPopoverItem {
+                                                // Touching mail.favorites keeps the label in sync when
+                                                // the list changes; isFavorite() itself is not tracked.
+                                                text: (mail.favorites, mail.isFavorite(accountSection.accountId, folderRow.modelData.id))
+                                                    ? qsTr("从收藏移除") : qsTr("添加到收藏")
+                                                iconName: "heart"
+                                                onTriggered: {
+                                                    mail.toggleFavorite(accountSection.accountId, folderRow.modelData.id,
+                                                        window.mailboxTitle(folderRow.modelData))
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1360,6 +1430,42 @@ ApplicationWindow {
     }
     MailComposer { id: composer; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
     AccountDialog { id: accountDialog; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
+    LiquidDialog {
+        id: deleteAccountDialog
+        objectName: "deleteAccountDialog"
+        parent: Overlay.overlay
+        property string targetId: ""
+        property string targetName: ""
+        width: Math.min(420, window.width - 32)
+        anchors.centerIn: parent
+        title: qsTr("删除账号？")
+        contentItem: Text {
+            text: qsTr("%1 的本地缓存和记住的口令会被删除，服务器上的邮件不受影响。").arg(deleteAccountDialog.targetName)
+            color: AppTheme.text
+            width: deleteAccountDialog.availableWidth
+            wrapMode: Text.Wrap
+        }
+        footer: Item {
+            implicitHeight: MailStyle.footerHeight
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 12; anchors.bottomMargin: 20
+                spacing: 8
+                Item { Layout.fillWidth: true }
+                LiquidDialogButton { text: qsTr("取消"); onClicked: deleteAccountDialog.close() }
+                LiquidDialogButton {
+                    objectName: "deleteAccountButton"
+                    text: qsTr("删除")
+                    destructive: true
+                    onClicked: {
+                        const id = deleteAccountDialog.targetId
+                        deleteAccountDialog.close()
+                        window.mail.removeAccount(id)
+                    }
+                }
+            }
+        }
+    }
     FileDialog {
         id: saveAttachmentDialog
         property int attachmentIndex: -1

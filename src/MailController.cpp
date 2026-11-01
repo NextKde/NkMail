@@ -187,6 +187,74 @@ QVariantList MailController::drafts() const {
     if (m_database->isOpen()) for (const auto &draft : m_database->drafts()) out.append(draftMap(draft));
     return out;
 }
+QStringList MailController::favoriteEntries() const {
+    QSettings settings(QDir(m_root).filePath("favorites.ini"), QSettings::IniFormat);
+    return settings.value("list").toStringList();
+}
+void MailController::saveFavoriteEntries(const QStringList &entries) const {
+    QSettings settings(QDir(m_root).filePath("favorites.ini"), QSettings::IniFormat);
+    settings.setValue("list", entries);
+    settings.sync();
+}
+QString MailController::favoriteAccountName(const QString &accountId) const {
+    const auto label = [](const Account &account) {
+        return account.name.isEmpty() ? account.address : account.name;
+    };
+    if (accountId == m_account.id) return label(m_account);
+    if (m_database && m_database->isOpen())
+        for (const auto &account : m_database->accounts())
+            if (account.id == accountId) return label(account);
+    return {};
+}
+QVariantList MailController::favorites() const {
+    QVariantList out;
+    for (const auto &entry : favoriteEntries()) {
+        // Each record is tab separated: accountId, folderId, title, accountName.
+        // Missing trailing columns are tolerated so older or hand-edited entries
+        // still resolve to a usable folder.
+        const auto parts = entry.split(QLatin1Char('\t'));
+        if (parts.size() < 2 || parts.at(0).isEmpty() || parts.at(1).isEmpty()) continue;
+        QString accountName = parts.size() > 3 ? parts.at(3) : QString{};
+        if (accountName.isEmpty()) accountName = favoriteAccountName(parts.at(0));
+        out.append(QVariantMap{{"accountId", parts.at(0)},
+                               {"folderId", parts.at(1)},
+                               {"title", parts.size() > 2 && !parts.at(2).isEmpty() ? parts.at(2) : parts.at(1)},
+                               {"accountName", accountName}});
+    }
+    return out;
+}
+bool MailController::isFavorite(const QString &accountId, const QString &folderId) const {
+    for (const auto &entry : favoriteEntries()) {
+        const auto parts = entry.split(QLatin1Char('\t'));
+        if (parts.size() >= 2 && parts.at(0) == accountId && parts.at(1) == folderId) return true;
+    }
+    return false;
+}
+void MailController::toggleFavorite(const QString &accountId, const QString &folderId, const QString &title) {
+    if (accountId.isEmpty() || folderId.isEmpty()) return;
+    QStringList entries = favoriteEntries();
+    int existing = -1;
+    for (int i = 0; i < entries.size(); ++i) {
+        const auto parts = entries.at(i).split(QLatin1Char('\t'));
+        if (parts.size() >= 2 && parts.at(0) == accountId && parts.at(1) == folderId) { existing = i; break; }
+    }
+    if (existing >= 0) entries.removeAt(existing);
+    else entries.append(accountId + QLatin1Char('\t') + folderId + QLatin1Char('\t') + title
+                        + QLatin1Char('\t') + favoriteAccountName(accountId));
+    saveFavoriteEntries(entries);
+    emit favoritesChanged();
+}
+void MailController::openFavorite(const QString &accountId, const QString &folderId) {
+    if (accountId.isEmpty() || folderId.isEmpty()) return;
+    if (accountId != m_account.id) {
+        switchAccount(accountId);
+        // switchAccount() is refused while another operation is in flight or when
+        // the account no longer exists; stay put rather than selecting a folder in
+        // the wrong account.
+        if (m_account.id != accountId) return;
+    }
+    selectFolder(folderId);
+}
 void MailController::setStatus(const QString &status, const QString &error) {
     m_status = status; m_error = error; emit statusChanged();
 }

@@ -47,6 +47,17 @@ TestCase {
         function refresh() { refreshCount++ }
         function selectFolder(folder) { currentFolder = folder }
         function foldersFor(accountId) { return folders }
+        property var favorites: ([])
+        property var favoriteKeys: ({})
+        function isFavorite(accountId, folderId) { return favoriteKeys[accountId + "|" + folderId] === true }
+        function toggleFavorite(accountId, folderId, title) {
+            const key = accountId + "|" + folderId
+            const next = Object.assign({}, favoriteKeys)
+            if (next[key]) delete next[key]; else next[key] = true
+            favoriteKeys = next
+            favorites = Object.keys(next).map(k => ({ accountId: k.split("|")[0], folderId: k.split("|")[1], title: title || k.split("|")[1], accountName: "" }))
+        }
+        function openFavorite(accountId, folderId) { currentAccountId = accountId }
         function switchAccount(accountId) { currentAccountId = accountId }
         function loadMore() {}
         function openMessage(uid, validity) { selectedUid = uid }

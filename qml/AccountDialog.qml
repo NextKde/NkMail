@@ -22,8 +22,11 @@ LiquidDialog {
     function field(map, key, fallback) {
         return map[key] !== undefined ? String(map[key]) : fallback || ""
     }
-    function editAccount() {
-        original = mail.account || ({})
+    function editAccount(account) {
+        // No argument keeps the historical behaviour (edit the active account or
+        // start a new one). A passed account map pre-fills those fields and keeps
+        // its id in `original`, so save() edits that record instead of creating one.
+        original = (account && String(account.id || "").length > 0) ? account : (mail.account || ({}))
         nameField.text = field(original, "name")
         addressField.text = field(original, "address")
         usernameField.text = field(original, "username")

@@ -2,6 +2,7 @@
 #include "MailTypes.h"
 #include <QObject>
 #include <QVariantList>
+#include <QStringList>
 #include <QThreadPool>
 #include <QTimer>
 #include <memory>
@@ -16,6 +17,7 @@ class MailController : public QObject {
     Q_PROPERTY(QObject* messages READ messages CONSTANT)
     Q_PROPERTY(QVariantList folders READ folders NOTIFY foldersChanged)
     Q_PROPERTY(QVariantList drafts READ drafts NOTIFY draftsChanged)
+    Q_PROPERTY(QVariantList favorites READ favorites NOTIFY favoritesChanged)
     Q_PROPERTY(QVariantMap account READ account NOTIFY accountChanged)
     Q_PROPERTY(QVariantList accounts READ accounts NOTIFY accountsChanged)
     Q_PROPERTY(QString currentAccountId READ currentAccountId NOTIFY accountChanged)
@@ -39,6 +41,10 @@ public:
     QObject *messages() const;
     QVariantList folders() const { return m_folders; }
     QVariantList drafts() const;
+    QVariantList favorites() const;
+    Q_INVOKABLE bool isFavorite(const QString &accountId, const QString &folderId) const;
+    Q_INVOKABLE void toggleFavorite(const QString &accountId, const QString &folderId, const QString &title);
+    Q_INVOKABLE void openFavorite(const QString &accountId, const QString &folderId);
     QVariantMap account() const;
     QVariantList accounts() const;
     QString currentAccountId() const { return m_account.id; }
@@ -95,6 +101,7 @@ public:
 signals:
     void foldersChanged();
     void draftsChanged();
+    void favoritesChanged();
     void accountChanged();
     void accountsChanged();
     void selectionChanged();
@@ -117,6 +124,9 @@ private:
     void moveMessagesTo(const QVariantList &indices, const QString &destination, bool archive);
     QString credentialKey() const;
     QString credentialKey(const Account &account) const;
+    QStringList favoriteEntries() const;
+    void saveFavoriteEntries(const QStringList &entries) const;
+    QString favoriteAccountName(const QString &accountId) const;
     void run(std::function<void()> task);
     bool m_demo = false, m_busy = false, m_sending = false, m_restorePending = false, m_hasMore = false;
     bool m_switchCredentialPending = false; // Credential read was started by switchAccount.
