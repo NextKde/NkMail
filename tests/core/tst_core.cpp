@@ -494,7 +494,7 @@ void CoreTests::messageModelIdentity()
     QCOMPARE(model.indexOf("INBOX", "100", "2"), 0);
     QVERIFY(model.get(-1).isEmpty());
     QVERIFY(!model.data(model.index(0), Qt::UserRole - 1).isValid());
-    QCOMPARE(model.roleNames().size(), 11);
+    QCOMPARE(model.roleNames().size(), 14);
     model.replace({message("2", "101")});
     QVERIFY(!persistent.isValid());
     QCOMPARE(model.indexOf("INBOX", "100", "2"), -1);

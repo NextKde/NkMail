@@ -18,6 +18,7 @@ struct Folder { QString id, title; int total = 0; };
 struct Summary {
     QString folder, uidValidity, uid;
     QString sender, senderAddress, recipients, subject, date, preview;
+    QString messageId, inReplyTo, references;
     bool unread = false, flagged = false, hasAttachments = false;
 };
 struct Attachment { QString name, mimeType, path; qint64 size = 0; QByteArray bytes; };

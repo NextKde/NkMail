@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QVariantList>
 #include <QThreadPool>
+#include <QTimer>
 #include <memory>
 #include <functional>
 
@@ -27,6 +28,9 @@ class MailController : public QObject {
     Q_PROPERTY(bool demo READ demo CONSTANT)
     Q_PROPERTY(bool hasMore READ hasMore NOTIFY statusChanged)
     Q_PROPERTY(QString search READ search WRITE setSearch NOTIFY searchChanged)
+    Q_PROPERTY(bool unreadOnly READ unreadOnly WRITE setUnreadOnly NOTIFY unreadOnlyChanged)
+    Q_PROPERTY(bool notifyEnabled READ notifyEnabled WRITE setNotifyEnabled NOTIFY notifyEnabledChanged)
+    Q_PROPERTY(int refreshInterval READ refreshInterval WRITE setRefreshInterval NOTIFY refreshIntervalChanged)
 public:
     explicit MailController(bool demo, const QString &dataRoot, QObject *parent = nullptr);
     ~MailController() override;
@@ -46,8 +50,15 @@ public:
     bool hasMore() const { return m_hasMore; }
     QString search() const { return m_search; }
     void setSearch(const QString &query);
+    bool unreadOnly() const { return m_unreadOnly; }
+    void setUnreadOnly(bool unreadOnly);
+    bool notifyEnabled() const { return m_notifyEnabled; }
+    void setNotifyEnabled(bool enabled);
+    int refreshInterval() const { return m_refreshInterval; }
+    void setRefreshInterval(int seconds);
     Q_INVOKABLE void configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
     Q_INVOKABLE void refresh();
+    Q_INVOKABLE void searchServer();
     Q_INVOKABLE void selectFolder(const QString &folder);
     Q_INVOKABLE void loadMore();
     Q_INVOKABLE void openMessage(const QString &uid, const QString &uidValidity);
@@ -60,6 +71,11 @@ public:
     Q_INVOKABLE void sendDraft(const QVariantMap &draft);
     Q_INVOKABLE void clearError();
     Q_INVOKABLE void disconnectAccount();
+    Q_INVOKABLE void setMessageRead(int index, bool read);
+    Q_INVOKABLE void toggleFlagged(int index);
+    Q_INVOKABLE void deleteMessage(int index);
+    Q_INVOKABLE void archiveMessage(int index);
+    Q_INVOKABLE void moveMessage(int index, const QString &destination);
 signals:
     void foldersChanged();
     void draftsChanged();
@@ -68,19 +84,31 @@ signals:
     void folderChanged();
     void statusChanged();
     void searchChanged();
+    void unreadOnlyChanged();
+    void notifyEnabledChanged();
+    void refreshIntervalChanged();
     void draftAccepted(const QString &id);
 private:
     void initialize();
     void seedDemo();
     void loadCached(bool append = false);
-    void fetchPage(bool append);
+    void fetchPage(bool append, bool quiet = false);
+    void startRefreshTimer();
+    void checkNewMail(const Page &page);
     void setStatus(const QString &status, const QString &error = {});
     void present(const Content &content);
     QString credentialKey() const;
     void run(std::function<void()> task);
     bool m_demo = false, m_busy = false, m_sending = false, m_restorePending = false, m_hasMore = false;
-    bool m_cachedOnly = true; // Until a successful header fetch, paging stays local.
+    bool m_serverSearching = false; // Server search is in flight, but must not block paging.
+    bool m_mutating = false; // One mailbox write operation at a time.
+    bool m_cachedOnly = true; // Query offsets stay local until a successful unfiltered header fetch.
+    bool m_unreadOnly = false;
+    bool m_notifyEnabled = true;
+    int m_refreshInterval = 300; // Seconds, clamped to at least 60.
+    QTimer m_refreshTimer;
     QString m_root, m_folder = QStringLiteral("INBOX"), m_status, m_error, m_search, m_selectedUid;
+    QString m_uidValidity; // Selected folder generation, for validating server search.
     int m_offset = 0;
     quint64 m_generation = 0, m_selectionGeneration = 0;
     Account m_account;

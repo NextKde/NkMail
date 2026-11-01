@@ -9,7 +9,8 @@ class MessageListModel final : public QAbstractListModel {
 public:
     enum Role { UidRole = Qt::UserRole + 1, UidValidityRole, FolderRole, SenderRole,
                 SenderAddressRole, SubjectRole, DateRole, PreviewRole, UnreadRole,
-                FlaggedRole, HasAttachmentsRole };
+                FlaggedRole, HasAttachmentsRole, ThreadKeyRole, ThreadCountRole,
+                ThreadFirstRole };
     Q_ENUM(Role)
     explicit MessageListModel(QObject *parent = nullptr);
     int rowCount(const QModelIndex &parent = {}) const override;
@@ -27,6 +28,12 @@ public:
 signals:
     void countChanged();
 private:
+    static QString threadKeyFor(const Summary &message);
+    static QString normalizedSubject(const QString &subject);
+    void rebuildThreads();
     QList<Summary> m_messages;
+    QList<QString> m_threadKeys;
+    QList<int> m_threadCounts;
+    QList<bool> m_threadFirst;
 };
 }

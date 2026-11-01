@@ -26,10 +26,11 @@ public:
     bool invalidateUidValidity(const QString &folder, const QString &uidValidity);
     bool savePage(const Page &page);
     Page cachedPage(const QString &folder, int offset = 0, int limit = 50,
-                    const QString &search = {}) const;
+                    const QString &search = {}, bool unreadOnly = false) const;
     bool saveContent(const Content &content);
     std::optional<Content> content(const QString &folder, const QString &uidValidity,
                                    const QString &uid) const;
+    bool removeMessage(const QString &folder, const QString &uidValidity, const QString &uid);
     QList<Draft> drafts() const;
     // Autosave cannot downgrade persisted sending/accepted/unknown states.
     // Read drafts() after saving if the caller needs the authoritative state.

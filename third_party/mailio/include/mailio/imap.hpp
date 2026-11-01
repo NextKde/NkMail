@@ -22,6 +22,7 @@ copy at http://www.freebsd.org/copyright/freebsd-license.html.
 #include <list>
 #include <map>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -457,6 +458,87 @@ public:
     @todo             Catch exceptions of `stoul` function.
     **/
     void remove(unsigned long message_no, bool is_uid = false);
+
+    /**
+    Storing flags on a message in an already selected mailbox.
+
+    @param message_no Number of the message to update.
+    @param flags      Flags to add or remove.
+    @param add        True to add the flags, false to remove them.
+    @param is_uid     Using a message uid number instead of a message sequence number.
+    @throw imap_error Storing message flags failure.
+    @throw imap_error Parsing failure.
+    @throw *          `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
+    **/
+    void store_flags(unsigned long message_no, const std::list<std::string>& flags, bool add, bool is_uid = false);
+
+    /**
+    Storing flags on a message from the given mailbox.
+
+    @param mailbox    Mailbox to use.
+    @param message_no Number of the message to update.
+    @param flags      Flags to add or remove.
+    @param add        True to add the flags, false to remove them.
+    @param is_uid     Using a message uid number instead of a message sequence number.
+    @throw *          `select(const string&, bool)`, `store_flags(unsigned long, const list<string>&, bool, bool)`.
+    **/
+    void store_flags(const std::string& mailbox, unsigned long message_no, const std::list<std::string>& flags, bool add, bool is_uid = false);
+
+    /**
+    Copying a message from an already selected mailbox to another mailbox.
+
+    @param message_no         Number of the message to copy.
+    @param destination_mailbox Mailbox to copy the message to.
+    @param is_uid             Using a message uid number instead of a message sequence number.
+    @throw imap_error         Copying message failure.
+    @throw imap_error         Parsing failure.
+    @throw *                  `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
+    **/
+    void copy(unsigned long message_no, const std::string& destination_mailbox, bool is_uid = false);
+
+    /**
+    Copying a message from the given mailbox to another mailbox.
+
+    @param mailbox            Mailbox to use.
+    @param message_no         Number of the message to copy.
+    @param destination_mailbox Mailbox to copy the message to.
+    @param is_uid             Using a message uid number instead of a message sequence number.
+    @throw *                  `select(const string&, bool)`, `copy(unsigned long, const string&, bool)`.
+    **/
+    void copy(const std::string& mailbox, unsigned long message_no, const std::string& destination_mailbox, bool is_uid = false);
+
+    /**
+    Expunging messages marked as deleted from an already selected mailbox.
+
+    @throw imap_error Expunging messages failure.
+    @throw imap_error Parsing failure.
+    @throw *          `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
+    **/
+    void expunge();
+
+    /**
+    Expunging a single message from an already selected mailbox.
+
+    When `is_uid` is enabled, the `UID EXPUNGE` command defined by RFC 4315 is sent, which needs the server to advertise the `UIDPLUS` capability.
+    Otherwise, the plain `EXPUNGE` command is sent.
+
+    @param message_no Number of the message to expunge.
+    @param is_uid     Using a message uid number instead of a message sequence number.
+    @throw imap_error Expunging messages failure.
+    @throw imap_error Parsing failure.
+    @throw *          `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
+    **/
+    void expunge(unsigned long message_no, bool is_uid);
+
+    /**
+    Querying the capabilities advertised by the server.
+
+    @return           Upper case capability tokens.
+    @throw imap_error Capability query failure.
+    @throw imap_error Parsing failure.
+    @throw *          `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
+    **/
+    std::set<std::string> capabilities();
 
     /**
     Searching a mailbox.

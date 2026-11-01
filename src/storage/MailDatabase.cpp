@@ -32,6 +32,9 @@ Summary summaryFromMap(const QVariantMap &m)
     s.subject = m.value("subject").toString();
     s.date = m.value("date").toString();
     s.preview = m.value("preview").toString();
+    s.messageId = m.value("messageId").toString();
+    s.inReplyTo = m.value("inReplyTo").toString();
+    s.references = m.value("references").toString();
     s.unread = m.value("unread").toBool();
     s.flagged = m.value("flagged").toBool();
     s.hasAttachments = m.value("hasAttachments").toBool();
@@ -345,7 +348,7 @@ bool MailDatabase::savePage(const Page &page)
             return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
-Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, const QString &search) const
+Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, const QString &search, bool unreadOnly) const
 {
     Page page;
     page.folder = folder;
@@ -360,12 +363,13 @@ Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, cons
         return page;
     QSqlQuery q(m_db);
     QString sql = QStringLiteral("SELECT payload FROM summaries WHERE folder=? AND uid_validity=? ORDER BY length(uid) DESC,uid DESC");
-    if (search.isEmpty())
+    const bool filtered = unreadOnly || !search.isEmpty();
+    if (!filtered)
         sql += QStringLiteral(" LIMIT ? OFFSET ?");
     q.prepare(sql);
     q.addBindValue(folder);
     q.addBindValue(page.uidValidity);
-    if (search.isEmpty()) {
+    if (!filtered) {
         q.addBindValue(limit + 1);
         q.addBindValue(offset);
     }
@@ -381,9 +385,13 @@ Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, cons
                                    + '\n' + s.subject + '\n' + s.preview;
             if (!haystack.contains(search, Qt::CaseInsensitive))
                 continue;
-            if (matched++ < offset)
-                continue;
         }
+        if (unreadOnly && !s.unread)
+            continue;
+        // Filter the entire cache before counting offsets, including the extra
+        // matching row used for hasMore. Raw mailbox offsets are unrelated.
+        if (filtered && matched++ < offset)
+            continue;
         if (page.messages.size() == limit) {
             page.hasMore = true;
             break;
@@ -456,6 +464,16 @@ std::optional<Content> MailDatabase::content(const QString &folder, const QStrin
                               QByteArray::fromBase64(a.value("bytes").toString().toLatin1())});
     }
     return c;
+}
+bool MailDatabase::removeMessage(const QString &folder, const QString &uidValidity, const QString &uid)
+{
+    if (!check())
+        return false;
+    if (folder.isEmpty() || uidValidity.isEmpty() || uid.isEmpty())
+        return fail(QStringLiteral("Folder, UIDVALIDITY and UID are required"));
+    const QVariantList identity{folder, uidValidity, uid};
+    return exec(m_db, QStringLiteral("DELETE FROM contents WHERE folder=? AND uid_validity=? AND uid=?"), identity, &m_error)
+        && exec(m_db, QStringLiteral("DELETE FROM summaries WHERE folder=? AND uid_validity=? AND uid=?"), identity, &m_error);
 }
 QList<Draft> MailDatabase::drafts() const
 {

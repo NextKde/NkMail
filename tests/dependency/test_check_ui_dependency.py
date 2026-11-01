@@ -121,7 +121,17 @@ class LocalGateTests(unittest.TestCase):
 
     def test_malformed_lock(self):
         self.lock.write_text("[]")
-        self.rejects("exactly tag and sha")
+        self.rejects("no other keys")
+
+    def test_sha_only_lock(self):
+        self.lock.write_text(json.dumps({"sha": self.sha}))
+        git(self.root, "add", gate.LOCK_PATH)
+        self.assertEqual(gate.local_dependency(self.root), (None, self.sha))
+
+    def test_extra_lock_keys_rejected(self):
+        self.lock.write_text(json.dumps({"sha": self.sha, "release": "v0.1.0-rc.1"}))
+        git(self.root, "add", gate.LOCK_PATH)
+        self.rejects("no other keys")
 
     def test_staged_upgrade_can_be_checked_before_parent_commit(self):
         git(self.module, "commit", "--allow-empty", "-qm", "next release")
@@ -132,35 +142,28 @@ class LocalGateTests(unittest.TestCase):
         self.assertEqual(gate.local_dependency(self.root), ("v0.1.0-rc.2", new_sha))
 
 
-class PublishedGateTests(unittest.TestCase):
+class UpstreamGateTests(unittest.TestCase):
     def setUp(self):
         self.sha = "a" * 40
         self.tag_sha = "b" * 40
         self.responses = {
-            "/releases/tags/v0.1.0-rc.1": {"tag_name": "v0.1.0-rc.1", "draft": False, "published_at": "2026-10-31T00:00:00Z", "prerelease": True, "target_commitish": "main"},
             "/git/ref/tags/v0.1.0-rc.1": {"object": {"type": "tag", "sha": self.tag_sha}},
             "/git/tags/" + self.tag_sha: {"object": {"type": "commit", "sha": self.sha}},
+            "/commits/" + self.sha: {"sha": self.sha},
         }
 
-    def check(self):
-        gate.published_dependency("v0.1.0-rc.1", self.sha, self.responses.__getitem__)
+    def check(self, tag="v0.1.0-rc.1"):
+        gate.published_dependency(tag, self.sha, self.responses.__getitem__)
 
-    def test_published_prerelease_annotated_tag(self):
+    def test_annotated_tag_and_existing_commit(self):
         self.check()
 
     def test_lightweight_tag(self):
         self.responses["/git/ref/tags/v0.1.0-rc.1"]["object"] = {"type": "commit", "sha": self.sha}
         self.check()
 
-    def test_draft(self):
-        self.responses["/releases/tags/v0.1.0-rc.1"]["draft"] = True
-        with self.assertRaisesRegex(gate.GateError, "non-draft"):
-            self.check()
-
-    def test_unpublished(self):
-        self.responses["/releases/tags/v0.1.0-rc.1"]["published_at"] = None
-        with self.assertRaisesRegex(gate.GateError, "non-draft"):
-            self.check()
+    def test_sha_only_pin_skips_tag_resolution(self):
+        gate.published_dependency(None, self.sha, lambda key: {"/commits/" + self.sha: {"sha": self.sha}}[key])
 
     def test_wrong_tag_commit(self):
         self.responses["/git/tags/" + self.tag_sha]["object"]["sha"] = "c" * 40
@@ -177,33 +180,49 @@ class PublishedGateTests(unittest.TestCase):
         with self.assertRaisesRegex(gate.GateError, "Invalid upstream tag"):
             self.check()
 
-    def test_release_and_tag_must_be_remotely_available(self):
-        for path in ("/releases/tags/v0.1.0-rc.1", "/git/ref/tags/v0.1.0-rc.1"):
-            with self.subTest(path=path):
-                def get(key):
-                    if key == path:
-                        raise gate.GateError("HTTP 404")
-                    return self.responses[key]
-                with self.assertRaisesRegex(gate.GateError, "404"):
-                    gate.published_dependency("v0.1.0-rc.1", self.sha, get)
+    def test_missing_upstream_commit(self):
+        def get(key):
+            if key == "/commits/" + self.sha:
+                raise gate.GateError("HTTP 404")
+            return self.responses[key]
+        with self.assertRaisesRegex(gate.GateError, "404"):
+            gate.published_dependency("v0.1.0-rc.1", self.sha, get)
+
+    def test_commit_response_must_match_pin(self):
+        self.responses["/commits/" + self.sha] = {"sha": "c" * 40}
+        with self.assertRaisesRegex(gate.GateError, "does not exist"):
+            self.check()
+
+    def test_commit_response_must_be_object(self):
+        self.responses["/commits/" + self.sha] = []
+        with self.assertRaisesRegex(gate.GateError, "does not exist"):
+            self.check()
+
+    def test_tag_must_be_remotely_available(self):
+        def get(key):
+            if key == "/git/ref/tags/v0.1.0-rc.1":
+                raise gate.GateError("HTTP 404")
+            return self.responses[key]
+        with self.assertRaisesRegex(gate.GateError, "404"):
+            gate.published_dependency("v0.1.0-rc.1", self.sha, get)
 
     def test_http_errors_fail_closed(self):
         for code in (404, 403, 429, 500):
             with self.subTest(code=code), patch.object(gate, "urlopen", side_effect=HTTPError("https://api.github.com/", code, "failure", {}, None)):
                 with self.assertRaisesRegex(gate.GateError, f"HTTP {code}"):
-                    gate.api_get("/releases/tags/v0.1.0-rc.1")
+                    gate.api_get("/commits/" + self.sha)
 
     def test_network_errors_fail_closed(self):
         for error in (URLError("offline"), TimeoutError(), OSError("TLS")):
             with self.subTest(error=error), patch.object(gate, "urlopen", side_effect=error):
                 with self.assertRaisesRegex(gate.GateError, "cannot be skipped"):
-                    gate.api_get("/releases/tags/v0.1.0-rc.1")
+                    gate.api_get("/commits/" + self.sha)
 
     def test_invalid_json_fails_closed(self):
         response = io.BytesIO(b"not JSON")
         with patch.object(gate, "urlopen", return_value=response):
             with self.assertRaisesRegex(gate.GateError, "cannot be skipped"):
-                gate.api_get("/releases/tags/v0.1.0-rc.1")
+                gate.api_get("/commits/" + self.sha)
 
 
 if __name__ == "__main__":
