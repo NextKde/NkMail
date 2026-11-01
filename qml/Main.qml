@@ -1293,6 +1293,22 @@ ApplicationWindow {
                                 }
                                 Text { text: window.dateLabel(window.message.date); color: window.muted; font.pixelSize: 11; Layout.fillWidth: true }
                                 Rectangle { Layout.fillWidth: true; height: 1; color: window.rule; Layout.topMargin: 4; Layout.bottomMargin: 6 }
+                                RowLayout {
+                                    objectName: "blockedImagesBar"
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    visible: window.mail.blockedImageCount > 0
+                                    Text {
+                                        text: qsTr("%1 张远程图片已隐藏").arg(window.mail.blockedImageCount)
+                                        color: window.muted; font.pixelSize: 11
+                                        Layout.fillWidth: true
+                                    }
+                                    MailAction {
+                                        stacked: true; stackedText: qsTr("显示图片"); iconName: "download"
+                                        accessibleText: qsTr("Load remote images")
+                                        onClicked: window.mail.loadRemoteImages()
+                                    }
+                                }
                                 // Render only the backend-sanitized html field; fall back to plain text.
                                 TextEdit {
                                     id: messageBody
