@@ -115,8 +115,8 @@ int main(int argc, char **argv) {
         const QRect fallback = screen ? screen->availableGeometry() : QRect(0, 0, 1280, 820);
         QRect restored(windowSettings->value("x", fallback.x() + 40).toInt(),
                        windowSettings->value("y", fallback.y() + 40).toInt(),
-                       windowSettings->value("width", 1280).toInt(),
-                       windowSettings->value("height", 820).toInt());
+                       windowSettings->value("width", 1180).toInt(),
+                       windowSettings->value("height", 760).toInt());
         // Restore to the screen with the greatest intersection; unplugged screens
         // fall back to the current screen rather than stranding a frameless window.
         QRect available = fallback;

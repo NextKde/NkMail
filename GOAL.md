@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Smaller default window · 2026-11-02
+
+- Reduced the initial window from 1280×820 to 1180×760, retaining the compact 189px sidebar and 280px message list. Saved user window sizes remain respected.
+- Host build succeeded; replaced the previous synthetic preview through guarded tray exit and opened at defaults. VM UI regression passed in 9.38s.
+
 ## Compact initial message list · 2026-11-02
 
 - Reduced the message list default/reset width from 320 to 280; retained drag resizing, the 260 minimum and saved custom widths. Updated keyboard/reset geometry expectations.

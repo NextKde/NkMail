@@ -11,8 +11,8 @@ ApplicationWindow {
     property var desktop: null
     property string lifecycleNotice: ""
     objectName: "mailWindow"
-    width: 1280
-    height: 820
+    width: 1180
+    height: 760
     minimumWidth: 900
     minimumHeight: 520
     visible: true
