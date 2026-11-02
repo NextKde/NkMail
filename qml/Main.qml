@@ -305,11 +305,9 @@ ApplicationWindow {
                     anchors.right: parent.right
                     anchors.rightMargin: 14
                     y: (44 - height) / 2
-                    implicitHeight: 38 // MailAction defaults to the compact toolbar height.
                     objectName: "unreadFilterButton"
                     visible: messagePane.visible && !window.draftsVisible
-                    stacked: true
-                    stackedText: qsTr("筛选")
+                    iconOnly: true
                     iconName: "filter"
                     checkable: true
                     checked: mail.unreadOnly
@@ -379,7 +377,7 @@ ApplicationWindow {
                     anchors.right: parent.right
                     anchors.rightMargin: window.sidebarVisible ? 12 : 0
                     y: windowChrome.controlsCenterY - height / 2
-                    stacked: true; stackedText: qsTr("侧栏"); iconName: "panelLeft"
+                    iconOnly: true; iconName: "panelLeft"
                     accessibleText: window.sidebarVisible ? qsTr("Hide sidebar") : qsTr("Show sidebar")
                     floatingAction: true; shellBackdrop: chromeBackdrop
                     liquidIntensity: "strong"

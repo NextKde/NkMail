@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Icon-only view toggles · 2026-11-02
+
+- Changed the unread filter and sidebar toggle to compact icon-only liquid buttons. Kept accessible names, hover hints, filter selection state and existing actions.
+- Host build succeeded and a new synthetic preview was opened. VM UI regression passed in 9.62s; no host automated tests.
+
 ## Grouped inline liquid toolbar · 2026-11-02
 
 - Reduced labels from 12px to 11px and icons from 15px to 14px. Each action group now shares one canonical liquid surface, with transparent interactive cells and subtle short separators; horizontal labels, shortcuts/tooltips and action routing are preserved.
