@@ -6,6 +6,7 @@ import Kos.Ui
 Rectangle {
     id: root
     required property Item surface
+    property string localeName: Qt.locale().name
     required property var mail
     required property QtObject selection
     property bool draftsVisible: false
@@ -55,6 +56,9 @@ Rectangle {
                 implicitHeight: visible ? MailStyle.messageRowHeight : 0
                 hoverEnabled: true
                 readonly property bool selected: mail.selectedUid === uid
+                readonly property color rowInk: selected ? "#ffffff" : root.ink
+                readonly property color rowMuted: selected ? "#ffffff" : root.muted
+                readonly property color rowAccent: selected ? "#ffffff" : AppTheme.accent
                 readonly property bool multiSelected: root.selection.isRowSelected(index)
                 readonly property int messageIndex: (mail.messages && typeof mail.messages.indexOf === "function")
                     ? mail.messages.indexOf(mail.currentFolder, uidValidity, uid) : -1
@@ -125,51 +129,65 @@ Rectangle {
                         }
                     }
                 }
-                background: Rectangle {
-                    color: messageRow.multiSelected ? root.selectedSurface : messageRow.selected ? root.selectedSurface : messageRow.hovered ? root.hoverSurface : "transparent"
-                    border.width: messageRow.activeFocus ? 1 : 0
-                    border.color: AppTheme.focusRing
-                    Rectangle { height: 1; anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.leftMargin: 19; anchors.right: parent.right; color: root.rule }
+                background: Item {
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8; anchors.rightMargin: 8
+                        anchors.topMargin: 2; anchors.bottomMargin: 2
+                        radius: 6
+                        color: messageRow.selected ? AppTheme.accent : messageRow.multiSelected ? root.selectedSurface : messageRow.hovered ? root.hoverSurface : "transparent"
+                        border.width: messageRow.activeFocus ? 1 : 0
+                        border.color: AppTheme.focusRing
+                    }
+                    Rectangle {
+                        height: 1
+                        anchors.top: parent.top
+                        anchors.left: parent.left; anchors.right: parent.right
+                        anchors.leftMargin: 24; anchors.rightMargin: 24
+                        color: root.rule
+                        opacity: 0.5
+                        visible: messageRow.index > 0 && !messageRow.selected
+                    }
                 }
                 contentItem: Item {
-                    Rectangle { x: 9; y: 23; width: 6; height: 6; radius: 3; color: AppTheme.accent; visible: messageRow.unread }
+                    Rectangle { x: 12; y: 14; width: 6; height: 6; radius: 3; color: messageRow.rowAccent; visible: messageRow.unread }
                     ColumnLayout {
-                        anchors.fill: parent; anchors.leftMargin: 23; anchors.rightMargin: 17; anchors.topMargin: 14; anchors.bottomMargin: 13
-                        spacing: 4
+                        anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; anchors.topMargin: 7; anchors.bottomMargin: 7
+                        spacing: 3
                         RowLayout {
                             Layout.fillWidth: true
-                            Text { text: messageRow.sender || messageRow.senderAddress; color: root.ink; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
+                            Text { text: messageRow.sender || messageRow.senderAddress; color: messageRow.rowInk; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
                             Rectangle {
                                 id: threadBadge
                                 visible: root.groupThreads && messageRow.threadFirst && messageRow.threadCount > 1
                                 implicitWidth: threadBadgeRow.implicitWidth + 12
                                 implicitHeight: 18
                                 radius: 9
-                                color: root.hoverSurface
+                                color: messageRow.selected ? AppTheme.withAlpha("#ffffff", 0.12) : root.hoverSurface
                                 border.width: 1
-                                border.color: root.rule
+                                border.color: messageRow.selected ? AppTheme.withAlpha("#ffffff", 0.18) : root.rule
                                 RowLayout {
                                     id: threadBadgeRow
                                     anchors.centerIn: parent
                                     spacing: 3
-                                    Text { text: messageRow.threadCount; color: root.muted; font.pixelSize: 10 }
-                                    VectorIcon { name: "chevronsUpDown"; size: 12; color: root.muted }
+                                    Text { text: messageRow.threadCount; color: messageRow.rowMuted; font.pixelSize: 10 }
+                                    VectorIcon { name: "chevronsUpDown"; size: 12; color: messageRow.rowMuted }
                                 }
                                 TapHandler {
                                     grabPermissions: PointerHandler.CanTakeOverFromAnything
                                     onTapped: root.selection.toggleThread(messageRow.threadKey)
                                 }
                             }
-                            Text { text: MailLabels.dateLabel(messageRow.date); color: root.muted; font.pixelSize: AppTheme.compactControlFontSize }
+                            Text { text: MailLabels.dateLabel(messageRow.date, root.localeName); color: messageRow.rowMuted; font.pixelSize: AppTheme.compactControlFontSize }
                         }
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
-                            Text { text: messageRow.subject || qsTr("(No subject)"); color: root.ink; font.pixelSize: 12; font.weight: messageRow.unread ? Font.DemiBold : Font.Normal; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                            Text { text: messageRow.flagged ? "★" : ""; color: AppTheme.accent; font.pixelSize: 12; visible: messageRow.flagged; Accessible.name: qsTr("Flagged") }
-                            VectorIcon { name: "album"; size: 14; color: root.muted; visible: messageRow.hasAttachments; Accessible.name: qsTr("Has attachment") }
+                            Text { text: messageRow.subject || qsTr("(No subject)"); color: messageRow.rowInk; font.pixelSize: 12; font.weight: messageRow.unread ? Font.DemiBold : Font.Normal; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
+                            Text { text: messageRow.flagged ? "★" : ""; color: messageRow.rowAccent; font.pixelSize: 12; visible: messageRow.flagged; Accessible.name: qsTr("Flagged") }
+                            VectorIcon { name: "album"; size: 14; color: messageRow.rowMuted; visible: messageRow.hasAttachments; Accessible.name: qsTr("Has attachment") }
                         }
-                        Text { objectName: "messagePreview"; visible: root.showSummary; text: messageRow.preview; color: root.muted; font.pixelSize: 11; lineHeight: 1.25; Layout.fillWidth: true; Layout.fillHeight: true; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight; textFormat: Text.PlainText }
+                        Text { objectName: "messagePreview"; visible: root.showSummary; text: messageRow.preview; color: messageRow.rowMuted; font.pixelSize: 11; lineHeight: 1.25; Layout.fillWidth: true; Layout.fillHeight: true; wrapMode: Text.NoWrap; maximumLineCount: 1; elide: Text.ElideRight; textFormat: Text.PlainText }
                     }
                 }
             }

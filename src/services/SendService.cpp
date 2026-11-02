@@ -46,22 +46,22 @@ void SendService::submitDraft(const Draft &draft) {
         SendResult result;
         QByteArray raw;
         try { result = transport->send(account, draft, &raw); }
-        catch (...) { result.state = SendResult::Unknown; result.message = QStringLiteral("Connection ended before the result could be confirmed."); }
+        catch (...) { result.state = SendResult::Unknown; result.message = SendService::tr("Connection ended before the result could be confirmed."); }
         if (self) QMetaObject::invokeMethod(self, [self, result, account, raw, id = draft.id] {
             if (!self) return;
             const QString state = result.state == SendResult::Accepted ? "accepted" : result.state == SendResult::Rejected ? "rejected" : "unknown";
             if (!self->m_database->markDraftState(id, state)) {
                 self->m_sending = false; emit self->draftsChanged();
-                self->setStatus(self->tr("Send result could not be saved"), self->tr("Do not resend. Restart to recover the draft as unknown.")); return;
+                self->setStatus(SendService::tr("Send result could not be saved"), SendService::tr("Do not resend. Restart to recover the draft as unknown.")); return;
             }
             emit self->draftsChanged();
             if (result.state == SendResult::Accepted) {
-                self->setStatus(self->tr("SMTP server accepted this message · delivery not confirmed")); emit self->draftAccepted(id);
+                self->setStatus(SendService::tr("SMTP server accepted this message · delivery not confirmed")); emit self->draftAccepted(id);
                 self->m_tasks.run([transport = self->m_transport, self, account, raw] {
                     const auto folder = transport->sentFolder(account);
                     if (folder.isEmpty()) {
                         if (self) QMetaObject::invokeMethod(self, [self] {
-                            if (self) { self->m_sending = false; self->setStatus(self->tr("SMTP server accepted this message · no Sent folder found, no copy saved")); }
+                            if (self) { self->m_sending = false; self->setStatus(SendService::tr("SMTP server accepted this message · no Sent folder found, no copy saved")); }
                         }, Qt::QueuedConnection);
                         return;
                     }
@@ -73,11 +73,11 @@ void SendService::submitDraft(const Draft &draft) {
                         if (!self) return;
                         self->m_sending = false;
                         self->setStatus(saved
-                            ? self->tr("SMTP server accepted this message · copy saved to %1").arg(folder)
-                            : self->tr("SMTP server accepted this message · copy could not be saved to %1").arg(folder));
+                            ? SendService::tr("SMTP server accepted this message · copy saved to %1").arg(folder)
+                            : SendService::tr("SMTP server accepted this message · copy could not be saved to %1").arg(folder));
                     }, Qt::QueuedConnection);
                 });
-            } else { self->m_sending = false; self->setStatus(result.state == SendResult::Unknown ? self->tr("Send result unknown · not retried") : self->tr("Message not accepted · draft preserved"), result.message); }
+            } else { self->m_sending = false; self->setStatus(result.state == SendResult::Unknown ? SendService::tr("Send result unknown · not retried") : SendService::tr("Message not accepted · draft preserved"), result.message); }
         }, Qt::QueuedConnection);
     });
 }

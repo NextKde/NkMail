@@ -1,4 +1,9 @@
 #include "MailController.h"
+#include "platform/TrayService.h"
+#include "platform/SingleInstance.h"
+#include "platform/LanguageService.h"
+#include <QApplication>
+#include <QIcon>
 #include <QCommandLineParser>
 #include <QDir>
 #include <QFile>
@@ -19,7 +24,8 @@
 #include <memory>
 
 int main(int argc, char **argv) {
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
+    app.setWindowIcon(QIcon(QStringLiteral(":/data/nkmail.svg")));
     app.setApplicationName(QStringLiteral("nkmail"));
     app.setApplicationDisplayName(QStringLiteral("NkMail"));
     app.setOrganizationName(QStringLiteral("NextKde"));
@@ -30,6 +36,7 @@ int main(int argc, char **argv) {
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("A quiet, native mail client powered by Kos.Ui and mailio."));
     parser.addHelpOption(); parser.addVersionOption();
+    parser.addOption({"language", "Interface language: system, zh_CN or en.", "language"});
     parser.addOption({"demo", "Use isolated synthetic mail; no network or saved credentials."});
     parser.addOption({"data-dir", "Use a separate local data directory.", "path"});
     parser.addOption({"screenshot", "Capture this application's synthetic preview window and exit (requires --demo).", "path"});
@@ -39,8 +46,24 @@ int main(int argc, char **argv) {
     parser.addOption({"review-height", "Synthetic preview window height.", "pixels", "800"});
     parser.process(app);
     const bool demo = parser.isSet("demo");
+    if (parser.isSet("language") && !QStringList{"system", "zh_CN", "en"}.contains(parser.value("language"))) {
+        std::fprintf(stderr, "Unsupported interface language. Use system, zh_CN or en.\n"); return 2;
+    }
     if (parser.isSet("screenshot") && !demo) {
         std::fprintf(stderr, "Screenshot export is only permitted with isolated --demo data.\n"); return 2;
+    }
+    nkmail::SingleInstance instance;
+    // Screenshot exports have no tray and must not activate a live user's window.
+    if (!parser.isSet("screenshot")) {
+        const auto ownership = instance.acquire();
+        if (ownership == nkmail::SingleInstance::Result::Activated) {
+            std::fprintf(stdout, "Activated existing NkMail window.\n");
+            return 0;
+        }
+        if (ownership == nkmail::SingleInstance::Result::Error) {
+            std::fprintf(stderr, "Cannot acquire or activate NkMail's desktop session instance.\n");
+            return 2;
+        }
     }
     QTemporaryDir demoDirectory;
     QString root = parser.isSet("data-dir") ? parser.value("data-dir") : QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -54,8 +77,13 @@ int main(int argc, char **argv) {
     if (!dataLock.tryLock(0)) {
         std::fprintf(stderr, "This mailbox data directory is already open in another NkMail instance.\n"); return 2;
     }
+    nkmail::LanguageService language(QDir(root).filePath("language.ini"));
+    if (parser.isSet("language")) language.setLanguage(parser.value("language"));
     nkmail::MailController mail(demo, root);
+    std::unique_ptr<nkmail::TrayService> desktop;
+    if (!parser.isSet("screenshot")) desktop = std::make_unique<nkmail::TrayService>(nkmail::createSystemTray());
     QQmlApplicationEngine engine;
+    QObject::connect(&language, &nkmail::LanguageService::languageChanged, &engine, &QQmlApplicationEngine::retranslate);
     engine.rootContext()->setContextProperty(QStringLiteral("reviewAppearance"), demo ? parser.value("appearance") : QStringLiteral("system"));
     engine.rootContext()->setContextProperty(QStringLiteral("forceGlassPreview"),
         qEnvironmentVariableIsSet("NKMAIL_FORCE_GLASS"));
@@ -64,16 +92,28 @@ int main(int argc, char **argv) {
     const bool persistWindow = !parser.isSet("screenshot");
     std::unique_ptr<QSettings> windowSettings;
     QVariantMap initialProperties{{QStringLiteral("mail"), QVariant::fromValue(&mail)}};
+    initialProperties.insert(QStringLiteral("desktop"), QVariant::fromValue(desktop.get()));
+    initialProperties.insert(QStringLiteral("i18n"), QVariant::fromValue(&language));
     if (persistWindow) {
         windowSettings = std::make_unique<QSettings>(QDir(root).filePath("window.ini"), QSettings::IniFormat);
-        initialProperties.insert(QStringLiteral("sidebarPreferredWidth"), qBound(190, windowSettings->value("sidebarWidth", 236).toInt(), 340));
-        initialProperties.insert(QStringLiteral("listPreferredWidth"), qBound(260, windowSettings->value("listWidth", 320).toInt(), 520));
+        initialProperties.insert(QStringLiteral("sidebarPreferredWidth"), qBound(152, windowSettings->value("sidebarWidth", 189).toInt(), 340));
+        initialProperties.insert(QStringLiteral("listPreferredWidth"), qBound(260, windowSettings->value("listWidth", 280).toInt(), 520));
     }
     engine.setInitialProperties(initialProperties);
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
     engine.loadFromModule(QStringLiteral("NextKde.Mail"), QStringLiteral("Main"));
     if (engine.rootObjects().isEmpty()) return 1;
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+    if (desktop && window) {
+        QObject::connect(&instance, &nkmail::SingleInstance::activationRequested,
+                         desktop.get(), &nkmail::TrayService::showWindow);
+        desktop->attach(window, [window] {
+            QVariant accepted;
+            return QMetaObject::invokeMethod(window, "prepareForQuit", Q_RETURN_ARG(QVariant, accepted))
+                && accepted.toBool();
+        });
+        QObject::connect(desktop.get(), &nkmail::TrayService::exitRequested, &app, &QCoreApplication::quit);
+    }
     QRect normalGeometry;
     bool maximized = false;
     QTimer preferenceSave;
@@ -84,8 +124,8 @@ int main(int argc, char **argv) {
         const QRect fallback = screen ? screen->availableGeometry() : QRect(0, 0, 1280, 820);
         QRect restored(windowSettings->value("x", fallback.x() + 40).toInt(),
                        windowSettings->value("y", fallback.y() + 40).toInt(),
-                       windowSettings->value("width", 1280).toInt(),
-                       windowSettings->value("height", 820).toInt());
+                       windowSettings->value("width", 1180).toInt(),
+                       windowSettings->value("height", 760).toInt());
         // Restore to the screen with the greatest intersection; unplugged screens
         // fall back to the current screen rather than stranding a frameless window.
         QRect available = fallback;

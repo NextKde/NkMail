@@ -2,6 +2,7 @@
 #include "TaskRunner.h"
 #include "mail/MailTransport.h"
 #include <QObject>
+#include <QCoreApplication>
 #include <QPointer>
 #include <memory>
 namespace nkmail {
@@ -35,7 +36,7 @@ private:
             T result{}; QString error;
             try { result = work(); }
             catch (const std::exception &e) { error = QString::fromUtf8(e.what()); }
-            catch (...) { error = QStringLiteral("Mail operation failed."); }
+            catch (...) { error = QCoreApplication::translate("MailErrors", "Mail operation failed."); }
             if (self) QMetaObject::invokeMethod(self, [self, result, error, done] {
                 if (self) done(result, error);
             }, Qt::QueuedConnection);

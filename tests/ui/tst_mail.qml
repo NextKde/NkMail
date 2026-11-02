@@ -95,6 +95,11 @@ TestCase {
         function clearError() { error = "" }
         function disconnectAccount() { configured = false }
     }
+    QtObject {
+        id: desktopMock
+        property int hides: 0
+        function hideToTray() { hides++; app.hide(); return true }
+    }
     Component { id: readerComponent; App.MessageReader {} }
     Component { id: sidebarComponent; App.MailSidebar {} }
     Component { id: paneComponent; App.MessagePane { selection: App.MailSelection {} } }
@@ -118,6 +123,32 @@ TestCase {
     function activateApp() {
         app.requestActivate()
         wait(40)
+    }
+    function test_tray_close_keeps_window_and_sending_alive() {
+        app.desktop = desktopMock; desktopMock.hides = 0
+        mock.sending = true
+        app.close()
+        compare(desktopMock.hides, 1)
+        compare(app.visible, false)
+        compare(mock.sending, true)
+        app.show()
+        compare(app.prepareForQuit(), false)
+        mock.sending = false; mock.sendPending = true
+        compare(app.prepareForQuit(), false)
+        mock.sendPending = false
+        compare(app.prepareForQuit(), true)
+    }
+    function test_failed_draft_save_blocks_explicit_exit() {
+        app.compose("new")
+        const editor = findChild(app, "composerDialog")
+        verify(editor !== null)
+        const subject = findChild(app, "composerSubject")
+        subject.text = "Unsaved synthetic changes"
+        mock.failSave = true
+        compare(app.prepareForQuit(), false)
+        verify(editor.visible)
+        mock.failSave = false
+        compare(app.prepareForQuit(), true)
     }
     function test_toolbar_resolves_row_after_model_removal() {
         const original = JSON.parse(JSON.stringify(messageModel.get(0)))
@@ -153,6 +184,73 @@ TestCase {
         selection.clearSelection()
         compare(selection.selectionSize, 0)
     }
+    Component {
+        id: platformControlsMock
+        QtObject {
+            property var target
+            property var buttons
+            property bool enabled
+            property bool active: false
+        }
+    }
+    function test_window_controls_geometry_and_takeover() {
+        const controls = findChild(app, "windowControls")
+        const client = findChild(controls, "clientWindowControls")
+        const original = controls.platformComponent
+        controls.platformComponent = platformControlsMock
+        try {
+            wait(20)
+            compare(controls.buttonLayout.length, 3)
+            const actions = ["maximize", "minimize", "close"]
+            for (let i = 0; i < 3; ++i) {
+                const rect = controls.buttonLayout[i]
+                compare(rect.action, actions[i])
+                compare(rect.width, 14)
+                compare(rect.height, 14)
+                const point = controls.mapToItem(app.contentItem, rect.x, rect.y)
+                compare(point.x - app.width, -84.5 + 28 * i)
+                compare(point.y, 16.5)
+            }
+            compare(client.opacity, 1)
+            verify(client.enabled)
+            controls.platformSlot.active = true
+            compare(client.opacity, 0)
+            verify(!client.enabled)
+            compare(controls.opacity, 1)
+            compare(controls.width, 78)
+            controls.platformSlot.active = false
+            compare(client.opacity, 1)
+            verify(client.enabled)
+            controls.platformComponent = null
+            compare(controls.platformSlot, null)
+            compare(client.opacity, 1)
+            verify(client.enabled)
+        } finally {
+            controls.platformComponent = original
+        }
+    }
+
+    function test_search_has_ten_pixel_gap_to_traffic_lights() {
+        const toolbar = findChild(app, "readerHeader")
+        const controls = findChild(app, "windowControls")
+        for (const width of [1000, 1180, 1320, 1600]) {
+            toolbar.closeSearch()
+            app.width = width
+            wait(30)
+            for (const expanded of [false, true]) {
+                if (expanded) toolbar.openSearch()
+                wait(30)
+                const search = findChild(app, toolbar.wideSearch || expanded ? "searchField" : "searchToggleButton")
+                verify(search.visible)
+                const circleLeft = controls.mapToItem(app.contentItem, controls.buttonLayout[0].x, 0).x
+                const searchRight = search.mapToItem(app.contentItem, search.width, 0).x
+                verify(circleLeft - searchRight >= 9.5 && circleLeft - searchRight <= 10,
+                       "Gap at width " + width + ", expanded=" + expanded + ": " + (circleLeft - searchRight))
+            }
+        }
+        toolbar.closeSearch()
+    }
+
     function test_shell_planes_and_window_chrome_are_stable() {
         const planes = findChild(app, "chromePlanes")
         const sidebarPlane = findChild(app, "sidebarPlane")
@@ -168,9 +266,9 @@ TestCase {
         verify(controls !== null)
         compare(backdrop.sourceItem, planes)
         verify(backdrop.sourceItem !== findChild(app, "mailScene"))
-        compare(App.MailStyle.shellHeaderHeight, 68)
-        compare(App.MailStyle.toolbarButtonHeight, 26)
-        compare(chrome.height, 68)
+        compare(App.MailStyle.shellHeaderHeight, 47)
+        compare(App.MailStyle.toolbarButtonHeight, 28)
+        compare(chrome.height, 47)
         compare(chrome.width, app.width)
         verify(chrome.visible)
         verify(controls.width > 0 && controls.height > 0)
@@ -185,11 +283,23 @@ TestCase {
         compare(sidebar.parent, scene)
         compare(content.parent, scene)
         compare(header.y, 0)
-        compare(header.height, 68)
-        compare(sidebar.y, 68)
-        compare(content.y, 68)
+        compare(header.height, 47)
+        const filter = findChild(app, "unreadFilterButton")
+        const toolbar = findChild(app, "readerHeader")
+        for (const name of ["mailTitle", "folderTitle", "unreadFilterButton", "sidebarToggleButton", "windowControls", "mailboxActionGroup"]) {
+            const item = findChild(app, name)
+            compare(item.mapToItem(header, 0, item.height / 2).y, header.height / 2,
+                    name + " must be vertically centred in the header")
+        }
+        compare(filter.height, 28)
+        compare(findChild(app, "sidebarToggleButton").height, filter.height)
+        compare(findChild(app, "mailboxActionGroup").height, filter.height)
+        compare(filter.mapToItem(scene, 0, filter.height / 2).y,
+                toolbar.mapToItem(scene, 0, toolbar.controlsCenterY).y)
+        compare(sidebar.y, 47)
+        compare(content.y, 47)
         verify(sidebar.height > 0 && content.height > 0)
-        for (const name of ["sidebarComposeButton", "searchField"]) {
+        for (const name of ["sidebarToggleButton", "searchField"]) {
             let item = findChild(app, name)
             verify(item !== null)
             while (item && item !== header) item = item.parent
@@ -209,8 +319,8 @@ TestCase {
                 compare(owner, header, name + " must belong to the header")
             }
         }
-        compare(findChild(app, "messageList").mapToItem(scene, 0, 0).y, 68)
-        compare(findChild(app, "readerScroll").mapToItem(scene, 0, 0).y, 68)
+        compare(findChild(app, "messageList").mapToItem(scene, 0, 0).y, 47)
+        compare(findChild(app, "readerScroll").mapToItem(scene, 0, 0).y, 47)
     }
 
     function test_shell_geometry_at_width_boundaries() {
@@ -223,7 +333,7 @@ TestCase {
         const controls = findChild(app, "windowControls")
         const listHeader = findChild(app, "listHeader")
         const readerHeader = findChild(app, "readerHeader")
-        const status = findChild(app, "statusStrip")
+        compare(findChild(app, "statusStrip"), null)
         for (const width of [580, 650, 799, 800, 820, 1079, 1080, 1280]) {
             for (const expanded of [false, true]) {
                 for (const reading of [false, true]) {
@@ -234,9 +344,9 @@ TestCase {
                     wait(25)
                     compare(header.width, width)
                     compare(content.x, app.sidebarVisible ? app.sidebarWidth : 0)
-                    compare(content.y, 68)
-                    compare(content.y + content.height, status.y)
-                    compare(sidebar.y + sidebar.height, status.y)
+                    compare(content.y, 47)
+                    compare(content.y + content.height, scene.height)
+                    compare(sidebar.y + sidebar.height, scene.height)
                     compare(list.visible, !app.narrow || !reading)
                     compare(reader.visible, !app.narrow || reading)
                     compare(listHeader.visible, list.visible)
@@ -248,21 +358,21 @@ TestCase {
                     }
                     const controlTop = controls.mapToItem(scene, 0, 0)
                     verify(controlTop.x >= 0 && controlTop.x + controls.width <= width)
-                    for (const name of ["sidebarComposeButton", "sidebarToggleButton", "refreshButton", "headerComposeButton", "searchField", "readerBackButton", "replyButton", "forwardButton", "detailsButton", "moreButton"]) {
+                    for (const name of ["sidebarToggleButton", "refreshButton", "headerComposeButton", "searchField", "readerBackButton", "replyButton", "forwardButton", "detailsButton", "moreButton"]) {
                         const item = findChild(app, name)
                         if (!item || !item.visible) continue
                         const top = item.mapToItem(scene, 0, 0)
                         verify(item.width > 0 && item.height > 0, name)
                         verify(top.x >= 0 && top.x + item.width <= width, name + " outside window")
-                        verify(top.y >= 0 && top.y + item.height <= 68, name + " outside header")
+                        verify(top.y >= 0 && top.y + item.height <= 47, name + " outside header")
                         verify(top.y >= controlTop.y + controls.height
                             || top.x + item.width <= controlTop.x, name + " overlaps window controls")
                     }
                     for (const name of ["sidebarDivider", "messageDivider"]) {
                         const divider = findChild(app, name)
                         if (!divider.visible) continue
-                        compare(divider.y, 68)
-                        compare(divider.y + divider.height, status.y)
+                        compare(divider.y, 47)
+                        compare(divider.y + divider.height, scene.height)
                     }
                 }
             }
@@ -289,8 +399,13 @@ TestCase {
         keyClick(Qt.Key_F, Qt.ControlModifier)
         compare(app.readerVisible, false)
         const search = findChild(app, "searchField")
-        // 580 宽下搜索框收成按钮，输入框不常显；焦点仍应落在可输入的搜索入口上
-        compare(search.visible, false)
+        // Compact search replaces header actions with a visible, usable input.
+        tryCompare(search, "visible", true)
+        tryCompare(search, "activeFocus", true)
+        keyClick(Qt.Key_A)
+        tryCompare(mock, "search", "a")
+        keyClick(Qt.Key_Escape)
+        tryCompare(search, "visible", false)
         verify(findChild(app, "searchToggleButton") !== null)
     }
 
@@ -315,21 +430,21 @@ TestCase {
         tryCompare(search, "activeFocus", true)
         keyClick(Qt.Key_A)
         tryCompare(mock, "search", "a")
-        const compose = findChild(app, "sidebarComposeButton")
+        compare(findChild(app, "sidebarComposeButton"), null)
+        const compose = findChild(app, "mailboxActionGroup")
         verify(compose.visible)
         verify(compose.enabled)
         verify(compose.width > 0 && compose.height > 0)
-        // 侧栏头部这块按钮已经被拖拽区覆盖，指针点击落不到按钮本体；
-        // 这里改为发信号验证动作链路，指针命中另由 refresh / search 两项覆盖。
-        compose.clicked()
+        const composePoint = compose.mapToItem(scene, compose.width * 3 / 4, compose.height / 2)
+        mouseClick(scene, composePoint.x, composePoint.y)
         tryCompare(findChild(app, "composerDialog"), "visible", true)
     }
 
     function test_column_widths_are_adjustable_and_clamped() {
         const sidebarDivider = findChild(app, "sidebarDivider")
         const listDivider = findChild(app, "messageDivider")
-        compare(app.sidebarWidth, 236)
-        compare(app.listWidth, 320)
+        compare(app.sidebarWidth, 189)
+        compare(app.listWidth, 280)
         sidebarDivider.resizeTo(290)
         listDivider.resizeTo(410)
         compare(app.sidebarPreferredWidth, 290)
@@ -352,23 +467,23 @@ TestCase {
         // scene coordinate space instead of accidentally chasing the handle.
         const start = divider.mapToItem(scene, divider.width / 2, 120)
         mouseDrag(scene, start.x, start.y, 40, 0)
-        compare(app.sidebarPreferredWidth, 276)
-        tryCompare(divider, "x", 272)
+        compare(app.sidebarPreferredWidth, 229)
+        tryCompare(divider, "x", 225)
         const next = divider.mapToItem(scene, divider.width / 2, 120)
         mouseDrag(scene, next.x, next.y, -40, 0)
-        compare(app.sidebarPreferredWidth, 236)
+        compare(app.sidebarPreferredWidth, 189)
     }
     function test_column_divider_keyboard_and_double_click() {
         activateApp()
         const divider = findChild(app, "messageDivider")
         divider.forceActiveFocus()
         keyClick(Qt.Key_Right)
-        compare(app.listPreferredWidth, 330)
+        compare(app.listPreferredWidth, 290)
         keyClick(Qt.Key_Left)
-        compare(app.listPreferredWidth, 320)
+        compare(app.listPreferredWidth, 280)
         divider.resizeTo(410)
         mouseDoubleClickSequence(divider, divider.width / 2, 120)
-        compare(app.listPreferredWidth, 320)
+        compare(app.listPreferredWidth, 280)
     }
     function test_search_shortcut_and_tab_focus() {
         activateApp()
@@ -377,6 +492,9 @@ TestCase {
         const search = findChild(app, "searchField")
         tryCompare(search, "activeFocus", true)
         compare(app.draftsVisible, false)
+        verify(findChild(app, "listHeader").visible)
+        verify(findChild(app, "folderTitle").visible)
+        verify(findChild(app, "unreadFilterButton").visible)
         for (const character of "example") keyClick(character)
         tryCompare(mock, "search", "example")
         keyClick(Qt.Key_Escape)

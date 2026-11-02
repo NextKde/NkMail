@@ -1,5 +1,197 @@
 # NkMail local delivery goal
 
+## 下一阶段产品目标：邮件操作、账户接入与导航一致性 · 2026-11-02
+
+本轮完成参考图与代码差距评估并制定目标，尚未开始本节功能实现。参考图只作为信息层级与交互参考；不复制截图内真实邮件、地址或密钥片段。
+
+目标：在保留紧凑三栏布局、液态按钮组、6px 选中圆角、中英文和单实例托盘行为的前提下，让用户能够清楚地添加账户、定位邮件、执行常用操作，并确保每个可见入口对应真实能力。保留已确认的标题栏居中、4px 下移和搜索距交通灯10px布局。
+
+现状与差距：
+- MessagePane 已有紧凑邮件行、未读点、蓝底白字选择、多选、线程折叠、附件/旗标提示和基础右键菜单。回复/全部回复/转发已存在于其他入口，需统一到行菜单并锁定目标邮件；发送者头像尚未呈现。复制到、附件转发、彩色旗标、提醒、静音、屏蔽及规则需要额外后端或本地数据模型。
+- AccountDialog 目前直接展示身份、密码、IMAP/SMTP、TLS与高级配置，缺少邮箱优先的分步接入和提供商预设。保存配置不能等同于认证成功。现有应用密码接入不能冒充 OAuth 或 Exchange 原生支持。
+- MailSidebar 已有收藏、按账户展开文件夹、账户管理和本地草稿。收藏无计数，非当前账户文件夹未读数被置零；本地草稿入口与账户文件夹层级需整理。系统文件夹显示/icon仍有名称映射逻辑，需以服务器角色优先，避免混淆同名或不同路径文件夹。缺少统一收件箱/有旗标等聚合视图。
+
+阶段一：整理现有能力（优先交付）
+1. 邮件行：提供可选的本地生成首字头像，不请求远程头像；保持紧凑行高、内容留白、单行摘要与轻分隔线。
+2. 操作菜单：按打开/回复转发、已读旗标、归档移动删除分组；复用已有命令。右键未选中邮件时明确操作对象，多选显示匹配的批量能力，禁用状态有依据。为危险操作保留现有语义，不擅自扩大删除范围。
+3. 账户向导：邮箱入口 → 适用的预设/手动配置 → 分项连接验证 → 明确成功或失败。高级端口/TLS设置渐进展开；错误可重试且保留非敏感输入。未知域名回到手动设置，预设和认证方式需在实现时核实提供商官方信息。
+4. 导航：统一分组标题、图标列、计数列和选中状态；系统文件夹排序和角色映射独立建模。保留不同服务器文件夹身份，不按翻译后的同名合并。明确本地草稿与服务器草稿的区别。同步状态仅在进行中/失败时按账户显示，不恢复永久底栏。
+
+5. 邮件阅读区（补充参考图）：将“详情 / Details”从顶部工具栏迁入邮件头右侧，作为可键盘访问的轻量文字按钮；复用现有详情数据与展开/收起能力，常驻显示发件人、主题、收件人摘要和时间，详细地址、抄送等按需展开。移除工具栏对应按钮并同步收紧按钮组，不留空位。
+   - 把当前大主题、头像/发件人、时间的纵向堆叠整理成紧凑邮件头：左侧头像与身份信息，右侧账户/文件夹、时间和详情入口；窄窗口自然换行，长主题/地址不挤压按钮。
+   - 邮件头和正文用轻分隔线区分；统一正文左右留白、段落行距、附件区域与图片自适应宽度。保留现有正文净化和远程图片显式加载策略，不能为模仿截图直接加载远程资源；富文本能力按现有安全渲染器实际支持范围验收。
+   - 补充验收：展开/收起详情、切换邮件、长收件人列表、无主题、附件/内嵌图、窄窗与中英文。该项纳入阶段一，与操作菜单和导航共用既有服务，不新增第二套邮件状态。
+
+阶段二：新增日常高价值能力
+- 统一收件箱、未读、有旗标等只读聚合视图；所有行必须携带账户+文件夹+UIDVALIDITY+UID，打开/操作必须路由回原账户，不依赖当前账户猜测。
+- 收藏排序和持久化、后台账户缓存计数；标明未知/过期状态，不能把未同步当成零。
+- 增加移动到垃圾邮件与复制到，基于明确的文件夹角色和协议能力。附件形式转发需要保留原始 MIME、正确生成 message/rfc822 并做回归。
+
+阶段三：独立评估，不以空菜单交付
+- OAuth、Exchange 原生接入；需逐提供商核实授权注册、协议和令牌生命周期。
+- 彩色旗标（标准 IMAP Flagged 只有布尔值，颜色需独立存储并明确同步范围）、提醒、会话静音、发件人屏蔽/分类和规则引擎。
+- 再次发送与代转分别定义语义和权限，不能简单复用普通转发。
+
+模块边界：
+- QML 负责视图、输入和状态展示，不直接连接邮箱。
+- 新的 MessageActionModel/组件统一菜单、工具栏和快捷键的命令描述，执行仍由 MailboxCommands、DraftService、SendService 负责。
+- ProviderProfiles 与 AccountSetup 状态机分别负责预设和接入流程，AccountSession 负责账户会话，凭据继续使用系统钥匙串。
+- MailboxNavigationModel 负责文件夹角色、分组、收藏和计数；聚合查询单独实现，不把遍历多账户和协议逻辑塞进 MailController/Main.qml。
+
+验收：
+- 先完成阶段一的三块界面及真实操作，再开展阶段二；每块提供合成数据预览，按用户反馈微调。
+- 覆盖窄/默认/宽窗口、中英文、明暗主题、空列表/长文本/多账户与错误状态；已确认的紧凑布局不退化。
+- 验证单邮件与多选的操作目标、跨账户路由、异步期间切换账户、重复提交和失败重试；无可用能力时不显示可执行的假入口。
+- 自动化、协议与图形回归在虚拟机完成；本机仅在用户已授权范围编译打开预览。账户写入/发送测试仅使用合成 loopback 数据，不操作真实邮箱。
+- 每阶段独立提交，记录结果和未验证项；不得以软件渲染检查代替真实合成器验收。
+
+
+## Inbox top separator · 2026-11-02
+
+- Suppressed the first message row top separator so it does not overlap the inbox header rule. Inter-row separators retain their existing appearance. VM UI regression passed in 11.21s; host build and guarded preview replacement succeeded.
+
+## Search spacing refinement · 2026-11-02
+
+- Increased search-to-traffic-light spacing from 5px to 10px for both icon and input. VM UI regression passed in 11.32s, with half-pixel layout-rounding tolerance. Host build and guarded preview replacement succeeded.
+
+## Search beside traffic lights · 2026-11-02
+
+- Removed cumulative toolbar/search trailing margins; search now ends at most 5px before the visible first traffic-light circle. Moved compact-search close action inside the input with reserved text padding so the input itself reaches this edge.
+- VM UI passed in 11.36s, covering icon/expanded/wide input at four widths. RowLayout pixel rounding makes the gap slightly under 5px; assertions enforce the requested maximum rather than exact fractional placement. Host build and guarded preview replacement succeeded.
+
+## Header layout and four-pixel offset · 2026-11-02
+
+- Set the control centre to 23.5px, 4px below its original position, and centre all titles/controls within a 47px header. List, reader, sidebar and dividers follow the header bottom. Replaced rounded centre anchors with exact centre expressions after VM assertions exposed a half-pixel mismatch.
+- VM UI regression passed in 10.44s, including title/control centre alignment and content geometry. Host build and guarded preview replacement succeeded.
+
+## Refined header offset · 2026-11-02
+
+- Reduced requested downward offset from 10px to 6px (4px upward from previous preview), retaining the common alignment. VM UI regression passed in 10.32s; host build and guarded preview replacement succeeded.
+
+## Header controls vertical offset · 2026-11-02
+
+- Moved traffic-light row down 10px. Existing shared center-line bindings move toolbar groups, search, filter, folder title and sidebar toggle together; header height remains 44px. Updated expected circle Y coordinate to 22.5px.
+- Host build and guarded preview replacement succeeded. VM UI regression passed in 10.59s.
+
+## Cooperative window controls · 2026-11-02
+
+- Added an app-owned optional platform adapter for the pinned Kos.Ui controls, using actual delegate rectangles and `WindowControlSlot`. Native takeover hides/disables fallback only after active acknowledgement; loss restores it. No reference project or dependency pin changed. Calendar placement and 22px client hit cells now match.
+- VM build and UI regression passed (10.44s), including exact circle coordinates, native-active simulation, restoration and missing-adapter fallback. No host validation performed.
+- Attempted real VM Wayland capture: no window-controls protocol appeared in the trace, bridge debug returned no diagnostics, and capture failed because the window was not exposed. Real compositor/GPU acceptance remains unverified; no desktop configuration was changed. The existing host preview still runs the previous binary.
+
+## Preserve inbox header during search · 2026-11-02
+
+- Removed search-state coupling from the message-list header visibility. Opening search only replaces reader-toolbar actions; the mailbox title and unread filter remain visible.
+- Added assertions for title/filter visibility during compact search. VM UI regression passed in 9.98s; host build and guarded single-instance preview replacement succeeded.
+
+## Consistent toolbar sizing and compact search · 2026-11-02
+
+- Unified filter, sidebar, action groups and search to the shared 28px toolbar height. Visible groups retain horizontal labels; operations that do not fit move to existing menu commands. Search/back controls no longer use stacked labels. Compact options retain a View route through More.
+- Compact search now exposes a visible input and close control; header actions give it room. Escape prioritizes active search over sidebar collapse. Updated geometry assertions and exercised compact typing/escape. Initial regressions exposed the old Escape priority; fixed without weakening the test.
+- VM UI/catalog checks passed 2/2 in 10.12s. Host build succeeded and old preview exited through guarded tray quit before replacement; single instance retained.
+
+## Top-only message separators · 2026-11-02
+
+- Moved each message separator to the top of its row, leaving no trailing line below the final message. Preserved horizontal insets, lighter opacity and selected-row treatment.
+- Host build and guarded single-instance preview replacement succeeded. VM UI regression passed in 9.67s.
+
+## Joined toolbar hover surfaces · 2026-11-02
+
+- Replaced independent capsule hover backgrounds inside toolbar groups with clipped segment highlights: rounded only at the two outside ends, square at internal boundaries, explicitly antialiased. Preserved the canonical shared liquid surface and keyboard focus ring. Rounded segment widths to whole pixels and disabled per-cell scaling.
+- VM UI/catalog regressions passed 2/2 in 9.87s. A temporary offscreen hover capture exercised first/middle/last segments; inspected the captured hover geometry (software rendering, not GPU acceptance). Initial capture harness lacked visible:true and incorrectly treated save() as returning a bool; corrected the harness and reran successfully.
+- Host build succeeded and the prior preview exited through guarded tray quit before replacement; single-instance preview retained.
+
+## Softer row edges · 2026-11-02
+
+- Reduced message selection/hover corner radius to 6px. Separators now render at half their existing theme opacity, preserving light/dark colors and horizontal insets.
+- Host build and guarded single-instance preview replacement succeeded. Final VM UI regression passed in 9.48s.
+
+## Compact inset message rows · 2026-11-02
+
+- Reduced message row height from 84 to 68 and vertical content padding to 7px, with a single elided summary line. Text and separators now have 24px left/right insets. Selection/hover surfaces have 8px horizontal insets and 8px corners; active white text is preserved.
+- VM UI and translation guards passed 2/2 in 9.40s; inspected the 1180×760 Chinese synthetic screenshot. Host build succeeded and the prior preview exited through the guarded tray menu before replacement.
+
+## Chinese/English localization · 2026-11-02
+
+- Added LanguageService with profile-scoped language preference, system default, English/zh_CN selection, embedded Qt catalogs, live QQmlEngine retranslation and optional installed Qt dialog catalogs. More exposes all three choices; --language supports isolated reviews. Demo preferences remain temporary.
+- Completed 353 entries in each catalog, covering QML, tray, account/draft/send status and application-owned protocol/storage errors. Restored extraction for SendService callbacks. Standard folders and dates follow the selected locale; user mail/custom server text is not translated. Already-generated operation messages can retain their original language until a new status update.
+- VM full seven-suite regression passed in 45.21s before the catalog guard/native-tray test extension; final i18n + source/catalog guard passed 2/2 in 0.15s, including live native tray-menu translation, QML retranslation and saved choice. There are now eight suites required by CI. English and Chinese 1180×760 synthetic screenshots were inspected; no GPU-material claim.
+- Host build succeeded and the prior preview exited through its guarded tray menu before opening the new Chinese preview. Single interactive instance retained; no real mailbox or reference project was used. No host automated tests.
+
+## Header alignment and spacing · 2026-11-02
+
+- Aligned the unread filter to the shared window-control/toolbar center instead of its independent 44px row. Reduced shell header height from 68 to 44, removing 24px of unused space above the list and bringing all panes upward together.
+- VM UI regression passed in 9.69s, including an explicit filter/toolbar center alignment assertion and updated header geometry checks. Inspected the 1180×760 synthetic screenshot. Host build succeeded; replaced the previous preview via guarded tray exit, retaining one instance.
+
+## Smaller default window · 2026-11-02
+
+- Reduced the initial window from 1280×820 to 1180×760, retaining the compact 189px sidebar and 280px message list. Saved user window sizes remain respected.
+- Host build succeeded; replaced the previous synthetic preview through guarded tray exit and opened at defaults. VM UI regression passed in 9.38s.
+
+## Compact initial message list · 2026-11-02
+
+- Reduced the message list default/reset width from 320 to 280; retained drag resizing, the 260 minimum and saved custom widths. Updated keyboard/reset geometry expectations.
+- Host build succeeded; previous preview exited through its guarded tray menu before replacement. VM UI regression passed in 9.43s.
+
+## Narrower navigation sidebar · 2026-11-02
+
+- Reduced the navigation sidebar default/reset width from 236 to 189 (approximately 20%) and its minimum from 190 to 152. Explicit saved custom widths remain respected; list/reader widths are unchanged.
+- Host build succeeded and the previous synthetic preview exited via its guarded tray menu before replacement. VM UI regression passed in 9.49s, including updated drag and geometry expectations.
+
+## Active message contrast · 2026-11-02
+
+- Current message rows now use solid accent blue with white sender, subject, preview, date, unread marker and status icons. Thread badges use a translucent white surface; inactive and multi-selection styles are preserved.
+- VM UI regression passed in 9.39s and the synthetic screenshot was inspected. Host build succeeded; the prior preview exited through its guarded tray menu before the replacement opened, preserving one interactive instance.
+
+## Desktop single-instance correction · 2026-11-02
+
+- Root cause: only data-directory locking existed; each interactive demo used a fresh temporary directory and therefore could create another window/tray. Added an independent SingleInstance D-Bus service before storage/controller/tray construction. Repeated interactive starts activate the existing window and exit, regardless of demo/profile arguments. Profile locking remains. Screenshot exports stay isolated with no tray.
+- VM process/tray regression passed **2/2 in 9.83s**, covering normal/profile relaunch, demo relaunch, ownership release/restart and screenshot export alongside a running demo. Tests run on a private session bus; CI explicitly installs D-Bus tools. Host build succeeded.
+- Removed only the duplicate synthetic host previews started in this chat and replaced the final old preview with the corrected binary. Read-only host process/watcher inspection confirmed **one NkMail process and one registered tray item**. Runtime log was empty. No real mailbox was accessed.
+
+## Remove permanent bottom bar · 2026-11-02
+
+- Removed the entire status strip and extended sidebar, content and column dividers to the window bottom. Theme switching moved to More. Errors, blocked-exit notices and active live-account work use an on-demand floating notice without reserving footer space.
+- Host build and synthetic preview launch succeeded. VM UI regression passed in 9.40s; geometry checks now assert full-height panes/dividers and absence of statusStrip. Corrected one stale status.y test reference found on the first run.
+
+## Quiet preview status · 2026-11-02
+
+- Removed the permanent Demo/synthetic-mail status caption and its idle dot from the preview footer. Lifecycle notices and errors remain visible; normal account status behavior is unchanged. Preview mode still uses synthetic data and disables sending.
+- Host build and preview launch succeeded; VM UI regression passed in 9.54s.
+
+## Shared sidebar glyph and compose placement · 2026-11-02
+
+- Replaced panelLeft with canonical KosSidebarToggle (rounded outline and filled inset pane, as used by Weather/Calendar), retaining the liquid background. Removed the sidebar-header compose button; main-toolbar compose remains. Recorded the user preference in AGENTS.md.
+- Host build succeeded and synthetic preview opened. VM UI regression passed in 9.52s, including pointer activation of the remaining compose action and absence of the removed sidebar button. Initial test lookup of a Repeater delegate returned null; corrected the test to click its stable group coordinates, without bypassing pointer handling.
+
+## Icon-only view toggles · 2026-11-02
+
+- Changed the unread filter and sidebar toggle to compact icon-only liquid buttons. Kept accessible names, hover hints, filter selection state and existing actions.
+- Host build succeeded and a new synthetic preview was opened. VM UI regression passed in 9.62s; no host automated tests.
+
+## Grouped inline liquid toolbar · 2026-11-02
+
+- Reduced labels from 12px to 11px and icons from 15px to 14px. Each action group now shares one canonical liquid surface, with transparent interactive cells and subtle short separators; horizontal labels, shortcuts/tooltips and action routing are preserved.
+- Host build succeeded and the updated synthetic preview was opened. VM UI regression passed in 9.85s; inspected the 1600px software preview for grouping/layout (not GPU material acceptance).
+
+## Restore inline liquid controls · 2026-11-02
+
+- Restored canonical LiquidActionButton glass material, capsule geometry and theme ink for inline toolbar actions. Each group now receives the shell backdrop and material preference; horizontal icon/label layout remains unchanged. No shared dependency source was changed.
+- Host build succeeded and a new synthetic preview was opened. VM UI regression passed in 9.32s. No host automated tests or real-mail access.
+
+## Inline toolbar refinement · 2026-11-02
+
+- Replaced stacked capsule groups with a mail-specific horizontal composition of canonical Kos.Ui buttons: 15px icons, 12px labels, 30px hit targets, hover surfaces and group whitespace. Narrow layouts retain icons and accessible tooltips. Shared dependency sources remain untouched.
+- Fixed compact More action routing while preserving action indices and object names. VM UI regression passed in 9.46s; inspected a 1600px software-rendered synthetic preview. Host preview build uses the previously authorized local preview workflow; automated tests remain VM-only.
+
+## System-tray persistence · 2026-11-02
+
+- User explicitly authorized implementing systray persistence, compiling and opening NkMail on the host for this task. Automated regressions remain VM-only; reference projects are untouched.
+- Added independent TrayService lifecycle policy and native TrayBackend implementation. Window close saves the draft and hides into the tray; activation restores; menu/Ctrl+Q exits through a draft/send guard. Missing/disappearing tray hosts cannot strand a hidden client. No login autostart was added.
+- Default pinned-source Debug builds succeeded on host and VM. VM CTest passed **6/6 in 39.61s**, including new tray lifecycle tests and QML close/send/draft protection regressions. No real account or mailbox writes were used.
+- Opened host `build/host-tray/nkmail --demo --appearance=light`; process remained running and its StatusNotifierItem was registered with the desktop watcher. Runtime log was empty. Host automated tests were not run.
+- The prior modularity commit fb2749c was published to PR #5; main remains protected and unmerged.
+
 ## Modularity implementation · 2026-11-02
 
 - Authorized scope: repair the review findings and split maintainable feature modules. Branch `codex/modular-mail-services`; all builds, execution and tests are restricted to the designated VM. No real account, external SMTP, reference-project modifications, main push or dependency upgrade.
@@ -90,3 +282,9 @@ The user rejected the previous shell presentation. The current uncommitted itera
 First runnable milestone published. Second workflow/window milestone published as `d5d5b7d46cfa3a6435a283b0b1b3c505d747abbe`, including two further reviewed synthetic screenshots. Final committed code verified in **Debug: 5/5 CTest passed, 27.96 seconds** and **Release: 5/5 passed, 27.92 seconds**. Coverage: core 16 / controller 23 / UI 14 pass (Qt tests include init/cleanup), CLI 3 process cases, protocol 32 loopback scenarios. Working tree was clean after publication; no real mailbox data or credentials were included.
 
 The scoped local implementation is substantially complete, but real-provider read-only verification is blocked at an unidentified authenticated phase. Do not report the whole first release or real-account compatibility complete. Next useful work is credential-free phase diagnostics and controlled resolution with account-owner input, not repeated password attempts or arbitrary UI expansion.
+
+## Sidebar heading review · 2026-11-02
+
+- Reduced the sidebar Mail heading from 24px Bold to 15px DemiBold; aligned it with the existing top-row controls and reserved space for the shared sidebar toggle. No dependency or mail behavior changes.
+- Fresh default pinned-source VM build succeeded. VM CTest `nkmail_ui`, `nkmail_i18n`, and `nkmail_translations`: 3/3 passed. Actual synthetic X11/GPU screenshots inspected at 1240px light/Chinese and dark/English, plus 900px Chinese. No heading/control overlap observed. Nested Wayland screenshot attempts returned “Preview window is not exposed”; Wayland visual acceptance is not claimed. No real mailbox was accessed.
+- Rebuilt the existing host `build-clean/nkmail` entry without launching it or running tests. Its existing sibling Kos.Ui development override was preserved; default-source validation refers to the separate VM build. No commit, publication or dependency upgrade performed.

@@ -16,10 +16,53 @@ daemon. Server acceptance is not delivery; uncertain sends remain non-resendable
 
 Mailio is a protocol/MIME library, not a complete application backend. NkMail supplies the application state, cache, credentials, UI and workflows. The vendored dependency includes the documented [TLS verification and PEEK patch](patches/mailio/0001-verified-tls-peek-timeouts.patch); its loopback acceptance tests do not by themselves prove real-provider compatibility.
 
+## Languages
+
+Simplified Chinese and English are included. The interface follows the system language
+by default (Chinese → Simplified Chinese, other languages → English). Choose **More →
+Language: follow system / 简体中文 / English** to switch without restarting. The selection
+is saved in the profile's `language.ini`; isolated demo/screenshot runs keep temporary
+preferences and do not modify your real profile. `--language=system|zh_CN|en` selects a
+language at startup. A second interactive launch activates the existing instance rather
+than changing its language; use its menu to switch.
+
+LanguageService owns loading and preference persistence, QML retranslation and date
+locale are wired by the application, and the tray updates on LanguageChange. Each shipped
+catalog contains complete UI and application diagnostic translations. Mail contents,
+custom server folder names and raw system/provider diagnostics retain their original text.
+Existing operation messages may keep the language in which they were generated until
+the next status update. Standard Qt dialogs use the installed Qt translation package.
+
+Update catalogs with `lupdate src qml -no-obsolete -ts translations/nkmail_zh_CN.ts
+translations/nkmail_en.ts` (Qt's binary directory may need adding to PATH), then translate
+new entries in both files. CMake compiles and embeds the QM files. The catalog gate checks
+source coverage, finished entries and matching placeholders; never hand-edit generated QM files.
+
+## Single instance
+
+Interactive NkMail windows share one instance per desktop D-Bus session, including
+`--demo`. Launching again restores the existing window (also when hidden in the tray)
+and exits successfully, before opening any new data directory. A different `--data-dir`
+does not create another interactive instance; exit the running client before switching
+profiles or between demo and normal mode. Mailbox locking remains a separate storage
+safeguard. Screenshot exports bypass desktop ownership and never create a tray icon.
+An unavailable session bus is reported as a startup error rather than allowing duplicates.
+
+## System tray
+
+Closing the window saves the open draft and hides NkMail in the system tray; background
+work continues. Click the tray icon or choose **显示 NkMail** to restore it. Choose
+**退出 NkMail** or press Ctrl+Q to exit. Explicit exit is blocked while a send is pending
+or in progress, or when the current draft cannot be saved. Without a supported tray,
+closing exits normally with the same protections. If the tray host disappears while
+NkMail is hidden, the window is restored. Screenshot mode does not create a tray icon.
+This does not install login autostart or a separate background daemon.
+
 ## Module boundaries
 
 | Module | Owns | Must not own |
 | --- | --- | --- |
+| `TrayService` / `TrayBackend` | Window visibility, guarded exit, tray-host availability / native icon and menu | Mail protocols, draft persistence or send state |
 | `MailController` | QML facade, active view generation, result presentation | Protocol calls, SMTP state machine, HTTP downloads |
 | `AccountSession` | Profile/account credential keys, session secrets, asynchronous credential resolution | Mailbox/cache contents |
 | `MailboxSync` | Serial read-operation scheduling, typed results on the GUI thread | Current QML selection or cache writes |
@@ -49,7 +92,8 @@ one shared mutable controller across multiple implementation files.
 ## Dependencies
 
 - CMake 3.30+, C++20 compiler, Ninja (optional)
-- Qt 6.8+: Core, Gui, Qml, Quick, QuickControls2, QuickDialogs2, Network, Concurrent, Sql; QtTest/QuickTest for testing
+- Qt 6.8+: Core, Gui, Widgets, Qml, Quick, QuickControls2, QuickDialogs2, Network, Concurrent, Sql, LinguistTools; QtTest/QuickTest for testing
+- Qt translation catalogs (for standard dialogs, e.g. `qt6-translations` on Arch)
 - Qt graphical-effects compatibility module and SVG support as required by Kos.Ui
 - QtKeychain for Qt 6; system Secret Service or equivalent
 - Boost development files (`date_time`, `regex`) and OpenSSL
@@ -168,7 +212,7 @@ Screenshot export is intentionally blocked outside synthetic preview mode. Publi
 
 ## Regression tests (virtual machine only)
 
-Tests additionally require Qt Test / QuickTest, Python 3 and the `openssl` executable (for short-lived loopback certificates). They do not need a real account. Core/controller tests use temporary data directories; protocol services bind only `127.0.0.1`; UI tests run offscreen with synthetic state.
+Tests additionally require Qt Test / QuickTest, Python 3, `dbus-daemon`, `dbus-send` and the `openssl` executable (for short-lived loopback certificates). They do not need a real account. Core/controller tests use temporary data directories; protocol services bind only `127.0.0.1`; UI tests run offscreen with synthetic state.
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DNKMAIL_BUILD_TESTS=ON
@@ -193,3 +237,17 @@ Do not use a primary personal mailbox until the documented protocol and TLS acce
 ## License
 
 GPL-3.0-or-later for NkMail. See LICENSE and NOTICE.md. Third-party components retain their own licenses.
+
+### Cooperative window controls
+
+`MailWindowControls.qml` adapts the pinned Kos.Ui controls to the optional installed
+`Kos.SurfaceShape.WindowControlSlot` platform module. It sends the actual delegate
+circle rectangles, preserves layout, and hides/disables client controls only while
+the adapter reports compositor takeover. Missing modules/protocol support retain
+client drawing; no Wayland dependency is added to Kos.Ui. The compatibility mapping
+uses the pinned component's action object names and is covered by UI regression tests.
+Calendar geometry is used: 14px circles in 22px button cells, 6px spacing, with the
+row 10.5px from the right and 12.5px from the top (4px below Calendar), centred in a 47px header. Native takeover requires the v2
+NextKde window-controls protocol and enabled KOS window appearance. The older pinned
+fallback keeps its existing hover-glyph preference; global fallback glyph preference
+integration awaits a tested canonical UI release exposing that property.

@@ -33,7 +33,7 @@ Item {
 
     objectName: "readerHeader"
     readonly property real leadingInset: readerHeader.narrow && !readerHeader.sidebarVisible ? 48 : 14
-    readonly property real trailingEdge: Math.floor(Math.min(width - 14, readerHeader.controlsLeft - 12))
+    readonly property real trailingEdge: Math.min(width, readerHeader.controlsLeft) - 10
     readonly property real rowWidth: Math.max(0, trailingEdge - leadingInset)
     readonly property real titleWidth: 0
     readonly property real actionLeft: leadingInset + titleWidth + (titleWidth > 0 ? 8 : 0)
@@ -46,9 +46,15 @@ Item {
     readonly property bool fullReplyGroup: messageActions && actionWidth >= baselineWidth + 146
     readonly property bool directDetails: messageActions && actionWidth >= baselineWidth + 180
     readonly property bool directFilter: !readerHeader.draftsVisible && actionWidth >= baselineWidth + 60 + (messageActions ? 120 : 0) + 34
-    readonly property bool searching: false
+    readonly property bool searching: searchOpen && !wideSearch
+    readonly property bool compactOptions: actionWidth < 240
+    readonly property bool extendedOptions: windowWidth >= 1180
+    readonly property bool messageOpsVisible: messageOpsGroup.visible
+    readonly property real searchReservation: (wideSearch ? 160 : MailStyle.toolbarButtonHeight) + 8
+    readonly property real baseActionsWidth: (mailboxActions.visible ? mailboxActions.implicitWidth + 14 : 0)
+        + messageOptionsGroup.implicitWidth + 14 + searchReservation
     // 宽度够就把搜索做成常显输入框，不够就退化成搜索按钮
-    readonly property bool wideSearch: readerHeader.windowWidth >= 1180
+    readonly property bool wideSearch: readerHeader.windowWidth >= 1320
     property bool searchOpen: false
     onCompactActionsChanged: {
         if (readerHeader.focusWithin(mailboxActions)) readerHeader.forceActiveFocus()
@@ -59,13 +65,13 @@ Item {
     }
     function openSearch() {
         readerHeader.searchRequested()
-        toolbarSearch.active = true
+        readerHeader.searchOpen = true
         searchFocus.restart()
     }
     function closeSearch() {
         searchFocus.stop()
         searchDelay.stop()
-        toolbarSearch.active = false
+        readerHeader.searchOpen = false
         searchField.text = ""
         mail.search = ""
         searchField.focus = false
@@ -79,61 +85,59 @@ Item {
             Layout.rightMargin: 8
             objectName: "readerBackButton"
             visible: readerHeader.backVisible && !readerHeader.searching
-            stacked: true; stackedText: qsTr("返回"); iconName: "back"; accessibleText: qsTr("Back to messages")
+            iconOnly: true; iconName: "back"; accessibleText: qsTr("Back to messages")
             floatingAction: true; shellBackdrop: readerHeader.backdrop
             onClicked: readerHeader.backRequested()
         }
-        LiquidActionButtonGroup {
+        MailToolbarGroup {
+            backdrop: readerHeader.backdrop
+            materialForm: !readerHeader.liquidControls
             id: mailboxActions
-            Layout.rightMargin: 8
+            Layout.rightMargin: 14
+            showLabels: true
             objectName: "mailboxActionGroup"
-            stacked: true
             visible: !readerHeader.compactActions && !readerHeader.searching && readerHeader.windowWidth >= 1180
-            buttonSize: MailStyle.toolbarButtonHeight
             icons: ["refreshRounded", "editRounded"]
             labels: [qsTr("收取"), qsTr("撰写")]
             objectNames: ["refreshButton", "headerComposeButton"]
             enabledActions: [!mail.busy && !readerHeader.draftsVisible && (mail.configured || mail.demo), mail.configured || mail.demo]
-            backdrop: readerHeader.backdrop
-            materialForm: !readerHeader.liquidControls
             onTriggered: index => {
                 if (index === 0) mail.refresh()
                 else readerHeader.composeRequested("new")
             }
         }
-        LiquidActionButtonGroup {
+        MailToolbarGroup {
+            backdrop: readerHeader.backdrop
+            materialForm: !readerHeader.liquidControls
             id: messageOpsGroup
+            showLabels: true
             objectName: "messageOpsGroup"
-            Layout.rightMargin: 8
-            visible: !readerHeader.draftsVisible && readerHeader.windowWidth >= 1100 && readerHeader.selection.selectionSize === 0
-            stacked: true
-            buttonSize: 38
+            Layout.rightMargin: 14
+            visible: !readerHeader.draftsVisible && !readerHeader.searching && readerHeader.windowWidth >= 1100 && readerHeader.selection.selectionSize === 0
+                && readerHeader.actionWidth >= readerHeader.baseActionsWidth + implicitWidth + 14
             icons: ["trash", "archive", "flag"]
             labels: [qsTr("删除"), qsTr("归档"), qsTr("旗标")]
             enabledActions: [readerHeader.hasMessage, readerHeader.hasMessage, readerHeader.hasMessage]
-            backdrop: readerHeader.backdrop
-            materialForm: !readerHeader.liquidControls
             onTriggered: index => {
                 readerHeader.messageCommandRequested(index)
             }
         }
         Text {
             objectName: "selectionCountLabel"
-            visible: readerHeader.selection.selectionSize > 0
+            visible: readerHeader.selection.selectionSize > 0 && !readerHeader.searching
             text: qsTr("%1 selected").arg(readerHeader.selection.selectionSize)
             color: readerHeader.muted; font.pixelSize: 11
             Layout.alignment: Qt.AlignVCenter
         }
-        LiquidActionButtonGroup {
-            id: selectionOpsGroup
-            objectName: "selectionOpsGroup"
-            stacked: true
-            buttonSize: 38
-            visible: !readerHeader.draftsVisible && readerHeader.selection.selectionSize > 0
-            icons: ["envelope", "flag", "archive", "trash", "folder"]
-            labels: [qsTr("已读"), qsTr("旗标"), qsTr("归档"), qsTr("删除"), qsTr("移动")]
+        MailToolbarGroup {
             backdrop: readerHeader.backdrop
             materialForm: !readerHeader.liquidControls
+            id: selectionOpsGroup
+            showLabels: true
+            objectName: "selectionOpsGroup"
+            visible: !readerHeader.draftsVisible && !readerHeader.searching && readerHeader.selection.selectionSize > 0
+            icons: ["envelope", "flag", "archive", "trash", "folder"]
+            labels: [qsTr("已读"), qsTr("旗标"), qsTr("归档"), qsTr("删除"), qsTr("移动")]
             onTriggered: index => {
                 if (index === 0) mail.setMessagesRead(readerHeader.selection.selectedIndexList(), true)
                 else if (index === 1) mail.setMessagesFlagged(readerHeader.selection.selectedIndexList(), true)
@@ -165,38 +169,39 @@ Item {
                 }
             }
         }
-        LiquidActionButtonGroup {
+        MailToolbarGroup {
+            backdrop: readerHeader.backdrop
+            materialForm: !readerHeader.liquidControls
             id: replyActions
-            Layout.rightMargin: 8
+            Layout.rightMargin: 14
+            showLabels: true
             objectName: "replyActionGroup"
-            stacked: true
             visible: readerHeader.showReplyGroup && !readerHeader.searching && readerHeader.windowWidth >= 1480
-            buttonSize: MailStyle.toolbarButtonHeight
+                && readerHeader.actionWidth >= readerHeader.baseActionsWidth
+                    + (messageOpsGroup.visible ? messageOpsGroup.implicitWidth + 14 : 0) + implicitWidth + 14
             icons: readerHeader.fullReplyGroup ? ["undo", "arrows", "forward"] : ["undo", "forward"]
             labels: readerHeader.fullReplyGroup ? [qsTr("回复"), qsTr("全部回复"), qsTr("转发")] : [qsTr("回复"), qsTr("转发")]
             objectNames: readerHeader.fullReplyGroup ? ["replyButton", "replyAllButton", "forwardButton"] : ["replyButton", "forwardButton"]
             enabledActions: [readerHeader.hasMessage && !mail.sending, readerHeader.hasMessage && !mail.sending, readerHeader.hasMessage && !mail.sending]
-            backdrop: readerHeader.backdrop
-            materialForm: !readerHeader.liquidControls
             onTriggered: index => readerHeader.composeRequested(readerHeader.fullReplyGroup ? ["reply", "replyAll", "forward"][index] : ["reply", "forward"][index])
             onVisibleChanged: { if (!visible && readerHeader.focusWithin(replyActions)) readerHeader.forceActiveFocus() }
         }
-        LiquidActionButtonGroup {
-            id: messageOptionsGroup
-            objectName: "messageOptionsGroup"
-            Layout.rightMargin: 8
-            visible: !readerHeader.draftsVisible
-            stacked: true
-            buttonSize: 38
-            icons: readerHeader.wideSearch ? ["sliders", "info", "more"] : ["sliders", "more"]
-            labels: readerHeader.wideSearch ? [qsTr("显示"), qsTr("详情"), qsTr("更多")] : [qsTr("显示"), qsTr("更多")]
-            objectNames: readerHeader.wideSearch ? ["listOptionsButton", "detailsButton", "moreButton"] : ["listOptionsButton", "moreButton"]
-            enabledActions: [true, readerHeader.hasMessage, readerHeader.hasMessage]
+        MailToolbarGroup {
             backdrop: readerHeader.backdrop
             materialForm: !readerHeader.liquidControls
+            id: messageOptionsGroup
+            showLabels: true
+            objectName: "messageOptionsGroup"
+            Layout.rightMargin: 14
+            visible: !readerHeader.draftsVisible && !readerHeader.searching
+            icons: readerHeader.compactOptions ? ["more"] : readerHeader.extendedOptions ? ["sliders", "info", "more"] : ["sliders", "more"]
+            labels: readerHeader.compactOptions ? [qsTr("更多")] : readerHeader.extendedOptions ? [qsTr("显示"), qsTr("详情"), qsTr("更多")] : [qsTr("显示"), qsTr("更多")]
+            objectNames: readerHeader.compactOptions ? ["moreButton"] : readerHeader.extendedOptions ? ["listOptionsButton", "detailsButton", "moreButton"] : ["listOptionsButton", "moreButton"]
+            enabledActions: readerHeader.compactOptions ? [true] : readerHeader.extendedOptions ? [true, readerHeader.hasMessage, true] : [true, true]
             onTriggered: index => {
-                if (index === 0) readerHeader.optionsRequested()
-                else if (index === 1) readerHeader.detailsRequested()
+                if (readerHeader.compactOptions) readerHeader.moreRequested()
+                else if (index === 0) readerHeader.optionsRequested()
+                else if (readerHeader.extendedOptions && index === 1) readerHeader.detailsRequested()
                 else readerHeader.moreRequested()
             }
         }
@@ -208,15 +213,16 @@ Item {
         Item {
             id: toolbarSearch
             objectName: "toolbarSearch"
-            property bool active: true
-            readonly property real wanted: 216
+            readonly property bool active: readerHeader.searchOpen || searchField.activeFocus
+            readonly property real wanted: 160
             readonly property bool shown: !readerHeader.draftsVisible
                 && (readerHeader.wideSearch || readerHeader.searchOpen)
-                && readerHeader.windowWidth >= 1320
+
             Layout.preferredWidth: shown ? wanted : 0
+            Layout.fillWidth: readerHeader.searching
             Layout.minimumWidth: 0
             Layout.fillHeight: true
-            Layout.rightMargin: shown ? 8 : 0
+            Layout.rightMargin: 0
             visible: shown
                 clip: true
                 LiquidTextField {
@@ -230,6 +236,7 @@ Item {
                     liquidIntensity: "light"
                     backdrop: readerHeader.backdrop
                     leftPadding: 30
+                    rightPadding: readerHeader.searching ? 36 : 10
                     placeholderText: qsTr("Search cached mail")
                     Accessible.name: placeholderText
                     text: mail.search
@@ -251,19 +258,30 @@ Item {
                             readerHeader.searchOpen = false
                     }
                 }
+                MailAction {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    objectName: "closeSearchButton"
+                    visible: readerHeader.searching
+                    iconOnly: true; iconName: "close"; iconSize: 14
+                    accessibleText: qsTr("Close search")
+                    floatingAction: true; shellBackdrop: readerHeader.backdrop
+                    onClicked: readerHeader.closeSearch()
+                }
             }
         MailAction {
             objectName: "searchToggleButton"
-            Layout.rightMargin: 8
+            Layout.rightMargin: 0
             visible: !readerHeader.wideSearch && !readerHeader.searchOpen && !readerHeader.draftsVisible
-            stacked: true
-            stackedText: qsTr("搜索")
+            iconOnly: true
             iconName: "search"
+            iconSize: 14
             accessibleText: qsTr("Search cached mail")
             floatingAction: true; shellBackdrop: readerHeader.backdrop
-            onClicked: { readerHeader.searchOpen = true; searchField.focus = true }
+            onClicked: readerHeader.openSearch()
         }
-                        }
+
+    }
     Timer {
         id: searchFocus
         interval: AppTheme.reduceMotion ? 0 : AppTheme.motionFast + 50

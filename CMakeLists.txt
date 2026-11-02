@@ -3,7 +3,7 @@ project(NkMail VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 QuickDialogs2 Sql Concurrent Network DBus)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 QuickDialogs2 Sql Concurrent Network DBus Widgets LinguistTools)
 find_package(Qt6Keychain REQUIRED)
 qt_standard_project_setup(REQUIRES 6.8)
 set(NKMAIL_UI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nextkdeAppDemo" CACHE PATH "Pinned nextkdeAppDemo source directory (override for local development)")
@@ -30,13 +30,21 @@ add_library(nkmail_core STATIC
 target_include_directories(nkmail_core PUBLIC src)
 target_link_libraries(nkmail_core PUBLIC Qt6::Core Qt6::Gui Qt6::Sql Qt6Keychain::Qt6Keychain mailio)
 include(cmake/NkMailServices.cmake)
-qt_add_executable(nkmail ${NKMAIL_SERVICE_SOURCES} src/main.cpp src/MailController.cpp src/MailController.h src/NotificationService.cpp src/NotificationService.h src/RichTextEditor.cpp src/RichTextEditor.h)
+qt_add_executable(nkmail ${NKMAIL_SERVICE_SOURCES} src/platform/TrayService.cpp src/platform/TrayService.h src/platform/SystemTray.cpp src/platform/SingleInstance.cpp src/platform/SingleInstance.h src/platform/LanguageService.cpp src/platform/LanguageService.h src/main.cpp src/MailController.cpp src/MailController.h src/NotificationService.cpp src/NotificationService.h src/RichTextEditor.cpp src/RichTextEditor.h)
+qt_add_lrelease(nkmail
+    TS_FILES translations/nkmail_zh_CN.ts translations/nkmail_en.ts
+    QM_FILES_OUTPUT_VARIABLE NKMAIL_QM_FILES)
+qt_add_resources(nkmail nkmail_translations PREFIX "/i18n"
+    BASE "${CMAKE_CURRENT_BINARY_DIR}" FILES ${NKMAIL_QM_FILES})
+qt_add_resources(nkmail nkmail_icons PREFIX "/" FILES data/nkmail.svg)
+qt_add_resources(nkmail nkmail_window_controls PREFIX "/nkmail/platform"
+    BASE qml FILES qml/NativeWindowControls.qml)
 set_source_files_properties(qml/MailLabels.qml qml/MailStyle.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(nkmail
     URI NextKde.Mail VERSION 1.0 RESOURCE_PREFIX /qt/qml
-    QML_FILES qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/Main.qml qml/WindowChrome.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
+    QML_FILES qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/Main.qml qml/WindowChrome.qml qml/MailWindowControls.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
 target_link_libraries(nkmail PRIVATE nkmail_core Kos::Ui Kos::UiPlugin
-    Qt6::Quick Qt6::QuickControls2 Qt6::QuickDialogs2 Qt6::Concurrent Qt6::Network Qt6::DBus)
+    Qt6::Quick Qt6::QuickControls2 Qt6::QuickDialogs2 Qt6::Concurrent Qt6::Network Qt6::DBus Qt6::Widgets)
 target_compile_definitions(nkmail PRIVATE NKMAIL_VERSION="${PROJECT_VERSION}")
 install(TARGETS nkmail RUNTIME DESTINATION bin)
 install(FILES data/nkmail.desktop DESTINATION share/applications)
@@ -44,6 +52,9 @@ install(FILES data/nkmail.svg DESTINATION share/icons/hicolor/scalable/apps)
 option(NKMAIL_BUILD_TESTS "Build isolated local regression tests" OFF)
 if(NKMAIL_BUILD_TESTS)
     enable_testing()
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_subdirectory(tests/i18n)
+    add_subdirectory(tests/tray)
     add_subdirectory(tests/core)
     add_subdirectory(tests/controller)
     add_subdirectory(tests/protocol)
@@ -54,7 +65,9 @@ if(NKMAIL_BUILD_TESTS)
     qt_add_executable(nkmail_ui_tests tests/ui/main.cpp src/RichTextEditor.cpp src/RichTextEditor.h)
     qt_add_qml_module(nkmail_ui_tests
         URI NextKde.Mail.TestViews VERSION 1.0 RESOURCE_PREFIX /qt/qml
-        QML_FILES qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/Main.qml qml/WindowChrome.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
+        QML_FILES qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/Main.qml qml/WindowChrome.qml qml/MailWindowControls.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
+    qt_add_resources(nkmail_ui_tests nkmail_test_window_controls PREFIX "/nkmail/platform"
+        BASE qml FILES qml/NativeWindowControls.qml)
     target_compile_definitions(nkmail_ui_tests PRIVATE QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/ui")
     target_link_libraries(nkmail_ui_tests PRIVATE Qt6::QuickTest Qt6::QuickControls2 Qt6::QuickDialogs2 Kos::Ui Kos::UiPlugin)
     add_test(NAME nkmail_ui COMMAND nkmail_ui_tests -input "${CMAKE_CURRENT_SOURCE_DIR}/tests/ui")

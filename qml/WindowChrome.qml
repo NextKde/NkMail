@@ -11,7 +11,8 @@ Item {
     height: MailStyle.shellHeaderHeight
     readonly property real controlsReservedWidth: controls.width + 29
     readonly property real controlsCenterY: controls.y + controls.height / 2
-    readonly property real controlsLeft: controls.x
+    // Visible circle edge, excluding the larger click target.
+    readonly property real controlsLeft: controls.x + (controls.buttonWidth - controls.circleSize) / 2
 
     MouseArea {
         id: moveArea
@@ -40,18 +41,17 @@ Item {
         }
     }
 
-    KosWindowControls {
+    MailWindowControls {
         id: controls
         objectName: "windowControls"
         targetWindow: chrome.targetWindow
         maximizeMode: true
         circleSize: 14
-        buttonWidth: 14
-        buttonHeight: 14
-        spacing: 14
+        buttonWidth: 22
+        buttonHeight: 22
+        spacing: 6
         anchors.right: parent.right
-        anchors.rightMargin: 14.5
-        anchors.top: parent.top
-        anchors.topMargin: 10.5
+        anchors.rightMargin: 10.5
+        y: (parent.height - height) / 2
     }
 }

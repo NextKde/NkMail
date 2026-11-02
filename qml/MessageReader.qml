@@ -5,6 +5,7 @@ import Kos.Ui
 
 Rectangle {
     id: root
+    property string localeName: Qt.locale().name
     required property var mail
     property var message: ({})
     property bool hasMessage: false
@@ -84,7 +85,7 @@ Rectangle {
                                     model: [ {title: qsTr("From"), value: MailLabels.value(root.message, "senderAddress")},
                                         {title: qsTr("To"), value: MailLabels.value(root.message, "to")},
                                         {title: qsTr("Cc"), value: MailLabels.value(root.message, "cc")},
-                                        {title: qsTr("Date"), value: MailLabels.dateLabel(root.message.date)},
+                                        {title: qsTr("Date"), value: MailLabels.dateLabel(root.message.date, root.localeName)},
                                         {title: qsTr("Message ID"), value: MailLabels.value(root.message, "messageId")} ]
                                     delegate: ColumnLayout {
                                         id: detailsEntry
@@ -123,7 +124,7 @@ Rectangle {
                             Text { text: qsTr("To: ") + MailLabels.value(root.message, "to"); color: root.muted; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
                         }
                     }
-                    Text { text: MailLabels.dateLabel(root.message.date); color: root.muted; font.pixelSize: 11; Layout.fillWidth: true }
+                    Text { text: MailLabels.dateLabel(root.message.date, root.localeName); color: root.muted; font.pixelSize: 11; Layout.fillWidth: true }
                     Rectangle { Layout.fillWidth: true; height: 1; color: root.rule; Layout.topMargin: 4; Layout.bottomMargin: 6 }
                     RowLayout {
                         objectName: "blockedImagesBar"

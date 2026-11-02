@@ -8,9 +8,12 @@ import Kos.Ui
 ApplicationWindow {
     id: window
     required property var mail
+    property var desktop: null
+    property var i18n: null
+    property string lifecycleNotice: ""
     objectName: "mailWindow"
-    width: 1280
-    height: 820
+    width: 1180
+    height: 760
     minimumWidth: 900
     minimumHeight: 520
     visible: true
@@ -67,9 +70,9 @@ ApplicationWindow {
     }
     // Preferred widths survive temporary narrow layouts; actual widths always
     // leave space for the reader and never squeeze the list below its minimum.
-    property int sidebarPreferredWidth: 236
-    property int listPreferredWidth: 320
-    readonly property int sidebarWidth: Math.max(190, Math.min(340, sidebarPreferredWidth,
+    property int sidebarPreferredWidth: 189
+    property int listPreferredWidth: 280
+    readonly property int sidebarWidth: Math.max(152, Math.min(340, sidebarPreferredWidth,
         width - (narrow ? 260 : 560)))
     readonly property int listWidth: Math.max(260, Math.min(520, listPreferredWidth,
         width - (sidebarVisible ? sidebarWidth : 0) - 300))
@@ -139,14 +142,34 @@ ApplicationWindow {
         if (typeof reviewAppearance !== "undefined" && (reviewAppearance === "light" || reviewAppearance === "dark"))
             AppTheme.appearanceMode = reviewAppearance
     }
+    function prepareForQuit() {
+        if (mail.sending || mail.sendPending) {
+            lifecycleNotice = qsTr("邮件正在发送或等待发送，请等待完成或撤销发送后再退出。")
+            return false
+        }
+        if (composer.visible && !composer.persist()) {
+            composer.forceActiveFocus()
+            return false
+        }
+        lifecycleNotice = ""
+        return true
+    }
     onClosing: close => {
-        if (composer.visible && (mail.sending || !composer.persist())) {
+        if (composer.visible && !composer.persist()) {
             close.accepted = false
             composer.forceActiveFocus()
+            return
         }
+        if (desktop && desktop.hideToTray()) {
+            close.accepted = false
+            return
+        }
+        close.accepted = window.prepareForQuit()
     }
     Connections {
         target: mail
+        function onStatusChanged() { if (!mail.sending && !mail.sendPending) window.lifecycleNotice = "" }
+        function onSendPendingChanged() { if (!mail.sending && !mail.sendPending) window.lifecycleNotice = "" }
         function onSelectionChanged() { if (window.narrow && window.hasMessage) window.readerVisible = true }
         function onFolderChanged() { window.clearSelection() }
         function onAccountChanged() {
@@ -242,21 +265,16 @@ ApplicationWindow {
                 width: sidebarPlane.width
                 height: parent.height
                 Text {
-                    x: 14; y: 4
-                    width: parent.width - 28; height: 26
-                    text: qsTr("Mail"); font.pixelSize: 24; font.weight: Font.Bold
+                    objectName: "mailTitle"
+                    x: 14
+                    y: windowChrome.controlsCenterY - height / 2
+                    width: Math.max(0, parent.width - 14 - 12 - sidebarToggleButton.width - 12)
+                    height: MailStyle.toolbarButtonHeight
+                    text: qsTr("Mail"); font.pixelSize: 15; font.weight: Font.DemiBold
                     color: window.ink; elide: Text.ElideRight
                     verticalAlignment: Text.AlignVCenter
                 }
-                MailAction {
-                    anchors.right: parent.right; anchors.rightMargin: 14
-                    y: 36
-                    iconOnly: true; iconName: "editRounded"; accessibleText: qsTr("New message")
-                    floatingAction: true; shellBackdrop: chromeBackdrop
-                    objectName: "sidebarComposeButton"
-                    enabled: mail.configured || mail.demo
-                    onClicked: window.compose("new")
-                }
+
             }
 
             Item {
@@ -282,13 +300,12 @@ ApplicationWindow {
                     id: unreadFilterButton
                     anchors.right: parent.right
                     anchors.rightMargin: 14
-                    y: (44 - height) / 2
-                    implicitHeight: 38 // MailAction defaults to the compact toolbar height.
+                    y: windowChrome.controlsCenterY - height / 2
                     objectName: "unreadFilterButton"
                     visible: messagePane.visible && !window.draftsVisible
-                    stacked: true
-                    stackedText: qsTr("筛选")
+                    iconOnly: true
                     iconName: "filter"
+                    iconSize: 14
                     checkable: true
                     checked: mail.unreadOnly
                     highlighted: mail.unreadOnly
@@ -322,9 +339,9 @@ ApplicationWindow {
                 draftsVisible: window.draftsVisible
                 liquidControls: window.liquidControls
                 hasMessage: window.hasMessage
-                visible: reader.visible
+                visible: reader.visible || readerHeader.searching
                 x: contentScene.x + (window.narrow ? 0 : reader.x)
-                width: (window.narrow ? contentScene.width : reader.width) - windowChrome.controlsReservedWidth
+                width: Math.max(0, windowChrome.controlsLeft - x)
                 height: parent.height
                 onMessageCommandRequested: function(command) {
                     const row = window.selectedIndex()
@@ -351,17 +368,25 @@ ApplicationWindow {
                 x: window.sidebarVisible ? 0 : 14
                 width: window.sidebarVisible ? sidebarPlane.width : sidebarToggleButton.width
                 height: parent.height
-                MailAction {
+                KosSidebarToggle {
                     id: sidebarToggleButton
                     objectName: "sidebarToggleButton"
                     anchors.right: parent.right
                     anchors.rightMargin: window.sidebarVisible ? 12 : 0
                     y: windowChrome.controlsCenterY - height / 2
-                    stacked: true; stackedText: qsTr("侧栏"); iconName: "panelLeft"
-                    accessibleText: window.sidebarVisible ? qsTr("Hide sidebar") : qsTr("Show sidebar")
-                    floatingAction: true; shellBackdrop: chromeBackdrop
-                    liquidIntensity: "strong"
-                    focusRingColor: materialForm ? AppTheme.focusRing : "transparent"
+                    implicitWidth: MailStyle.toolbarButtonHeight
+                    implicitHeight: implicitWidth
+                    // Same shared sidebar control as Weather; never use panelLeft.
+                    glyphColor: AppTheme.text
+                    glyphPaneColor: glyphColor
+                    Accessible.name: window.sidebarVisible ? qsTr("Hide sidebar") : qsTr("Show sidebar")
+                    background: LiquidActionButton {
+                        enabled: false
+                        Accessible.ignored: true
+                        materialForm: !window.liquidControls
+                        backdrop: chromeBackdrop
+                        liquidIntensity: "strong"
+                    }
                     focusPolicy: Qt.TabFocus
                     onClicked: window.toggleSidebar()
                 }
@@ -378,7 +403,7 @@ ApplicationWindow {
             visible: window.sidebarVisible
             anchors.left: parent.left
             anchors.top: floatingHeader.bottom
-            anchors.bottom: statusStrip.top
+            anchors.bottom: parent.bottom
             width: sidebarPlane.width
             z: 1
             onEditAccountRequested: function(account) { accountDialog.editAccount(account) }
@@ -394,11 +419,12 @@ ApplicationWindow {
             anchors.left: sidebar.right
             anchors.right: parent.right
             anchors.top: floatingHeader.bottom
-            anchors.bottom: statusStrip.top
+            anchors.bottom: parent.bottom
             spacing: 0
             z: 1
 
             MessagePane {
+                localeName: window.i18n ? window.i18n.localeName : Qt.locale().name
                 id: messagePane
                 surface: chromePlanes
                 mail: window.mail
@@ -418,6 +444,7 @@ ApplicationWindow {
             }
 
             MessageReader {
+                localeName: window.i18n ? window.i18n.localeName : Qt.locale().name
                 id: reader
                 mail: window.mail
                 message: window.message
@@ -439,7 +466,7 @@ ApplicationWindow {
             x: contentScene.x + messagePane.x + messagePane.width - width
             y: 0
             width: 1
-            height: statusStrip.y - y
+            height: parent.height - y
             color: window.rule
             visible: !window.narrow
             z: 2
@@ -454,7 +481,7 @@ ApplicationWindow {
             property int startWidth: 0
             width: 8
             y: floatingHeader.height
-            height: statusStrip.y - y
+            height: parent.height - y
             z: 4
             cursorShape: Qt.SplitHCursor
             hoverEnabled: true
@@ -464,7 +491,7 @@ ApplicationWindow {
             Accessible.name: sidebarHandle ? qsTr("Mailbox column width") : qsTr("Message column width")
             Accessible.description: qsTr("Drag or use Left and Right to resize. Double-click to reset.")
             function resizeTo(value) {
-                if (sidebarHandle) window.sidebarPreferredWidth = Math.round(Math.max(190, Math.min(340, value, window.width - 560)))
+                if (sidebarHandle) window.sidebarPreferredWidth = Math.round(Math.max(152, Math.min(340, value, window.width - 560)))
                 else window.listPreferredWidth = Math.round(Math.max(260, Math.min(520, value,
                     window.width - (window.sidebarVisible ? window.sidebarWidth : 0) - 300)))
             }
@@ -477,8 +504,8 @@ ApplicationWindow {
                 if (pressed) resizeTo(startWidth + mapToItem(mailScene, mouse.x, mouse.y).x - pressSceneX)
             }
             onDoubleClicked: {
-                if (sidebarHandle) window.sidebarPreferredWidth = 236
-                else window.listPreferredWidth = 320
+                if (sidebarHandle) window.sidebarPreferredWidth = 189
+                else window.listPreferredWidth = 280
             }
             Keys.onLeftPressed: resizeTo((sidebarHandle ? window.sidebarWidth : window.listWidth) - 10)
             Keys.onRightPressed: resizeTo((sidebarHandle ? window.sidebarWidth : window.listWidth) + 10)
@@ -502,22 +529,37 @@ ApplicationWindow {
         }
 
         Rectangle {
-            id: statusStrip
-            objectName: "statusStrip"
-            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-            height: mail.error ? 44 : 29
-            color: mail.error ? (AppTheme.dark ? "#452f30" : "#fff1ef") : window.sidebarColor
-            Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: window.rule }
+            id: transientNotice
+            objectName: "transientNotice"
+            readonly property string message: window.lifecycleNotice || mail.error
+                || ((!mail.demo && (mail.busy || mail.sending || mail.sendPending)) ? mail.status : "")
+            visible: message.length > 0
+            anchors.right: parent.right; anchors.bottom: parent.bottom
+            anchors.margins: 16
+            width: Math.min(460, parent.width - 32)
+            height: noticeRow.implicitHeight + 24
+            z: 10
+            radius: 10
+            color: AppTheme.contentBackground
+            border.width: 1
+            border.color: mail.error ? AppTheme.destructive : window.rule
             RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 18; anchors.rightMargin: 14; spacing: 10
-                Rectangle { width: 5; height: 5; radius: 3; color: mail.error ? AppTheme.destructive : mail.busy ? AppTheme.accent : window.muted }
+                id: noticeRow
+                anchors.fill: parent; anchors.margins: 12
+                spacing: 12
                 Text {
-                    text: mail.error || (mail.demo ? qsTr("Demo · synthetic mail only · sending disabled") : mail.status || qsTr("Ready"))
-                    color: mail.error ? AppTheme.destructive : window.muted; font.pixelSize: 10
-                    Layout.fillWidth: true; elide: Text.ElideRight
+                    text: transientNotice.message
+                    color: mail.error ? AppTheme.destructive : window.ink
+                    font.pixelSize: 12
+                    wrapMode: Text.Wrap
+                    Layout.fillWidth: true
                 }
-                MailAction { visible: !!mail.error; implicitHeight: 24; text: qsTr("Dismiss"); onClicked: mail.clearError() }
-                MailAction { implicitHeight: 24; iconOnly: true; iconName: "theme"; accessibleText: qsTr("Switch light / dark appearance"); onClicked: AppTheme.appearanceMode = AppTheme.dark ? "light" : "dark" }
+                MailAction {
+                    visible: !!mail.error || !!window.lifecycleNotice
+                    implicitHeight: 24
+                    text: qsTr("Dismiss")
+                    onClicked: { mail.clearError(); window.lifecycleNotice = "" }
+                }
             }
         }
 
@@ -609,6 +651,30 @@ ApplicationWindow {
     LiquidPopover {
         id: moreMenu
         objectName: "moreMessageMenu"
+        LiquidPopoverItem {
+            visible: readerHeader.compactOptions
+            text: qsTr("显示"); iconName: "sliders"
+            onTriggered: { moreMenu.close(); listOptions.openAtAnchor() }
+        }
+        LiquidPopoverItem {
+            objectName: "languageSystem"
+            text: qsTr("Language: follow system") + (window.i18n && window.i18n.language === "system" ? " ✓" : "")
+            onTriggered: { if (window.i18n) window.i18n.language = "system"; moreMenu.close() }
+        }
+        LiquidPopoverItem {
+            objectName: "languageChinese"
+            text: "简体中文" + (window.i18n && window.i18n.language === "zh_CN" ? " ✓" : "")
+            onTriggered: { if (window.i18n) window.i18n.language = "zh_CN"; moreMenu.close() }
+        }
+        LiquidPopoverItem {
+            objectName: "languageEnglish"
+            text: "English" + (window.i18n && window.i18n.language === "en" ? " ✓" : "")
+            onTriggered: { if (window.i18n) window.i18n.language = "en"; moreMenu.close() }
+        }
+        LiquidPopoverItem {
+            text: qsTr("Switch light / dark appearance"); iconName: "theme"
+            onTriggered: { moreMenu.close(); AppTheme.appearanceMode = AppTheme.dark ? "light" : "dark" }
+        }
         sourceItem: chromePlanes
         anchorItem: readerHeader.optionsAnchor
         LiquidPopoverItem { text: qsTr("Reply"); iconName: "undo"; enabled: !mail.sending; onTriggered: window.compose("reply") }
@@ -617,17 +683,17 @@ ApplicationWindow {
         LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: window.detailsVisible = true }
         LiquidPopoverItem {
             text: qsTr("删除"); iconName: "trash"
-            enabled: window.hasMessage && window.width < 1100
+            enabled: window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.deleteMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: qsTr("归档"); iconName: "archive"
-            enabled: window.hasMessage && window.width < 1100
+            enabled: window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.archiveMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: window.message.flagged ? qsTr("取消旗标") : qsTr("标为旗标"); iconName: "flag"
-            enabled: window.hasMessage && window.width < 1100
+            enabled: window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.toggleFlagged(window.selectedIndex())
         }
     }
@@ -676,6 +742,7 @@ ApplicationWindow {
         fileMode: FileDialog.SaveFile
         onAccepted: mail.saveAttachment(attachmentIndex, selectedFile.toString())
     }
+    Shortcut { sequence: "Ctrl+Q"; onActivated: { if (window.desktop) window.desktop.requestQuit(); else if (window.prepareForQuit()) window.close() } }
     Shortcut { sequence: "Ctrl+N"; enabled: !composer.visible && !accountDialog.visible && (mail.configured || mail.demo); onActivated: window.compose("new") }
     Shortcut { sequence: "Ctrl+F"; enabled: !composer.visible && !accountDialog.visible; onActivated: readerHeader.openSearch() }
     Shortcut {
@@ -684,9 +751,9 @@ ApplicationWindow {
         onActivated: {
             if (window.selectionSize > 0) { window.clearSelection(); return }
             if (window.detailsVisible) { window.detailsVisible = false; return }
+            if (readerHeader.searchActive) { readerHeader.closeSearch(); return }
             if (window.width < 1080 && window.sidebarExpanded) window.sidebarExpanded = false
             else if (window.narrow && window.readerVisible) window.readerVisible = false
-            else if (readerHeader.searchActive) readerHeader.closeSearch()
         }
     }
     Shortcut { sequence: "Ctrl+R"; enabled: !composer.visible && !accountDialog.visible && !mail.busy; onActivated: mail.refresh() }
