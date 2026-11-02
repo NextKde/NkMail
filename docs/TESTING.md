@@ -1,9 +1,12 @@
 # Testing and acceptance boundaries
 
-All builds, automated suites and graphical acceptance run in the designated virtual machine; never run them on the host. NkMail has five distinct suites. Enable them with `-DNKMAIL_BUILD_TESTS=ON` and run `ctest --test-dir build --output-on-failure`.
+Automated suites run in the designated virtual machine. The user explicitly authorized host builds and interactive NkMail previews for the current UI work; reference projects remain untouched. NkMail has eight distinct suites. Enable them with `-DNKMAIL_BUILD_TESTS=ON` and run `ctest --test-dir build --output-on-failure`.
 
 | Suite | Actual code exercised | Deliberately isolated boundary |
 | --- | --- | --- |
+| `nkmail_i18n` | Real catalog loading, live QML/tray switching, system locale and saved language choice | Temporary preference file; offscreen tray/menu |
+| `nkmail_translations` | Source extraction coverage, finished Chinese/English entries and placeholder integrity | lupdate plus XML validation |
+| `nkmail_tray` | Window hide/restore, host loss, guarded quit | Injected tray backend, offscreen window |
 | `nkmail_core` | SQLite migrations/cache/drafts, DTO serialization, incremental models | Temporary databases; no keyring jobs or network |
 | `nkmail_controller` | Real facade/services, SQLite and message model; asynchronous dispatch and stale-result handling | Injected transport regressions plus linked legacy synthetic protocol/credential boundaries; remote-image tests use a synthetic loopback HTTP fixture, never external hosts |
 | `loopback-protocol` | Real mailio adapter, patched TLS/IMAP/SMTP, MIME encoding/decoding | Python services bound to loopback, generated test CA/certificates, synthetic credentials and `.invalid` recipients; no relay |

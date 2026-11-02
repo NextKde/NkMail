@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "MailDatabase.h"
 #include <QDir>
 #include <QFile>
@@ -68,7 +69,7 @@ bool MailDatabase::check() const
         return fail(QStringLiteral("MailDatabase must be used on its owning thread"));
     m_error.clear();
     if (!m_db.isValid() || !m_db.isOpen())
-        return fail(QStringLiteral("Mail database is not open"));
+        return fail(QCoreApplication::translate("MailErrors", "Mail database is not open"));
     return true;
 }
 bool MailDatabase::isOpen() const
@@ -96,14 +97,14 @@ bool MailDatabase::open(const QString &root, const QString &accountId)
     m_error.clear();
     m_accountId = accountId.trimmed().isEmpty() ? QStringLiteral("default") : accountId;
     if (root.trimmed().isEmpty())
-        return fail(QStringLiteral("An explicit storage root is required"));
+        return fail(QCoreApplication::translate("MailErrors", "An explicit storage root is required"));
     QDir dir(root);
     if (!dir.exists() && !dir.mkpath(QStringLiteral(".")))
-        return fail(QStringLiteral("Cannot create storage root"));
+        return fail(QCoreApplication::translate("MailErrors", "Cannot create storage root"));
     const QString filename = dir.absoluteFilePath(QStringLiteral("mail.sqlite"));
     // SQLite may create WAL/SHM files beside the database; keep its directory private.
     if (!QFile::setPermissions(dir.absolutePath(), QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner))
-        return fail(QStringLiteral("Cannot protect storage root permissions"));
+        return fail(QCoreApplication::translate("MailErrors", "Cannot protect storage root permissions"));
     m_connection = QStringLiteral("nkmail-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
     m_db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connection);
     m_db.setDatabaseName(filename);
@@ -118,7 +119,7 @@ bool MailDatabase::open(const QString &root, const QString &accountId)
         || !exec(m_db, QStringLiteral("PRAGMA journal_mode=WAL"), {}, &m_error)
         || !exec(m_db, QStringLiteral("PRAGMA synchronous=FULL"), {}, &m_error)
         || !migrate()) {
-        const QString message = m_error.isEmpty() ? QStringLiteral("Cannot protect database permissions") : m_error;
+        const QString message = m_error.isEmpty() ? QCoreApplication::translate("MailErrors", "Cannot protect database permissions") : m_error;
         close();
         return fail(message);
     }
@@ -135,7 +136,7 @@ bool MailDatabase::updateFlags(const QList<Summary> &messages)
     if (!tx.active()) return fail(m_db.lastError().text());
     for (const auto &s : messages) {
         if (!validIdentity(s) || validity(s.folder) != s.uidValidity)
-            return fail(QStringLiteral("Cannot update flags for a stale mailbox"));
+            return fail(QCoreApplication::translate("MailErrors", "Cannot update flags for a stale mailbox"));
         for (const auto &table : {"summaries", "contents"}) {
             QSqlQuery query(m_db);
             query.prepare(QStringLiteral("SELECT payload FROM ") + QLatin1String(table)
@@ -167,7 +168,7 @@ bool MailDatabase::migrate()
     const int version = versionQuery.value(0).toInt();
     versionQuery.finish();
     if (version < 0 || version > SchemaVersion)
-        return fail(QStringLiteral("Unsupported mail database schema version %1").arg(version));
+        return fail(QCoreApplication::translate("MailErrors", "Unsupported mail database schema version %1").arg(version));
     Transaction tx(m_db);
     if (!tx.active())
         return fail(m_db.lastError().text());
@@ -421,7 +422,7 @@ QString MailDatabase::validity(const QString &folder) const
 bool MailDatabase::setValidity(const QString &folder, const QString &uidValidity)
 {
     if (folder.isEmpty() || uidValidity.isEmpty())
-        return fail(QStringLiteral("Folder and UIDVALIDITY are required"));
+        return fail(QCoreApplication::translate("MailErrors", "Folder and UIDVALIDITY are required"));
     QSqlQuery retired(m_db);
     retired.prepare(QStringLiteral("SELECT 1 FROM retired_validities WHERE account=? AND folder=? AND uid_validity=?"));
     retired.addBindValue(m_accountId);
@@ -466,7 +467,7 @@ bool MailDatabase::savePage(const Page &page)
         return false;
     for (const auto &s : page.messages)
         if (!validIdentity(s) || s.folder != page.folder || s.uidValidity != page.uidValidity)
-            return fail(QStringLiteral("Page contains an invalid or mismatched message identity"));
+            return fail(QCoreApplication::translate("MailErrors", "Page contains an invalid or mismatched message identity"));
     Transaction tx(m_db);
     if (!tx.active())
         return fail(m_db.lastError().text());
@@ -485,7 +486,7 @@ Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, cons
     if (!check())
         return page;
     if (offset < 0 || limit <= 0 || limit > 10000) {
-        fail(QStringLiteral("Invalid cache page bounds"));
+        fail(QCoreApplication::translate("MailErrors", "Invalid cache page bounds"));
         return page;
     }
     page.uidValidity = validity(folder);
@@ -558,13 +559,13 @@ bool MailDatabase::saveContent(const Content &content)
         return false;
     const auto &s = content.summary;
     if (!validIdentity(s))
-        return fail(QStringLiteral("Content requires a complete message identity"));
+        return fail(QCoreApplication::translate("MailErrors", "Content requires a complete message identity"));
     const QString current = validity(s.folder);
     if (!m_error.isEmpty())
         return false;
     // A late content callback must never roll the folder back to an old generation.
     if (!current.isEmpty() && current != s.uidValidity)
-        return fail(QStringLiteral("Content UIDVALIDITY is stale"));
+        return fail(QCoreApplication::translate("MailErrors", "Content UIDVALIDITY is stale"));
     Transaction tx(m_db);
     if (!tx.active())
         return fail(m_db.lastError().text());
@@ -667,7 +668,7 @@ bool MailDatabase::saveDraft(const Draft &draft)
     if (!existing.exec())
         return fail(existing.lastError().text());
     if (existing.next()) {
-        if (existing.value(1).toString() != m_accountId) return fail(QStringLiteral("Draft belongs to another account"));
+        if (existing.value(1).toString() != m_accountId) return fail(QCoreApplication::translate("MailErrors", "Draft belongs to another account"));
         const QString persisted = existing.value(0).toString();
         // The UI often holds a stale draft map during/after an asynchronous send.
         // Only markDraftState may finalize an in-flight submission. Autosave may
@@ -712,6 +713,6 @@ bool MailDatabase::markDraftState(const QString &id, const QString &state)
     q.addBindValue(state);
     if (!q.exec())
         return fail(q.lastError().text());
-    return q.numRowsAffected() > 0 || fail(QStringLiteral("Draft not found or send state transition is unsafe"));
+    return q.numRowsAffected() > 0 || fail(QCoreApplication::translate("MailErrors", "Draft not found or send state transition is unsafe"));
 }
 }

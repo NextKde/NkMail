@@ -9,6 +9,7 @@ ApplicationWindow {
     id: window
     required property var mail
     property var desktop: null
+    property var i18n: null
     property string lifecycleNotice: ""
     objectName: "mailWindow"
     width: 1180
@@ -419,6 +420,7 @@ ApplicationWindow {
             z: 1
 
             MessagePane {
+                localeName: window.i18n ? window.i18n.localeName : Qt.locale().name
                 id: messagePane
                 surface: chromePlanes
                 mail: window.mail
@@ -438,6 +440,7 @@ ApplicationWindow {
             }
 
             MessageReader {
+                localeName: window.i18n ? window.i18n.localeName : Qt.locale().name
                 id: reader
                 mail: window.mail
                 message: window.message
@@ -644,6 +647,21 @@ ApplicationWindow {
     LiquidPopover {
         id: moreMenu
         objectName: "moreMessageMenu"
+        LiquidPopoverItem {
+            objectName: "languageSystem"
+            text: qsTr("Language: follow system") + (window.i18n && window.i18n.language === "system" ? " ✓" : "")
+            onTriggered: { if (window.i18n) window.i18n.language = "system"; moreMenu.close() }
+        }
+        LiquidPopoverItem {
+            objectName: "languageChinese"
+            text: "简体中文" + (window.i18n && window.i18n.language === "zh_CN" ? " ✓" : "")
+            onTriggered: { if (window.i18n) window.i18n.language = "zh_CN"; moreMenu.close() }
+        }
+        LiquidPopoverItem {
+            objectName: "languageEnglish"
+            text: "English" + (window.i18n && window.i18n.language === "en" ? " ✓" : "")
+            onTriggered: { if (window.i18n) window.i18n.language = "en"; moreMenu.close() }
+        }
         LiquidPopoverItem {
             text: qsTr("Switch light / dark appearance"); iconName: "theme"
             onTriggered: { moreMenu.close(); AppTheme.appearanceMode = AppTheme.dark ? "light" : "dark" }

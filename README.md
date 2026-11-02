@@ -16,6 +16,28 @@ daemon. Server acceptance is not delivery; uncertain sends remain non-resendable
 
 Mailio is a protocol/MIME library, not a complete application backend. NkMail supplies the application state, cache, credentials, UI and workflows. The vendored dependency includes the documented [TLS verification and PEEK patch](patches/mailio/0001-verified-tls-peek-timeouts.patch); its loopback acceptance tests do not by themselves prove real-provider compatibility.
 
+## Languages
+
+Simplified Chinese and English are included. The interface follows the system language
+by default (Chinese → Simplified Chinese, other languages → English). Choose **More →
+Language: follow system / 简体中文 / English** to switch without restarting. The selection
+is saved in the profile's `language.ini`; isolated demo/screenshot runs keep temporary
+preferences and do not modify your real profile. `--language=system|zh_CN|en` selects a
+language at startup. A second interactive launch activates the existing instance rather
+than changing its language; use its menu to switch.
+
+LanguageService owns loading and preference persistence, QML retranslation and date
+locale are wired by the application, and the tray updates on LanguageChange. Each shipped
+catalog contains complete UI and application diagnostic translations. Mail contents,
+custom server folder names and raw system/provider diagnostics retain their original text.
+Existing operation messages may keep the language in which they were generated until
+the next status update. Standard Qt dialogs use the installed Qt translation package.
+
+Update catalogs with `lupdate src qml -no-obsolete -ts translations/nkmail_zh_CN.ts
+translations/nkmail_en.ts` (Qt's binary directory may need adding to PATH), then translate
+new entries in both files. CMake compiles and embeds the QM files. The catalog gate checks
+source coverage, finished entries and matching placeholders; never hand-edit generated QM files.
+
 ## Single instance
 
 Interactive NkMail windows share one instance per desktop D-Bus session, including
@@ -70,7 +92,8 @@ one shared mutable controller across multiple implementation files.
 ## Dependencies
 
 - CMake 3.30+, C++20 compiler, Ninja (optional)
-- Qt 6.8+: Core, Gui, Widgets, Qml, Quick, QuickControls2, QuickDialogs2, Network, Concurrent, Sql; QtTest/QuickTest for testing
+- Qt 6.8+: Core, Gui, Widgets, Qml, Quick, QuickControls2, QuickDialogs2, Network, Concurrent, Sql, LinguistTools; QtTest/QuickTest for testing
+- Qt translation catalogs (for standard dialogs, e.g. `qt6-translations` on Arch)
 - Qt graphical-effects compatibility module and SVG support as required by Kos.Ui
 - QtKeychain for Qt 6; system Secret Service or equivalent
 - Boost development files (`date_time`, `regex`) and OpenSSL

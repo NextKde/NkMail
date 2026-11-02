@@ -1,5 +1,12 @@
 # NkMail local delivery goal
 
+## Chinese/English localization · 2026-11-02
+
+- Added LanguageService with profile-scoped language preference, system default, English/zh_CN selection, embedded Qt catalogs, live QQmlEngine retranslation and optional installed Qt dialog catalogs. More exposes all three choices; --language supports isolated reviews. Demo preferences remain temporary.
+- Completed 353 entries in each catalog, covering QML, tray, account/draft/send status and application-owned protocol/storage errors. Restored extraction for SendService callbacks. Standard folders and dates follow the selected locale; user mail/custom server text is not translated. Already-generated operation messages can retain their original language until a new status update.
+- VM full seven-suite regression passed in 45.21s before the catalog guard/native-tray test extension; final i18n + source/catalog guard passed 2/2 in 0.15s, including live native tray-menu translation, QML retranslation and saved choice. There are now eight suites required by CI. English and Chinese 1180×760 synthetic screenshots were inspected; no GPU-material claim.
+- Host build succeeded and the prior preview exited through its guarded tray menu before opening the new Chinese preview. Single interactive instance retained; no real mailbox or reference project was used. No host automated tests.
+
 ## Header alignment and spacing · 2026-11-02
 
 - Aligned the unread filter to the shared window-control/toolbar center instead of its independent 44px row. Reduced shell header height from 68 to 44, removing 24px of unused space above the list and bringing all panes upward together.

@@ -6,6 +6,7 @@ import Kos.Ui
 Rectangle {
     id: root
     required property Item surface
+    property string localeName: Qt.locale().name
     required property var mail
     required property QtObject selection
     property bool draftsVisible: false
@@ -163,7 +164,7 @@ Rectangle {
                                     onTapped: root.selection.toggleThread(messageRow.threadKey)
                                 }
                             }
-                            Text { text: MailLabels.dateLabel(messageRow.date); color: messageRow.rowMuted; font.pixelSize: AppTheme.compactControlFontSize }
+                            Text { text: MailLabels.dateLabel(messageRow.date, root.localeName); color: messageRow.rowMuted; font.pixelSize: AppTheme.compactControlFontSize }
                         }
                         RowLayout {
                             Layout.fillWidth: true

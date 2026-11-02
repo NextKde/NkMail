@@ -1,6 +1,7 @@
 #include "MailController.h"
 #include "platform/TrayService.h"
 #include "platform/SingleInstance.h"
+#include "platform/LanguageService.h"
 #include <QApplication>
 #include <QIcon>
 #include <QCommandLineParser>
@@ -35,6 +36,7 @@ int main(int argc, char **argv) {
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("A quiet, native mail client powered by Kos.Ui and mailio."));
     parser.addHelpOption(); parser.addVersionOption();
+    parser.addOption({"language", "Interface language: system, zh_CN or en.", "language"});
     parser.addOption({"demo", "Use isolated synthetic mail; no network or saved credentials."});
     parser.addOption({"data-dir", "Use a separate local data directory.", "path"});
     parser.addOption({"screenshot", "Capture this application's synthetic preview window and exit (requires --demo).", "path"});
@@ -44,6 +46,9 @@ int main(int argc, char **argv) {
     parser.addOption({"review-height", "Synthetic preview window height.", "pixels", "800"});
     parser.process(app);
     const bool demo = parser.isSet("demo");
+    if (parser.isSet("language") && !QStringList{"system", "zh_CN", "en"}.contains(parser.value("language"))) {
+        std::fprintf(stderr, "Unsupported interface language. Use system, zh_CN or en.\n"); return 2;
+    }
     if (parser.isSet("screenshot") && !demo) {
         std::fprintf(stderr, "Screenshot export is only permitted with isolated --demo data.\n"); return 2;
     }
@@ -72,10 +77,13 @@ int main(int argc, char **argv) {
     if (!dataLock.tryLock(0)) {
         std::fprintf(stderr, "This mailbox data directory is already open in another NkMail instance.\n"); return 2;
     }
+    nkmail::LanguageService language(QDir(root).filePath("language.ini"));
+    if (parser.isSet("language")) language.setLanguage(parser.value("language"));
     nkmail::MailController mail(demo, root);
     std::unique_ptr<nkmail::TrayService> desktop;
     if (!parser.isSet("screenshot")) desktop = std::make_unique<nkmail::TrayService>(nkmail::createSystemTray());
     QQmlApplicationEngine engine;
+    QObject::connect(&language, &nkmail::LanguageService::languageChanged, &engine, &QQmlApplicationEngine::retranslate);
     engine.rootContext()->setContextProperty(QStringLiteral("reviewAppearance"), demo ? parser.value("appearance") : QStringLiteral("system"));
     engine.rootContext()->setContextProperty(QStringLiteral("forceGlassPreview"),
         qEnvironmentVariableIsSet("NKMAIL_FORCE_GLASS"));
@@ -85,6 +93,7 @@ int main(int argc, char **argv) {
     std::unique_ptr<QSettings> windowSettings;
     QVariantMap initialProperties{{QStringLiteral("mail"), QVariant::fromValue(&mail)}};
     initialProperties.insert(QStringLiteral("desktop"), QVariant::fromValue(desktop.get()));
+    initialProperties.insert(QStringLiteral("i18n"), QVariant::fromValue(&language));
     if (persistWindow) {
         windowSettings = std::make_unique<QSettings>(QDir(root).filePath("window.ini"), QSettings::IniFormat);
         initialProperties.insert(QStringLiteral("sidebarPreferredWidth"), qBound(152, windowSettings->value("sidebarWidth", 189).toInt(), 340));

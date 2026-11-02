@@ -24,3 +24,5 @@
 - No permanent bottom status bar, including an empty footer or Demo caption. Content extends to the window bottom; show actionable errors/lifecycle notices only on demand. Theme switching lives in More.
 
 - Interactive previews must respect session-wide SingleInstance ownership. Do not accumulate demo windows/tray icons during UI iterations; replace the owned preview when updating the binary. Screenshot exports are isolated and create no tray.
+
+- Keep Simplified Chinese and English catalogs complete for all new interface/application diagnostics. Use qsTr/tr or explicit translation contexts, preserve placeholders, and run nkmail_i18n/nkmail_translations in the VM. Do not translate user mail or arbitrary provider text.

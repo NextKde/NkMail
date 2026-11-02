@@ -33,10 +33,10 @@ QtObject {
         default: return String(state || "")
         }
     }
-    function dateLabel(date) {
+    function dateLabel(date, localeName) {
         if (date === "Yesterday") return qsTr("Yesterday")
         const d = new Date(date)
         if (isNaN(d.getTime())) return String(date || "")
-        return AppTheme.formatDateTime(d, Locale.ShortFormat)
+        return Qt.formatDateTime(d, Qt.locale(localeName || Qt.locale().name), Locale.ShortFormat)
     }
 }

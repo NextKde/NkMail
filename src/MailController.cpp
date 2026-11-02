@@ -208,7 +208,8 @@ void MailController::openFavorite(const QString &accountId, const QString &folde
     selectFolder(folderId);
 }
 void MailController::setStatus(const QString &status, const QString &error) {
-    m_status = status; m_error = error; emit statusChanged();
+    m_status = status; m_error = error.isEmpty() ? QString()
+        : QCoreApplication::translate("MailErrors", error.toUtf8().constData()); emit statusChanged();
 }
 QString MailController::credentialKey() const { return credentialKey(m_account); }
 QString MailController::credentialKey(const Account &account) const { return m_credentials->key(account); }
