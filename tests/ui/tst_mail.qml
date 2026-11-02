@@ -254,7 +254,7 @@ TestCase {
         const controls = findChild(app, "windowControls")
         const listHeader = findChild(app, "listHeader")
         const readerHeader = findChild(app, "readerHeader")
-        const status = findChild(app, "statusStrip")
+        compare(findChild(app, "statusStrip"), null)
         for (const width of [580, 650, 799, 800, 820, 1079, 1080, 1280]) {
             for (const expanded of [false, true]) {
                 for (const reading of [false, true]) {
@@ -266,8 +266,8 @@ TestCase {
                     compare(header.width, width)
                     compare(content.x, app.sidebarVisible ? app.sidebarWidth : 0)
                     compare(content.y, 68)
-                    compare(content.y + content.height, status.y)
-                    compare(sidebar.y + sidebar.height, status.y)
+                    compare(content.y + content.height, scene.height)
+                    compare(sidebar.y + sidebar.height, scene.height)
                     compare(list.visible, !app.narrow || !reading)
                     compare(reader.visible, !app.narrow || reading)
                     compare(listHeader.visible, list.visible)
@@ -293,7 +293,7 @@ TestCase {
                         const divider = findChild(app, name)
                         if (!divider.visible) continue
                         compare(divider.y, 68)
-                        compare(divider.y + divider.height, status.y)
+                        compare(divider.y + divider.height, scene.height)
                     }
                 }
             }

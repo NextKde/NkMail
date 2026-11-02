@@ -21,4 +21,4 @@
 
 - Sidebar toggle must use the shared KosSidebarToggle rounded sidebar glyph, consistent with Weather/Calendar; do not replace it with VectorIcon panelLeft. The sidebar header has no compose button; compose remains in the main toolbar.
 
-- Do not reintroduce a permanent Demo/synthetic-mail caption in the preview footer. Preserve actionable lifecycle notices and errors.
+- No permanent bottom status bar, including an empty footer or Demo caption. Content extends to the window bottom; show actionable errors/lifecycle notices only on demand. Theme switching lives in More.

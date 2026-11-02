@@ -398,7 +398,7 @@ ApplicationWindow {
             visible: window.sidebarVisible
             anchors.left: parent.left
             anchors.top: floatingHeader.bottom
-            anchors.bottom: statusStrip.top
+            anchors.bottom: parent.bottom
             width: sidebarPlane.width
             z: 1
             onEditAccountRequested: function(account) { accountDialog.editAccount(account) }
@@ -414,7 +414,7 @@ ApplicationWindow {
             anchors.left: sidebar.right
             anchors.right: parent.right
             anchors.top: floatingHeader.bottom
-            anchors.bottom: statusStrip.top
+            anchors.bottom: parent.bottom
             spacing: 0
             z: 1
 
@@ -459,7 +459,7 @@ ApplicationWindow {
             x: contentScene.x + messagePane.x + messagePane.width - width
             y: 0
             width: 1
-            height: statusStrip.y - y
+            height: parent.height - y
             color: window.rule
             visible: !window.narrow
             z: 2
@@ -474,7 +474,7 @@ ApplicationWindow {
             property int startWidth: 0
             width: 8
             y: floatingHeader.height
-            height: statusStrip.y - y
+            height: parent.height - y
             z: 4
             cursorShape: Qt.SplitHCursor
             hoverEnabled: true
@@ -522,23 +522,37 @@ ApplicationWindow {
         }
 
         Rectangle {
-            id: statusStrip
-            objectName: "statusStrip"
-            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-            height: mail.error ? 44 : 29
-            color: mail.error ? (AppTheme.dark ? "#452f30" : "#fff1ef") : window.sidebarColor
-            Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: window.rule }
+            id: transientNotice
+            objectName: "transientNotice"
+            readonly property string message: window.lifecycleNotice || mail.error
+                || ((!mail.demo && (mail.busy || mail.sending || mail.sendPending)) ? mail.status : "")
+            visible: message.length > 0
+            anchors.right: parent.right; anchors.bottom: parent.bottom
+            anchors.margins: 16
+            width: Math.min(460, parent.width - 32)
+            height: noticeRow.implicitHeight + 24
+            z: 10
+            radius: 10
+            color: AppTheme.contentBackground
+            border.width: 1
+            border.color: mail.error ? AppTheme.destructive : window.rule
             RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 18; anchors.rightMargin: 14; spacing: 10
-                Rectangle { visible: statusLabel.text.length > 0; width: 5; height: 5; radius: 3; color: mail.error ? AppTheme.destructive : mail.busy ? AppTheme.accent : window.muted }
+                id: noticeRow
+                anchors.fill: parent; anchors.margins: 12
+                spacing: 12
                 Text {
-                    id: statusLabel
-                    text: window.lifecycleNotice || mail.error || (mail.demo ? "" : mail.status || qsTr("Ready"))
-                    color: mail.error ? AppTheme.destructive : window.muted; font.pixelSize: 10
-                    Layout.fillWidth: true; elide: Text.ElideRight
+                    text: transientNotice.message
+                    color: mail.error ? AppTheme.destructive : window.ink
+                    font.pixelSize: 12
+                    wrapMode: Text.Wrap
+                    Layout.fillWidth: true
                 }
-                MailAction { visible: !!mail.error; implicitHeight: 24; text: qsTr("Dismiss"); onClicked: mail.clearError() }
-                MailAction { implicitHeight: 24; iconOnly: true; iconName: "theme"; accessibleText: qsTr("Switch light / dark appearance"); onClicked: AppTheme.appearanceMode = AppTheme.dark ? "light" : "dark" }
+                MailAction {
+                    visible: !!mail.error || !!window.lifecycleNotice
+                    implicitHeight: 24
+                    text: qsTr("Dismiss")
+                    onClicked: { mail.clearError(); window.lifecycleNotice = "" }
+                }
             }
         }
 
@@ -630,6 +644,10 @@ ApplicationWindow {
     LiquidPopover {
         id: moreMenu
         objectName: "moreMessageMenu"
+        LiquidPopoverItem {
+            text: qsTr("Switch light / dark appearance"); iconName: "theme"
+            onTriggered: { moreMenu.close(); AppTheme.appearanceMode = AppTheme.dark ? "light" : "dark" }
+        }
         sourceItem: chromePlanes
         anchorItem: readerHeader.optionsAnchor
         LiquidPopoverItem { text: qsTr("Reply"); iconName: "undo"; enabled: !mail.sending; onTriggered: window.compose("reply") }

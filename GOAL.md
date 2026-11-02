@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Remove permanent bottom bar · 2026-11-02
+
+- Removed the entire status strip and extended sidebar, content and column dividers to the window bottom. Theme switching moved to More. Errors, blocked-exit notices and active live-account work use an on-demand floating notice without reserving footer space.
+- Host build and synthetic preview launch succeeded. VM UI regression passed in 9.40s; geometry checks now assert full-height panes/dividers and absence of statusStrip. Corrected one stale status.y test reference found on the first run.
+
 ## Quiet preview status · 2026-11-02
 
 - Removed the permanent Demo/synthetic-mail status caption and its idle dot from the preview footer. Lifecycle notices and errors remain visible; normal account status behavior is unchanged. Preview mode still uses synthetic data and disables sending.
