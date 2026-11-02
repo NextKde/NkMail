@@ -146,7 +146,7 @@ Rectangle {
                         anchors.leftMargin: 24; anchors.rightMargin: 24
                         color: root.rule
                         opacity: 0.5
-                        visible: !messageRow.selected
+                        visible: messageRow.index > 0 && !messageRow.selected
                     }
                 }
                 contentItem: Item {

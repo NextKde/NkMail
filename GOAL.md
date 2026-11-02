@@ -1,5 +1,9 @@
 # NkMail local delivery goal
 
+## Inbox top separator · 2026-11-02
+
+- Suppressed the first message row top separator so it does not overlap the inbox header rule. Inter-row separators retain their existing appearance. VM UI regression passed in 11.21s; host build and guarded preview replacement succeeded.
+
 ## Search spacing refinement · 2026-11-02
 
 - Increased search-to-traffic-light spacing from 5px to 10px for both icon and input. VM UI regression passed in 11.32s, with half-pixel layout-rounding tolerance. Host build and guarded preview replacement succeeded.
