@@ -141,7 +141,7 @@ Rectangle {
                     }
                     Rectangle {
                         height: 1
-                        anchors.bottom: parent.bottom
+                        anchors.top: parent.top
                         anchors.left: parent.left; anchors.right: parent.right
                         anchors.leftMargin: 24; anchors.rightMargin: 24
                         color: root.rule

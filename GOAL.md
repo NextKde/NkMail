@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Top-only message separators · 2026-11-02
+
+- Moved each message separator to the top of its row, leaving no trailing line below the final message. Preserved horizontal insets, lighter opacity and selected-row treatment.
+- Host build and guarded single-instance preview replacement succeeded. VM UI regression passed in 9.67s.
+
 ## Joined toolbar hover surfaces · 2026-11-02
 
 - Replaced independent capsule hover backgrounds inside toolbar groups with clipped segment highlights: rounded only at the two outside ends, square at internal boundaries, explicitly antialiased. Preserved the canonical shared liquid surface and keyboard focus ring. Rounded segment widths to whole pixels and disabled per-cell scaling.
