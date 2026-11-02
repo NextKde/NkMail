@@ -134,7 +134,7 @@ Rectangle {
                         anchors.fill: parent
                         anchors.leftMargin: 8; anchors.rightMargin: 8
                         anchors.topMargin: 2; anchors.bottomMargin: 2
-                        radius: 8
+                        radius: 6
                         color: messageRow.selected ? AppTheme.accent : messageRow.multiSelected ? root.selectedSurface : messageRow.hovered ? root.hoverSurface : "transparent"
                         border.width: messageRow.activeFocus ? 1 : 0
                         border.color: AppTheme.focusRing
@@ -145,6 +145,7 @@ Rectangle {
                         anchors.left: parent.left; anchors.right: parent.right
                         anchors.leftMargin: 24; anchors.rightMargin: 24
                         color: root.rule
+                        opacity: 0.5
                         visible: !messageRow.selected
                     }
                 }

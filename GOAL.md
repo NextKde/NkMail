@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Softer row edges · 2026-11-02
+
+- Reduced message selection/hover corner radius to 6px. Separators now render at half their existing theme opacity, preserving light/dark colors and horizontal insets.
+- Host build and guarded single-instance preview replacement succeeded. Final VM UI regression passed in 9.48s.
+
 ## Compact inset message rows · 2026-11-02
 
 - Reduced message row height from 84 to 68 and vertical content padding to 7px, with a single elided summary line. Text and separators now have 24px left/right insets. Selection/hover surfaces have 8px horizontal insets and 8px corners; active white text is preserved.
