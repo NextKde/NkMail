@@ -359,7 +359,7 @@ TestCase {
     function test_column_widths_are_adjustable_and_clamped() {
         const sidebarDivider = findChild(app, "sidebarDivider")
         const listDivider = findChild(app, "messageDivider")
-        compare(app.sidebarWidth, 236)
+        compare(app.sidebarWidth, 189)
         compare(app.listWidth, 320)
         sidebarDivider.resizeTo(290)
         listDivider.resizeTo(410)
@@ -383,11 +383,11 @@ TestCase {
         // scene coordinate space instead of accidentally chasing the handle.
         const start = divider.mapToItem(scene, divider.width / 2, 120)
         mouseDrag(scene, start.x, start.y, 40, 0)
-        compare(app.sidebarPreferredWidth, 276)
-        tryCompare(divider, "x", 272)
+        compare(app.sidebarPreferredWidth, 229)
+        tryCompare(divider, "x", 225)
         const next = divider.mapToItem(scene, divider.width / 2, 120)
         mouseDrag(scene, next.x, next.y, -40, 0)
-        compare(app.sidebarPreferredWidth, 236)
+        compare(app.sidebarPreferredWidth, 189)
     }
     function test_column_divider_keyboard_and_double_click() {
         activateApp()

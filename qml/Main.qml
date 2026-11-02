@@ -69,9 +69,9 @@ ApplicationWindow {
     }
     // Preferred widths survive temporary narrow layouts; actual widths always
     // leave space for the reader and never squeeze the list below its minimum.
-    property int sidebarPreferredWidth: 236
+    property int sidebarPreferredWidth: 189
     property int listPreferredWidth: 320
-    readonly property int sidebarWidth: Math.max(190, Math.min(340, sidebarPreferredWidth,
+    readonly property int sidebarWidth: Math.max(152, Math.min(340, sidebarPreferredWidth,
         width - (narrow ? 260 : 560)))
     readonly property int listWidth: Math.max(260, Math.min(520, listPreferredWidth,
         width - (sidebarVisible ? sidebarWidth : 0) - 300))
@@ -484,7 +484,7 @@ ApplicationWindow {
             Accessible.name: sidebarHandle ? qsTr("Mailbox column width") : qsTr("Message column width")
             Accessible.description: qsTr("Drag or use Left and Right to resize. Double-click to reset.")
             function resizeTo(value) {
-                if (sidebarHandle) window.sidebarPreferredWidth = Math.round(Math.max(190, Math.min(340, value, window.width - 560)))
+                if (sidebarHandle) window.sidebarPreferredWidth = Math.round(Math.max(152, Math.min(340, value, window.width - 560)))
                 else window.listPreferredWidth = Math.round(Math.max(260, Math.min(520, value,
                     window.width - (window.sidebarVisible ? window.sidebarWidth : 0) - 300)))
             }
@@ -497,7 +497,7 @@ ApplicationWindow {
                 if (pressed) resizeTo(startWidth + mapToItem(mailScene, mouse.x, mouse.y).x - pressSceneX)
             }
             onDoubleClicked: {
-                if (sidebarHandle) window.sidebarPreferredWidth = 236
+                if (sidebarHandle) window.sidebarPreferredWidth = 189
                 else window.listPreferredWidth = 320
             }
             Keys.onLeftPressed: resizeTo((sidebarHandle ? window.sidebarWidth : window.listWidth) - 10)

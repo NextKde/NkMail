@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
     initialProperties.insert(QStringLiteral("desktop"), QVariant::fromValue(desktop.get()));
     if (persistWindow) {
         windowSettings = std::make_unique<QSettings>(QDir(root).filePath("window.ini"), QSettings::IniFormat);
-        initialProperties.insert(QStringLiteral("sidebarPreferredWidth"), qBound(190, windowSettings->value("sidebarWidth", 236).toInt(), 340));
+        initialProperties.insert(QStringLiteral("sidebarPreferredWidth"), qBound(152, windowSettings->value("sidebarWidth", 189).toInt(), 340));
         initialProperties.insert(QStringLiteral("listPreferredWidth"), qBound(260, windowSettings->value("listWidth", 320).toInt(), 520));
     }
     engine.setInitialProperties(initialProperties);
