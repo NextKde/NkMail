@@ -84,6 +84,8 @@ Item {
             onClicked: readerHeader.backRequested()
         }
         MailToolbarGroup {
+            backdrop: readerHeader.backdrop
+            materialForm: !readerHeader.liquidControls
             id: mailboxActions
             Layout.rightMargin: 14
             showLabels: readerHeader.windowWidth >= 1180
@@ -99,6 +101,8 @@ Item {
             }
         }
         MailToolbarGroup {
+            backdrop: readerHeader.backdrop
+            materialForm: !readerHeader.liquidControls
             id: messageOpsGroup
             showLabels: readerHeader.windowWidth >= 1180
             objectName: "messageOpsGroup"
@@ -119,6 +123,8 @@ Item {
             Layout.alignment: Qt.AlignVCenter
         }
         MailToolbarGroup {
+            backdrop: readerHeader.backdrop
+            materialForm: !readerHeader.liquidControls
             id: selectionOpsGroup
             showLabels: readerHeader.windowWidth >= 1180
             objectName: "selectionOpsGroup"
@@ -157,6 +163,8 @@ Item {
             }
         }
         MailToolbarGroup {
+            backdrop: readerHeader.backdrop
+            materialForm: !readerHeader.liquidControls
             id: replyActions
             Layout.rightMargin: 14
             showLabels: readerHeader.windowWidth >= 1180
@@ -170,6 +178,8 @@ Item {
             onVisibleChanged: { if (!visible && readerHeader.focusWithin(replyActions)) readerHeader.forceActiveFocus() }
         }
         MailToolbarGroup {
+            backdrop: readerHeader.backdrop
+            materialForm: !readerHeader.liquidControls
             id: messageOptionsGroup
             showLabels: readerHeader.windowWidth >= 1180
             objectName: "messageOptionsGroup"

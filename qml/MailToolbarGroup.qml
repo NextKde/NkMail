@@ -10,6 +10,8 @@ Row {
     property var objectNames: []
     property var enabledActions: []
     property bool showLabels: true
+    property bool materialForm: false
+    property LiquidBackdrop backdrop: null
     signal triggered(int index)
     spacing: 2
     height: 30
@@ -23,11 +25,9 @@ Row {
             enabled: root.enabledActions[index] !== false
             height: 30
             width: root.showLabels ? inlineContent.implicitWidth + 16 : 30
-            materialForm: true
-            flat: true
-            cornerRadius: 6
-            // Quiet toolbar ink, with shared disabled and hover treatments.
-            textColor: enabled ? AppTheme.mutedText : AppTheme.disabledText
+            materialForm: root.materialForm
+            backdrop: root.backdrop
+            flat: false
             Accessible.name: root.labels[index] || root.icons[index]
             contentItem: Row {
                 id: inlineContent
