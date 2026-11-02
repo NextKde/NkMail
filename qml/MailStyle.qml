@@ -11,7 +11,7 @@ QtObject {
     readonly property int toolbarButtonHeight: 26
     readonly property int fieldHeight: 28
     readonly property int sidebarRowHeight: 32
-    readonly property int messageRowHeight: 84
+    readonly property int messageRowHeight: 68
     readonly property int draftRowHeight: 72
     readonly property int contentInset: 18
     readonly property int formSpacing: 8

@@ -129,17 +129,30 @@ Rectangle {
                         }
                     }
                 }
-                background: Rectangle {
-                    color: messageRow.selected ? AppTheme.accent : messageRow.multiSelected ? root.selectedSurface : messageRow.hovered ? root.hoverSurface : "transparent"
-                    border.width: messageRow.activeFocus ? 1 : 0
-                    border.color: AppTheme.focusRing
-                    Rectangle { height: 1; anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.leftMargin: 19; anchors.right: parent.right; color: messageRow.selected ? AppTheme.withAlpha("#ffffff", 0.18) : root.rule }
+                background: Item {
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8; anchors.rightMargin: 8
+                        anchors.topMargin: 2; anchors.bottomMargin: 2
+                        radius: 8
+                        color: messageRow.selected ? AppTheme.accent : messageRow.multiSelected ? root.selectedSurface : messageRow.hovered ? root.hoverSurface : "transparent"
+                        border.width: messageRow.activeFocus ? 1 : 0
+                        border.color: AppTheme.focusRing
+                    }
+                    Rectangle {
+                        height: 1
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left; anchors.right: parent.right
+                        anchors.leftMargin: 24; anchors.rightMargin: 24
+                        color: root.rule
+                        visible: !messageRow.selected
+                    }
                 }
                 contentItem: Item {
-                    Rectangle { x: 9; y: 23; width: 6; height: 6; radius: 3; color: messageRow.rowAccent; visible: messageRow.unread }
+                    Rectangle { x: 12; y: 14; width: 6; height: 6; radius: 3; color: messageRow.rowAccent; visible: messageRow.unread }
                     ColumnLayout {
-                        anchors.fill: parent; anchors.leftMargin: 23; anchors.rightMargin: 17; anchors.topMargin: 14; anchors.bottomMargin: 13
-                        spacing: 4
+                        anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; anchors.topMargin: 7; anchors.bottomMargin: 7
+                        spacing: 3
                         RowLayout {
                             Layout.fillWidth: true
                             Text { text: messageRow.sender || messageRow.senderAddress; color: messageRow.rowInk; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
@@ -173,7 +186,7 @@ Rectangle {
                             Text { text: messageRow.flagged ? "★" : ""; color: messageRow.rowAccent; font.pixelSize: 12; visible: messageRow.flagged; Accessible.name: qsTr("Flagged") }
                             VectorIcon { name: "album"; size: 14; color: messageRow.rowMuted; visible: messageRow.hasAttachments; Accessible.name: qsTr("Has attachment") }
                         }
-                        Text { objectName: "messagePreview"; visible: root.showSummary; text: messageRow.preview; color: messageRow.rowMuted; font.pixelSize: 11; lineHeight: 1.25; Layout.fillWidth: true; Layout.fillHeight: true; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight; textFormat: Text.PlainText }
+                        Text { objectName: "messagePreview"; visible: root.showSummary; text: messageRow.preview; color: messageRow.rowMuted; font.pixelSize: 11; lineHeight: 1.25; Layout.fillWidth: true; Layout.fillHeight: true; wrapMode: Text.NoWrap; maximumLineCount: 1; elide: Text.ElideRight; textFormat: Text.PlainText }
                     }
                 }
             }

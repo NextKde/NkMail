@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Compact inset message rows · 2026-11-02
+
+- Reduced message row height from 84 to 68 and vertical content padding to 7px, with a single elided summary line. Text and separators now have 24px left/right insets. Selection/hover surfaces have 8px horizontal insets and 8px corners; active white text is preserved.
+- VM UI and translation guards passed 2/2 in 9.40s; inspected the 1180×760 Chinese synthetic screenshot. Host build succeeded and the prior preview exited through the guarded tray menu before replacement.
+
 ## Chinese/English localization · 2026-11-02
 
 - Added LanguageService with profile-scoped language preference, system default, English/zh_CN selection, embedded Qt catalogs, live QQmlEngine retranslation and optional installed Qt dialog catalogs. More exposes all three choices; --language supports isolated reviews. Demo preferences remain temporary.
