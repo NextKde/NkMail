@@ -1,5 +1,11 @@
 # NkMail local delivery goal
 
+## Cooperative window controls · 2026-11-02
+
+- Added an app-owned optional platform adapter for the pinned Kos.Ui controls, using actual delegate rectangles and `WindowControlSlot`. Native takeover hides/disables fallback only after active acknowledgement; loss restores it. No reference project or dependency pin changed. Calendar placement and 22px client hit cells now match.
+- VM build and UI regression passed (10.44s), including exact circle coordinates, native-active simulation, restoration and missing-adapter fallback. No host validation performed.
+- Attempted real VM Wayland capture: no window-controls protocol appeared in the trace, bridge debug returned no diagnostics, and capture failed because the window was not exposed. Real compositor/GPU acceptance remains unverified; no desktop configuration was changed. The existing host preview still runs the previous binary.
+
 ## Preserve inbox header during search · 2026-11-02
 
 - Removed search-state coupling from the message-list header visibility. Opening search only replaces reader-toolbar actions; the mailbox title and unread filter remain visible.

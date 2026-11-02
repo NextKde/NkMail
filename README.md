@@ -237,3 +237,17 @@ Do not use a primary personal mailbox until the documented protocol and TLS acce
 ## License
 
 GPL-3.0-or-later for NkMail. See LICENSE and NOTICE.md. Third-party components retain their own licenses.
+
+### Cooperative window controls
+
+`MailWindowControls.qml` adapts the pinned Kos.Ui controls to the optional installed
+`Kos.SurfaceShape.WindowControlSlot` platform module. It sends the actual delegate
+circle rectangles, preserves layout, and hides/disables client controls only while
+the adapter reports compositor takeover. Missing modules/protocol support retain
+client drawing; no Wayland dependency is added to Kos.Ui. The compatibility mapping
+uses the pinned component's action object names and is covered by UI regression tests.
+Calendar geometry is used: 14px circles in 22px button cells, 6px spacing, with the
+row 10.5px from the right and 8.5px from the top. Native takeover requires the v2
+NextKde window-controls protocol and enabled KOS window appearance. The older pinned
+fallback keeps its existing hover-glyph preference; global fallback glyph preference
+integration awaits a tested canonical UI release exposing that property.

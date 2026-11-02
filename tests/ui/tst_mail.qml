@@ -184,6 +184,52 @@ TestCase {
         selection.clearSelection()
         compare(selection.selectionSize, 0)
     }
+    Component {
+        id: platformControlsMock
+        QtObject {
+            property var target
+            property var buttons
+            property bool enabled
+            property bool active: false
+        }
+    }
+    function test_window_controls_geometry_and_takeover() {
+        const controls = findChild(app, "windowControls")
+        const client = findChild(controls, "clientWindowControls")
+        const original = controls.platformComponent
+        controls.platformComponent = platformControlsMock
+        try {
+            wait(20)
+            compare(controls.buttonLayout.length, 3)
+            const actions = ["maximize", "minimize", "close"]
+            for (let i = 0; i < 3; ++i) {
+                const rect = controls.buttonLayout[i]
+                compare(rect.action, actions[i])
+                compare(rect.width, 14)
+                compare(rect.height, 14)
+                const point = controls.mapToItem(app.contentItem, rect.x, rect.y)
+                compare(point.x - app.width, -84.5 + 28 * i)
+                compare(point.y, 12.5)
+            }
+            compare(client.opacity, 1)
+            verify(client.enabled)
+            controls.platformSlot.active = true
+            compare(client.opacity, 0)
+            verify(!client.enabled)
+            compare(controls.opacity, 1)
+            compare(controls.width, 78)
+            controls.platformSlot.active = false
+            compare(client.opacity, 1)
+            verify(client.enabled)
+            controls.platformComponent = null
+            compare(controls.platformSlot, null)
+            compare(client.opacity, 1)
+            verify(client.enabled)
+        } finally {
+            controls.platformComponent = original
+        }
+    }
+
     function test_shell_planes_and_window_chrome_are_stable() {
         const planes = findChild(app, "chromePlanes")
         const sidebarPlane = findChild(app, "sidebarPlane")

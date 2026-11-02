@@ -40,18 +40,18 @@ Item {
         }
     }
 
-    KosWindowControls {
+    MailWindowControls {
         id: controls
         objectName: "windowControls"
         targetWindow: chrome.targetWindow
         maximizeMode: true
         circleSize: 14
-        buttonWidth: 14
-        buttonHeight: 14
-        spacing: 14
+        buttonWidth: 22
+        buttonHeight: 22
+        spacing: 6
         anchors.right: parent.right
-        anchors.rightMargin: 14.5
+        anchors.rightMargin: 10.5
         anchors.top: parent.top
-        anchors.topMargin: 10.5
+        anchors.topMargin: 8.5
     }
 }
