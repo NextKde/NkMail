@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Quiet preview status · 2026-11-02
+
+- Removed the permanent Demo/synthetic-mail status caption and its idle dot from the preview footer. Lifecycle notices and errors remain visible; normal account status behavior is unchanged. Preview mode still uses synthetic data and disables sending.
+- Host build and preview launch succeeded; VM UI regression passed in 9.54s.
+
 ## Shared sidebar glyph and compose placement · 2026-11-02
 
 - Replaced panelLeft with canonical KosSidebarToggle (rounded outline and filled inset pane, as used by Weather/Calendar), retaining the liquid background. Removed the sidebar-header compose button; main-toolbar compose remains. Recorded the user preference in AGENTS.md.

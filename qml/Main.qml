@@ -530,9 +530,10 @@ ApplicationWindow {
             Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: window.rule }
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 18; anchors.rightMargin: 14; spacing: 10
-                Rectangle { width: 5; height: 5; radius: 3; color: mail.error ? AppTheme.destructive : mail.busy ? AppTheme.accent : window.muted }
+                Rectangle { visible: statusLabel.text.length > 0; width: 5; height: 5; radius: 3; color: mail.error ? AppTheme.destructive : mail.busy ? AppTheme.accent : window.muted }
                 Text {
-                    text: window.lifecycleNotice || mail.error || (mail.demo ? qsTr("Demo · synthetic mail only · sending disabled") : mail.status || qsTr("Ready"))
+                    id: statusLabel
+                    text: window.lifecycleNotice || mail.error || (mail.demo ? "" : mail.status || qsTr("Ready"))
                     color: mail.error ? AppTheme.destructive : window.muted; font.pixelSize: 10
                     Layout.fillWidth: true; elide: Text.ElideRight
                 }

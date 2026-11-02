@@ -20,3 +20,5 @@
 - Database opening must never perform interrupted-send recovery. Call explicit recovery once at startup after the profile lock, before background work. View components expose inputs/signals and must load independently of Main.qml IDs.
 
 - Sidebar toggle must use the shared KosSidebarToggle rounded sidebar glyph, consistent with Weather/Calendar; do not replace it with VectorIcon panelLeft. The sidebar header has no compose button; compose remains in the main toolbar.
+
+- Do not reintroduce a permanent Demo/synthetic-mail caption in the preview footer. Preserve actionable lifecycle notices and errors.
