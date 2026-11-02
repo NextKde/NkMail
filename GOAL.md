@@ -1,5 +1,9 @@
 # NkMail local delivery goal
 
+## Search spacing refinement · 2026-11-02
+
+- Increased search-to-traffic-light spacing from 5px to 10px for both icon and input. VM UI regression passed in 11.32s, with half-pixel layout-rounding tolerance. Host build and guarded preview replacement succeeded.
+
 ## Search beside traffic lights · 2026-11-02
 
 - Removed cumulative toolbar/search trailing margins; search now ends at most 5px before the visible first traffic-light circle. Moved compact-search close action inside the input with reserved text padding so the input itself reaches this edge.

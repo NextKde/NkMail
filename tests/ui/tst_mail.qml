@@ -230,7 +230,7 @@ TestCase {
         }
     }
 
-    function test_search_has_five_pixel_gap_to_traffic_lights() {
+    function test_search_has_ten_pixel_gap_to_traffic_lights() {
         const toolbar = findChild(app, "readerHeader")
         const controls = findChild(app, "windowControls")
         for (const width of [1000, 1180, 1320, 1600]) {
@@ -244,7 +244,7 @@ TestCase {
                 verify(search.visible)
                 const circleLeft = controls.mapToItem(app.contentItem, controls.buttonLayout[0].x, 0).x
                 const searchRight = search.mapToItem(app.contentItem, search.width, 0).x
-                verify(circleLeft - searchRight > 0 && circleLeft - searchRight <= 5,
+                verify(circleLeft - searchRight >= 9.5 && circleLeft - searchRight <= 10,
                        "Gap at width " + width + ", expanded=" + expanded + ": " + (circleLeft - searchRight))
             }
         }

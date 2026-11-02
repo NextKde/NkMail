@@ -33,7 +33,7 @@ Item {
 
     objectName: "readerHeader"
     readonly property real leadingInset: readerHeader.narrow && !readerHeader.sidebarVisible ? 48 : 14
-    readonly property real trailingEdge: Math.min(width, readerHeader.controlsLeft) - 5
+    readonly property real trailingEdge: Math.min(width, readerHeader.controlsLeft) - 10
     readonly property real rowWidth: Math.max(0, trailingEdge - leadingInset)
     readonly property real titleWidth: 0
     readonly property real actionLeft: leadingInset + titleWidth + (titleWidth > 0 ? 8 : 0)
