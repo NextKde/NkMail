@@ -22,7 +22,9 @@ int main(int argc, char **argv)
     QJsonObject result;
     std::thread worker([&] {
         try {
-            if (operation == QStringLiteral("folders")) {
+            if (operation == QStringLiteral("remove") || operation == QStringLiteral("move")) {
+                nkmail::MailioBackend::removeOrMove(a, "INBOX", "42", {"102"}, operation == "move" ? "Archive" : "");
+            } else if (operation == QStringLiteral("folders")) {
                 const auto folders = nkmail::MailioBackend::folders(a);
                 QJsonArray array;
                 for (const auto &f : folders) array.append(QJsonObject{{"id", f.id}, {"title", f.title}, {"total", f.total}});

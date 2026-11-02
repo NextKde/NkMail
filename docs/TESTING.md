@@ -1,11 +1,11 @@
 # Testing and acceptance boundaries
 
-NkMail has five distinct local suites. Enable them with `-DNKMAIL_BUILD_TESTS=ON` and run `ctest --test-dir build --output-on-failure`.
+All builds, automated suites and graphical acceptance run in the designated virtual machine; never run them on the host. NkMail has five distinct suites. Enable them with `-DNKMAIL_BUILD_TESTS=ON` and run `ctest --test-dir build --output-on-failure`.
 
 | Suite | Actual code exercised | Deliberately isolated boundary |
 | --- | --- | --- |
 | `nkmail_core` | SQLite migrations/cache/drafts, DTO serialization, incremental models | Temporary databases; no keyring jobs or network |
-| `nkmail_controller` | Real controller, SQLite and message model; asynchronous dispatch and stale-result handling | Linked synthetic backend and credential-store implementations; no network/keyring implementation |
+| `nkmail_controller` | Real facade/services, SQLite and message model; asynchronous dispatch and stale-result handling | Injected transport regressions plus linked legacy synthetic protocol/credential boundaries; remote-image tests use a synthetic loopback HTTP fixture, never external hosts |
 | `loopback-protocol` | Real mailio adapter, patched TLS/IMAP/SMTP, MIME encoding/decoding | Python services bound to loopback, generated test CA/certificates, synthetic credentials and `.invalid` recipients; no relay |
 | `nkmail_ui` | Real QML views and canonical Kos.Ui components, focus and editor interactions | Behavioral controller mock; offscreen software rendering |
 | `nkmail_cli` | Actual application process, demo capture guard, private data directory and process locking | Fresh XDG directories, no configured account, synthetic demo |
@@ -14,14 +14,13 @@ A controller mock or linked boundary replacement is not protocol acceptance. Con
 
 ## UI release gate
 
-Run `python3 -m unittest discover -s tests/dependency -v` for offline guard regressions,
-then `python3 scripts/check_ui_dependency.py` for the read-only live upstream check.
-The lock at `third_party/kos-ui.lock.json`, staged gitlink and clean submodule HEAD
-must match. Stage intentional dependency metadata updates first. The canonical
-upstream must have a published, non-draft Release whose tag resolves to exactly that
-commit; a local tag, moving branch, draft or unpushed commit is insufficient. Source
-prereleases are currently accepted. API/TLS/rate-limit failures block verification;
-resolve them and retry, do not bypass the guard.
+Run `python3 -m unittest discover -s tests/dependency -v` for guard regressions,
+then `python3 scripts/check_ui_dependency.py`, in a Git checkout inside the VM.
+The current guard verifies the staged gitlink, clean submodule, canonical URL and
+published upstream commit; the current lock has a SHA and no release tag. A supplied
+tag must resolve to that SHA. This describes the inherited main-branch guard, not a
+new release-policy change. Do not claim a published Release check for a commit-only
+pin. API/network failures must not be bypassed.
 
 Guard tests create temporary Git fixtures under `tmp/`, mock network responses, and
 cover uninitialized submodules, dirty tracked/staged/untracked files, wrong URL or
@@ -49,6 +48,22 @@ infer an intended but untested visual change. Published UI tags must not be move
 the guard detects when a tag no longer matches the locked SHA but does not configure
 upstream tag protection. Administrators can change branch policy, so this is an
 accident-prevention gate rather than protection against malicious maintainers.
+
+## Modularity regression coverage
+
+- Core: a second connection must not rewrite a live `sending` draft; explicit startup
+  recovery preserves accepted/unknown states; flags update summary and cached body
+  together; a draft ID cannot be overwritten through another account binding.
+- Controller/services: first online page establishes batch UIDVALIDITY; failed writes
+  leave cache/view unchanged; a live accepted send survives sidebar probes; a cancelled
+  delay never reaches SMTP; stale compose data cannot cross accounts; background
+  credentials resolve using the correct profile/account key; rendered image caching
+  survives reopening and is isolated across accounts.
+- Protocol: servers without UIDPLUS receive no COPY/STORE/EXPUNGE for delete/move;
+  capable servers receive only UID EXPUNGE; a COPY followed by STORE failure reports
+  partial completion without repeating COPY. All commands target the loopback fixture.
+- UI: sidebar/list/reader load without the shell's ID context; the shell exercises the
+  extracted toolbar, focus, geometry, dialogs and search. QML warnings fail the suite.
 
 ## Screenshots
 

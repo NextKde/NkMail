@@ -42,6 +42,10 @@ LiquidDialog {
         submitting = false
         open()
     }
+    function addAccount() {
+        editAccount({id: "new"})
+        original = ({})
+    }
     function valid() {
         return addressField.text.trim().length > 0 && usernameField.text.trim().length > 0
             && imapField.text.trim().length > 0 && smtpField.text.trim().length > 0
@@ -131,7 +135,7 @@ LiquidDialog {
                 }
             }
             Text { visible: !!root.mail.error; text: root.mail.error; color: AppTheme.destructive; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap }
-            Text { text: qsTr("Mailboxes are read-only. Reading does not mark mail as read; move, delete and flag changes are not available."); color: AppTheme.mutedText; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            Text { text: qsTr("Reading does not change server flags. Explicit mail actions can update or delete messages."); color: AppTheme.mutedText; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap }
         }
     }
     footer: Item {

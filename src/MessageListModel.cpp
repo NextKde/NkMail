@@ -120,6 +120,12 @@ bool MessageListModel::update(const Summary &message)
     }
     return true;
 }
+void MessageListModel::remove(int row) {
+    if (row < 0 || row >= count()) return;
+    auto remaining = m_messages;
+    remaining.removeAt(row);
+    replace(remaining);
+}
 void MessageListModel::append(const QList<Summary> &messages)
 {
     const int before = count();

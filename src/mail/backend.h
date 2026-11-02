@@ -34,6 +34,10 @@ public:
     static QString sentFolder(const Account &account);
     static void appendSent(const Account &account, const QString &folder,
                            const QByteArray &raw);
+    // Checks capabilities before any write, and performs all steps on one session.
+    static void removeOrMove(const Account &account, const QString &folder,
+                             const QString &uidValidity, const QStringList &uids,
+                             const QString &destination = {});
     static void storeFlags(const Account &account, const QString &folder,
                            const QString &uidValidity, const QString &uid,
                            const QStringList &flags, bool add);

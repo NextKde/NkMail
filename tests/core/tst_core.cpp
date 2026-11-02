@@ -49,6 +49,9 @@ class CoreTests : public QObject {
 private slots:
     void initTestCase();
     void mapRoundTrips();
+    void cacheProbesDoNotRecoverLiveSends();
+    void flagsUpdateSummaryAndBodyTogether();
+    void staleDraftCannotCrossAccounts();
     void accountAndFolderPersistence();
     void accountChangeClearsMailboxCache();
     void draftRestartAndStates();
@@ -66,6 +69,55 @@ private slots:
 void CoreTests::initTestCase()
 {
     QVERIFY(QDir().mkpath(QStringLiteral(NKMAIL_TEST_TMP_ROOT)));
+}
+void CoreTests::cacheProbesDoNotRecoverLiveSends()
+{
+    QTemporaryDir root(temporaryTemplate());
+    MailDatabase active;
+    QVERIFY(active.open(root.path()));
+    Draft draft; draft.id = "live";
+    QVERIFY(active.saveDraft(draft));
+    QVERIFY(active.markDraftState(draft.id, "sending"));
+    MailDatabase probe;
+    QVERIFY(probe.open(root.path()));
+    probe.unreadCounts(); probe.folders();
+    QCOMPARE(active.drafts().first().state, QString("sending"));
+    QVERIFY(active.markDraftState(draft.id, "accepted"));
+    QVERIFY(probe.recoverInterruptedSends());
+    QCOMPARE(active.drafts().first().state, QString("accepted"));
+}
+void CoreTests::flagsUpdateSummaryAndBodyTogether()
+{
+    QTemporaryDir root(temporaryTemplate());
+    MailDatabase db;
+    QVERIFY(db.open(root.path()));
+    auto summary = message("1");
+    QVERIFY(db.savePage(page({summary})));
+    Content body; body.summary = summary; body.html = "<p>synthetic</p>";
+    QVERIFY(db.saveContent(body));
+    summary.unread = true; summary.flagged = true;
+    QVERIFY(db.updateFlags({summary}));
+    QCOMPARE(db.unreadCounts().value("INBOX"), 1);
+    QVERIFY(db.cachedPage("INBOX").messages.first().flagged);
+    const auto cached = db.content("INBOX", "100", "1");
+    QVERIFY(cached.has_value());
+    QVERIFY(cached->summary.unread && cached->summary.flagged);
+    QCOMPARE(cached->html, body.html);
+    summary.uidValidity = "stale";
+    QVERIFY(!db.updateFlags({summary}));
+}
+void CoreTests::staleDraftCannotCrossAccounts()
+{
+    QTemporaryDir root(temporaryTemplate());
+    MailDatabase db;
+    QVERIFY(db.open(root.path(), "first"));
+    Draft draft; draft.id = "stable-id"; draft.body = "Original";
+    QVERIFY(db.saveDraft(draft));
+    QVERIFY(db.open(root.path(), "second"));
+    draft.body = "Wrong account";
+    QVERIFY(!db.saveDraft(draft));
+    QVERIFY(db.open(root.path(), "first"));
+    QCOMPARE(db.drafts().first().body, QString("Original"));
 }
 void CoreTests::mapRoundTrips()
 {
@@ -220,6 +272,7 @@ void CoreTests::draftRestartAndStates()
     {
         MailDatabase db;
         QVERIFY(db.open(dir.path()));
+        QVERIFY(db.recoverInterruptedSends());
         const auto drafts = db.drafts();
         QCOMPARE(drafts.size(), 1);
         const auto &restored = drafts.first();

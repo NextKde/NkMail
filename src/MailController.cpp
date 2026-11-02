@@ -2,144 +2,21 @@
 #include "MessageListModel.h"
 #include "NotificationService.h"
 #include "storage/MailDatabase.h"
-#include "storage/CredentialStore.h"
-#include "mail/backend.h"
-#include <QCryptographicHash>
+#include "services/AccountSession.h"
+#include "services/DraftService.h"
+#include "services/SendService.h"
+#include "services/MailboxSync.h"
+#include "services/RemoteImageLoader.h"
+#include "mail/MailTransport.h"
 #include <QDir>
-#include <QEventLoop>
-#include <QFile>
-#include <QFileInfo>
-#include <QMimeDatabase>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
-#include <QPair>
 #include <QPointer>
-#include <QSaveFile>
 #include <QSettings>
-#include <QRegularExpression>
 #include <QSet>
 #include <QTimer>
-#include <QUrl>
-#include <QUuid>
-#include <QtConcurrent>
 
 namespace nkmail {
 namespace {
 constexpr int pageSize = 50;
-constexpr qint64 attachmentLimit = 25 * 1024 * 1024;
-QString localPath(const QString &url) {
-    const QUrl value(url);
-    return value.isLocalFile() ? value.toLocalFile() : QString{};
-}
-QString cleanSubject(const QString &prefix, const QString &subject) {
-    return subject.startsWith(prefix, Qt::CaseInsensitive) ? subject : prefix + subject;
-}
-QString escapeHtml(const QString &text)
-{
-    QString out; out.reserve(text.size());
-    for (const auto ch : text) {
-        switch (ch.unicode()) {
-        case u'&': out += QStringLiteral("&amp;"); break;
-        case u'<': out += QStringLiteral("&lt;"); break;
-        case u'>': out += QStringLiteral("&gt;"); break;
-        case u'"': out += QStringLiteral("&quot;"); break;
-        default: out += ch;
-        }
-    }
-    return out;
-}
-bool remoteHttpUrl(const QString &value) {
-    if (value.isEmpty()) return false;
-    for (const auto ch : value)
-        if (ch.unicode() < 0x20) return false;
-    const auto lower = value.toLower();
-    return lower.startsWith(QStringLiteral("http://")) || lower.startsWith(QStringLiteral("https://"));
-}
-// The sanitizer HTML-escapes the placeholder URL, so the attribute read back
-// from the sanitized markup must be unescaped before it can be fetched.
-QString htmlAttributeText(const QString &value) {
-    QString out = value;
-    out.replace(QStringLiteral("&lt;"), QStringLiteral("<"));
-    out.replace(QStringLiteral("&gt;"), QStringLiteral(">"));
-    out.replace(QStringLiteral("&quot;"), QStringLiteral("\""));
-    out.replace(QStringLiteral("&amp;"), QStringLiteral("&"));
-    return out;
-}
-// extract addr-specs, never display-name fragments. Unsupported RFC groups,
-// comments, quoted local parts and malformed input fail closed for manual review.
-bool replyAddresses(const QString &field, QStringList *addresses) {
-    addresses->clear();
-    if (field.trimmed().isEmpty()) return true;
-    QStringList tokens;
-    QString token;
-    bool quoted = false, escaped = false, angle = false;
-    for (const QChar ch : field) {
-        if (ch.unicode() < 0x20 || ch.unicode() == 0x7f) return false;
-        if (quoted) {
-            token += ch;
-            if (escaped) escaped = false;
-            else if (ch == QLatin1Char('\\')) escaped = true;
-            else if (ch == QLatin1Char('"')) quoted = false;
-            continue;
-        }
-        if (ch == QLatin1Char('"')) quoted = true;
-        else if (ch == QLatin1Char('<')) { if (angle) return false; angle = true; }
-        else if (ch == QLatin1Char('>')) { if (!angle) return false; angle = false; }
-        else if (ch == QLatin1Char(',') && !angle) {
-            if (token.trimmed().isEmpty()) return false;
-            tokens.append(token.trimmed()); token.clear(); continue;
-        }
-        else if (ch == QLatin1Char(':') || ch == QLatin1Char(';')
-                 || ch == QLatin1Char('(') || ch == QLatin1Char(')') || ch == QLatin1Char('\\')) return false;
-        token += ch;
-    }
-    if (quoted || escaped || angle || token.trimmed().isEmpty()) return false;
-    tokens.append(token.trimmed());
-    static const QRegularExpression atom(QStringLiteral("^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+$"));
-    static const QRegularExpression label(QStringLiteral("^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$"));
-    for (const auto &value : tokens) {
-        QString address = value;
-        const int opening = value.indexOf('<');
-        if (opening >= 0) {
-            if (!value.endsWith('>') || value.count('<') != 1 || value.count('>') != 1) return false;
-            address = value.mid(opening + 1, value.size() - opening - 2).trimmed();
-        } else if (value.contains('>')) return false;
-        if (address.size() > 254 || address.count('@') != 1) return false;
-        const auto parts = address.split('@');
-        if (parts.first().isEmpty() || parts.first().size() > 64 || parts.last().isEmpty()) return false;
-        for (const auto &part : parts.first().split('.'))
-            if (!atom.match(part).hasMatch()) return false;
-        for (const auto &part : parts.last().split('.'))
-            if (part.size() > 63 || !label.match(part).hasMatch()) return false;
-        addresses->append(address);
-    }
-    return true;
-}
-Summary summaryFromMap(const QVariantMap &map) {
-    Summary summary;
-    summary.folder = map.value("folder").toString();
-    summary.uidValidity = map.value("uidValidity").toString();
-    summary.uid = map.value("uid").toString();
-    summary.sender = map.value("sender").toString();
-    summary.senderAddress = map.value("senderAddress").toString();
-    summary.recipients = map.value("recipients").toString();
-    summary.subject = map.value("subject").toString();
-    summary.date = map.value("date").toString();
-    summary.preview = map.value("preview").toString();
-    summary.messageId = map.value("messageId").toString();
-    summary.inReplyTo = map.value("inReplyTo").toString();
-    summary.references = map.value("references").toString();
-    summary.unread = map.value("unread").toBool();
-    summary.flagged = map.value("flagged").toBool();
-    summary.hasAttachments = map.value("hasAttachments").toBool();
-    return summary;
-}
-QList<Summary> modelSnapshot(const MessageListModel *model) {
-    QList<Summary> result;
-    for (int row = 0; row < model->count(); ++row) result.append(summaryFromMap(model->get(row)));
-    return result;
-}
 bool sameMessage(const Summary &a, const Summary &b) {
     return a.folder == b.folder && a.uidValidity == b.uidValidity && a.uid == b.uid;
 }
@@ -156,85 +33,83 @@ bool isArchiveFolder(const QVariantList &folders, const QString &destination) {
     return false;
 }
 }
-MailController::MailController(bool demo, const QString &dataRoot, QObject *parent)
-    : QObject(parent), m_demo(demo), m_root(dataRoot), m_database(std::make_unique<MailDatabase>()),
-      m_messages(new MessageListModel(this)), m_credentials(new CredentialStore(this)) {
-    m_pool.setMaxThreadCount(1);
-    m_pool.setExpiryTimeout(-1);
-    m_refreshTimer.setTimerType(Qt::VeryCoarseTimer);
-    m_sendTimer.setSingleShot(true);
-    connect(&m_sendTimer, &QTimer::timeout, this, [this] {
-        const auto draft = m_pendingSend;
-        m_pendingSend = {};
-        m_sendPending = false;
-        emit sendPendingChanged();
-        submitDraft(draft);
+MailController::MailController(bool demo, const QString &dataRoot, QObject *parent, std::shared_ptr<MailTransport> transport)
+    : QObject(parent), m_transport(transport ? std::move(transport) : std::make_shared<MailTransport>()), m_demo(demo), m_root(dataRoot), m_database(std::make_unique<MailDatabase>()),
+      m_messages(new MessageListModel(this)), m_credentials(new AccountSession(dataRoot, this)) {
+    m_drafts = new DraftService(*m_database, dataRoot, this);
+    connect(m_drafts, &DraftService::draftsChanged, this, &MailController::draftsChanged);
+    connect(m_drafts, &DraftService::status, this, &MailController::setStatus);
+    m_send = new SendService(demo, *m_database, *m_drafts, m_transport, this);
+    connect(m_send, &SendService::draftsChanged, this, &MailController::draftsChanged);
+    connect(m_send, &SendService::sendPendingChanged, this, &MailController::sendPendingChanged);
+    connect(m_send, &SendService::draftAccepted, this, &MailController::draftAccepted);
+    connect(m_send, &SendService::status, this, &MailController::setStatus);
+    m_images = new RemoteImageLoader(this);
+    connect(m_images, &RemoteImageLoader::loaded, this, [this](const QString &key, const QString &html) {
+        if (key != RemoteImageLoader::key(m_account.id, m_content.summary)) return;
+        m_content.html = html; m_selected = contentMap(m_content); emit selectionChanged();
     });
+    m_commands = new MailboxCommands(*m_database, m_transport, this);
+    connect(m_commands, &MailboxCommands::completed, this, [this](const QList<Summary> &messages, bool removed, const QString &error) {
+        for (const auto &s : messages) {
+            if (removed) {
+                const int row = m_messages->indexOf(s.folder, s.uidValidity, s.uid);
+                if (row >= 0) m_messages->remove(row);
+            } else m_messages->update(s);
+            if (sameMessage(m_content.summary, s)) {
+                ++m_selectionGeneration;
+                if (removed) { m_content = {}; m_selected.clear(); m_selectedUid.clear(); }
+                else { m_content.summary = s; m_selected = contentMap(m_content); }
+                emit selectionChanged();
+            }
+        }
+        m_accountUnread.remove(m_account.id); ++m_accountUnreadRevision;
+        emit accountUnreadChanged(); emit folderUnreadChanged();
+        setStatus(error.isEmpty() ? tr("Messages updated") : tr("Mailbox operation needs attention"), error);
+    });
+    m_sync = new MailboxSync(m_transport, this);
+    m_refreshTimer.setTimerType(Qt::VeryCoarseTimer);
     connect(&m_refreshTimer, &QTimer::timeout, this, [this] {
-        if (m_busy || m_sending || m_demo || !configured() || m_account.password.isEmpty()) return;
+        if (m_busy || m_commands->busy() || sending() || m_demo || !configured()) return;
         fetchPage(false, true);
 
-        // Background sweep of the other accounts' INBOX statistics. Accounts are
-        // visited serially in a single task (one connection at a time); failures
-        // are per-account and never surface to the foreground UI or status bar.
-        QList<Account> others;
-        for (const auto &account : m_database->accounts())
-            if (account.id != m_account.id) others.append(account);
-        if (others.isEmpty()) return;
-        const bool notify = m_notifyEnabled;
-        QPointer<MailController> self(this);
-        run([self, others, notify] {
-            QHash<QString, int> unread;
-            QList<QPair<QString, QString>> notices;
-            for (const auto &account : others) {
-                InboxStats stats;
-                try { stats = MailioBackend::inboxStats(account); }
-                catch (...) { continue; }
-                unread.insert(account.id, stats.unseen);
-                bool ok = false;
-                const quint64 current = stats.maxUid.toULongLong(&ok);
-                if (!ok) continue;
-                QSettings settings;
-                const QString key = QStringLiteral("accounts/%1/lastMaxUid").arg(account.id);
-                if (!settings.contains(key)) {
-                    settings.setValue(key, QVariant::fromValue<qulonglong>(current));
-                    continue;
-                }
-                const quint64 last = settings.value(key).toULongLong();
-                if (current <= last) {
-                    // A lower maximum means the mailbox was regenerated; re-baseline quietly.
-                    if (current < last) settings.setValue(key, QVariant::fromValue<qulonglong>(current));
-                    continue;
-                }
-                settings.setValue(key, QVariant::fromValue<qulonglong>(current));
-                if (!notify) continue;
-                const QString title = account.name.isEmpty() ? account.address : account.name;
-                notices.append({title, MailController::tr("%1 new messages").arg(current - last)});
-            }
-            if (self) QMetaObject::invokeMethod(self, [self, unread, notices] {
-                if (!self) return;
-                for (auto it = unread.cbegin(); it != unread.cend(); ++it)
-                    self->m_accountUnread.insert(it.key(), it.value());
-                ++self->m_accountUnreadRevision;
-                emit self->accountUnreadChanged();
-                for (const auto &notice : notices)
-                    NotificationService::notify(notice.first, notice.second);
-            }, Qt::QueuedConnection);
-        });
+        for (const auto &account : m_database->accounts()) {
+            if (account.id == m_account.id) continue;
+            const auto generation = m_generation;
+            QPointer<MailController> self(this);
+            m_credentials->resolve(account, [self, generation](const Account &authenticated) {
+                if (!self || generation != self->m_generation || authenticated.password.isEmpty()) return;
+                self->m_sync->stats(authenticated, [self, authenticated, generation](const InboxStats &stats, const QString &error) {
+                    if (!self || generation != self->m_generation || !error.isEmpty()) return;
+                    self->m_accountUnread.insert(authenticated.id, stats.unseen);
+                    ++self->m_accountUnreadRevision;
+                    emit self->accountUnreadChanged();
+                    QSettings settings(QDir(self->m_root).filePath("polling.ini"), QSettings::IniFormat);
+                    const QString key = self->credentialKey(authenticated);
+                    const QString validity = settings.value(key + "/validity").toString();
+                    const quint64 previous = settings.value(key + "/maxUid").toULongLong();
+                    const quint64 current = stats.maxUid.toULongLong();
+                    settings.setValue(key + "/validity", stats.uidValidity);
+                    settings.setValue(key + "/maxUid", current);
+                    if (self->m_notifyEnabled && validity == stats.uidValidity && current > previous)
+                        NotificationService::notify(authenticated.name, tr("New mail available"));
+                });
+            });
+        }
     });
-    connect(m_credentials, &CredentialStore::passwordReady, this, [this](const QString &id, const QString &password) {
+    connect(m_credentials, &AccountSession::passwordReady, this, [this](const QString &id, const QString &password) {
         if (id != credentialKey() || m_demo || !m_restorePending || !m_account.password.isEmpty()) return;
         m_restorePending = false;
         m_switchCredentialPending = false;
         m_account.password = password;
         setStatus(tr("Saved credentials restored. Refresh to connect."));
     });
-    connect(m_credentials, &CredentialStore::passwordSaved, this, [this](const QString &) {
+    connect(m_credentials, &AccountSession::passwordSaved, this, [this](const QString &) {
         QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
         if (!settings.value("restoreAllowed", false).toBool()) return;
-        if (!m_busy && !m_sending) setStatus(tr("Credentials saved in the system keychain."));
+        if (!m_busy && !sending()) setStatus(tr("Credentials saved in the system keychain."));
     });
-    connect(m_credentials, &CredentialStore::error, this, [this](const QString &id, const QString &) {
+    connect(m_credentials, &AccountSession::error, this, [this](const QString &id, const QString &) {
         if (id != credentialKey()) return;
         m_restorePending = false;
         if (m_switchCredentialPending) {
@@ -249,7 +124,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     });
     QTimer::singleShot(0, this, &MailController::initialize);
 }
-MailController::~MailController() { m_sendTimer.stop(); m_pendingSend = {}; m_sendPending = false; m_pool.clear(); m_pool.waitForDone(); }
+MailController::~MailController() { delete m_sync; delete m_commands; delete m_send; delete m_images; }
 QObject *MailController::messages() const { return m_messages; }
 bool MailController::configured() const { return !m_account.address.isEmpty() && !m_account.imapHost.isEmpty(); }
 QVariantMap MailController::account() const { return accountMap(m_account); }
@@ -336,29 +211,24 @@ void MailController::setStatus(const QString &status, const QString &error) {
     m_status = status; m_error = error; emit statusChanged();
 }
 QString MailController::credentialKey() const { return credentialKey(m_account); }
-QString MailController::credentialKey(const Account &account) const {
-    // Keep the canonical-root hash used for profile scoping and prefix it with the
-    // account id. The same username configured in two accounts of one profile now
-    // maps to distinct keys, while separate profiles never share a secret.
-    const QFileInfo root(m_root);
-    QString path = root.canonicalFilePath();
-    if (path.isEmpty()) path = root.absoluteFilePath();
-    const QByteArray scope = path.toUtf8() + '\0' + account.id.toUtf8();
-    const QString profile = QStringLiteral("profile-") + QString::fromLatin1(QCryptographicHash::hash(scope, QCryptographicHash::Sha256).toHex());
-    return account.id + QLatin1Char(':') + profile;
-}
-void MailController::run(std::function<void()> task) { (void)QtConcurrent::run(&m_pool, std::move(task)); }
+QString MailController::credentialKey(const Account &account) const { return m_credentials->key(account); }
 void MailController::initialize() {
     if (!m_database->open(m_root, m_account.id)) { setStatus(tr("Storage unavailable"), m_database->error()); return; }
+    if (!m_database->recoverInterruptedSends()) { setStatus(tr("Storage unavailable"), m_database->error()); return; }
     if (m_demo) { seedDemo(); return; }
     m_account = m_database->account();
+    if (!configured() && !m_database->accounts().isEmpty()) {
+        const auto first = m_database->accounts().first();
+        if (!m_database->open(m_root, first.id)) { setStatus(tr("Storage unavailable"), m_database->error()); return; }
+        m_account = m_database->account();
+    }
     for (const auto &folder : m_database->folders()) m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
     emit accountChanged(); emit foldersChanged(); emit draftsChanged();
     loadCached();
     setStatus(configured() ? tr("Offline · cached mail") : tr("Add your email account to get started"));
     startRefreshTimer();
     QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
-    if (configured() && settings.value("restoreAllowed", false).toBool()) {
+    if (configured() && settings.value(credentialKey() + "/restoreAllowed", settings.value("restoreAllowed", false)).toBool()) {
         m_restorePending = true;
         m_credentials->read(credentialKey());
     }
@@ -396,7 +266,7 @@ void MailController::seedDemo() {
 }
 void MailController::configureAccount(const QVariantMap &configuration, const QString &password, bool remember) {
     if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return; }
-    if (m_busy || m_sending) return;
+    if (m_busy || sending() || m_commands->busy()) return;
     Account next = accountFromMap(configuration);
     const auto validHost = [](const QString &host) { return !host.trimmed().isEmpty() && !host.contains('/') && !host.contains('\n') && !host.contains('\r'); };
     if (!next.address.contains('@') || next.username.trimmed().isEmpty() || !validHost(next.imapHost) || !validHost(next.smtpHost)
@@ -421,11 +291,13 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
     // Only the live account may reuse the session-only password held in memory.
     next.password = password.isEmpty() ? (editingCurrent ? m_account.password : QString{}) : password;
     if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return; }
+    m_credentials->setPassword(next);
     if (!editingCurrent) {
         // Adding or editing a background account must not disturb the live mailbox.
         if (remember && !next.password.isEmpty()) m_credentials->write(credentialKey(next), next.password);
         else if (!remember) m_credentials->remove(credentialKey(next));
         emit accountsChanged();
+        if (!configured()) switchAccount(next.id);
         setStatus(tr("Account saved."));
         return;
     }
@@ -451,7 +323,7 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
 }
 void MailController::switchAccount(const QString &id) {
     const QString accountId = id.trimmed();
-    if (m_busy || m_sending || m_mutating) { setStatus(tr("Finish the current operation before switching accounts")); return; }
+    if (m_busy || sending() || m_commands->busy()) { setStatus(tr("Finish the current operation before switching accounts")); return; }
     if (accountId.isEmpty() || accountId == m_account.id) return;
     bool exists = false;
     for (const auto &account : m_database->accounts())
@@ -469,8 +341,7 @@ void MailController::switchAccount(const QString &id) {
         return;
     }
 
-    // The new account starts from an empty, cached-only view. Only this account is
-    // polled; other accounts are never fetched, pushed, or searched in the background.
+    // Foreground view starts cached-only; background accounts poll inbox statistics.
     m_messages->replace({});
     m_selected.clear(); m_selectedUid.clear(); m_content = {};
     m_folder = QStringLiteral("INBOX");
@@ -497,16 +368,14 @@ void MailController::switchAccount(const QString &id) {
     }
 
     emit accountChanged(); emit foldersChanged(); emit selectionChanged();
-    emit searchChanged(); emit folderChanged();
+    emit searchChanged(); emit folderChanged(); emit draftsChanged();
     setStatus(configured() ? tr("Offline · cached mail") : tr("Add your email account to get started"));
 }
 QVariantList MailController::foldersFor(const QString &accountId) const {
     QVariantList out;
-    MailDatabase probe;
-    if (!probe.open(m_root, accountId)) return out;
-    for (const auto &folder : probe.folders())
+    if (!m_database->isOpen()) return out;
+    for (const auto &folder : m_database->folders(accountId))
         out.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
-    probe.close();
     return out;
 }
 QVariantMap MailController::folderUnread() const {
@@ -521,17 +390,12 @@ int MailController::accountUnread(const QString &accountId) const {
     // Prefer the count most recently reported by the server; fall back to the
     // local cache when this account has not been polled yet.
     if (m_accountUnread.contains(accountId)) return m_accountUnread.value(accountId);
-    // Read-only probe: a separate connection keeps another account's cache
-    // inspectable without touching the active binding or opening a socket.
-    MailDatabase probe;
-    if (!probe.open(m_root, accountId)) return 0;
-    const int unread = probe.unreadCounts().value(QStringLiteral("INBOX"), 0);
-    probe.close();
-    return unread;
+    // A scoped SELECT, without opening a connection or changing the active binding.
+    return m_database->unreadCounts(accountId).value(QStringLiteral("INBOX"), 0);
 }
 void MailController::removeAccount(const QString &id) {
     if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return; }
-    if (m_busy || m_sending || m_mutating) { setStatus(tr("Finish the current operation before switching accounts")); return; }
+    if (m_busy || sending() || m_commands->busy()) { setStatus(tr("Finish the current operation before switching accounts")); return; }
     const QString accountId = id.trimmed().isEmpty() ? QStringLiteral("default") : id.trimmed();
     Account target;
     bool found = false;
@@ -539,47 +403,40 @@ void MailController::removeAccount(const QString &id) {
         if (account.id == accountId) { target = account; found = true; break; }
     if (!found) return;
     if (!m_database->removeAccount(accountId)) { setStatus(tr("Could not remove account"), m_database->error()); return; }
-    m_credentials->remove(credentialKey(target));
+    m_credentials->forget(target);
     emit accountsChanged();
     if (accountId != m_account.id) return;
 
     const auto remaining = m_database->accounts();
     if (!remaining.isEmpty()) { switchAccount(remaining.first().id); return; }
     disconnectAccount();
+    if (!m_database->open(m_root)) { setStatus(tr("Storage unavailable"), m_database->error()); return; }
+    m_account = {}; m_folders.clear(); m_messages->clear();
+    m_selected.clear(); m_selectedUid.clear(); m_content = {}; m_uidValidity.clear();
+    emit accountChanged(); emit foldersChanged(); emit selectionChanged(); emit draftsChanged();
     setStatus(tr("No accounts left"));
 }
 void MailController::refresh() {
     if (m_demo) { setStatus(tr("Preview · synthetic mail · not connected")); return; }
-    if (m_busy || m_sending) return;
+    if (m_busy || sending() || m_commands->busy()) return;
     if (!configured() || m_account.password.isEmpty()) { setStatus(tr("Account needs attention"), tr("Add an account and enter an application password before connecting.")); return; }
     const auto generation = ++m_generation; const auto account = m_account;
     m_busy = true; setStatus(tr("Connecting securely…"));
-    QPointer<MailController> self(this);
-    run([self, account, generation] {
-        try {
-            const auto folders = MailioBackend::folders(account);
-            if (!self) return;
-            QMetaObject::invokeMethod(self, [self, folders, generation] {
-                if (!self || generation != self->m_generation) return;
-                self->m_database->saveFolders(folders); self->m_folders.clear();
-                for (const auto &f : folders) self->m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"total", f.total}});
-                emit self->foldersChanged(); self->m_busy = false; self->m_offset = 0;
-                self->fetchPage(false);
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const QString error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, error, generation] {
-                if (!self || generation != self->m_generation) return;
-                self->m_busy = false; self->m_cachedOnly = true;
-                self->loadCached(); self->setStatus(self->tr("Offline · cached mail"), error);
-            }, Qt::QueuedConnection);
-        }
+    m_sync->folders(account, [this, generation](const QList<Folder> &folders, const QString &error) {
+        if (generation != m_generation) return;
+        m_busy = false;
+        if (!error.isEmpty()) { m_cachedOnly = true; loadCached(); setStatus(tr("Offline · cached mail"), error); return; }
+        m_database->saveFolders(folders); m_folders.clear();
+        for (const auto &f : folders) m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"total", f.total}});
+        emit foldersChanged(); m_busy = false; m_offset = 0;
+        fetchPage(false);
     });
 }
+
 void MailController::loadCached(bool append) {
     if (!m_database->isOpen()) return;
     auto page = m_database->cachedPage(m_folder, append ? m_offset : 0, pageSize, m_search, m_unreadOnly);
-    if (!page.uidValidity.isEmpty()) m_uidValidity = page.uidValidity;
+    m_uidValidity = page.uidValidity;
     if (append) m_messages->append(page.messages); else m_messages->replace(page.messages);
     m_offset = page.nextOffset; m_hasMore = page.hasMore; emit statusChanged();
     emit folderUnreadChanged();
@@ -608,33 +465,26 @@ void MailController::searchServer() {
     const auto generation = m_generation; const auto account = m_account;
     const auto folder = m_folder; const auto validity = m_uidValidity;
     m_serverSearching = true; setStatus(tr("Searching server…"));
-    QPointer<MailController> self(this);
-    run([self, account, folder, validity, query, generation] {
-        QList<QVariantMap> matches;
-        bool ok = true;
-        try { matches = MailioBackend::search(account, folder, validity, query, pageSize); }
-        catch (...) { ok = false; }
-        if (self) QMetaObject::invokeMethod(self, [self, matches, ok, generation] {
-            if (!self) return;
-            self->m_serverSearching = false;
-            if (generation != self->m_generation) return;
-            if (!ok) { self->setStatus(MailController::tr("Search · server unavailable")); return; }
-            QSet<QString> seen;
-            for (int row = 0; row < self->m_messages->count(); ++row) {
-                const auto existing = self->m_messages->get(row);
-                seen.insert(existing.value("uid").toString() + u'\n' + existing.value("uidValidity").toString());
-            }
-            QList<Summary> additions;
-            for (const auto &match : matches) {
-                const auto key = match.value("uid").toString() + u'\n' + match.value("uidValidity").toString();
-                if (seen.contains(key)) continue;
-                seen.insert(key); additions.append(summaryFromMap(match));
-            }
-            if (!additions.isEmpty()) self->m_messages->append(additions);
-            self->setStatus(MailController::tr("Search · cached + server"));
-        }, Qt::QueuedConnection);
+    m_sync->search(account, folder, validity, query, pageSize, [this, generation](const QList<QVariantMap> &matches, const QString &error) {
+        if (generation != m_generation) return;
+        m_serverSearching = false;
+        if (!error.isEmpty()) { setStatus(tr("Search · server unavailable"), error); return; }
+        QSet<QString> seen;
+        for (int row = 0; row < m_messages->count(); ++row) {
+            const auto existing = m_messages->get(row);
+            seen.insert(existing.value("uid").toString() + u'\n' + existing.value("uidValidity").toString());
+        }
+        QList<Summary> additions;
+        for (const auto &match : matches) {
+            const auto key = match.value("uid").toString() + u'\n' + match.value("uidValidity").toString();
+            if (seen.contains(key)) continue;
+            seen.insert(key); additions.append(summaryFromMap(match));
+        }
+        if (!additions.isEmpty()) m_messages->append(additions);
+        setStatus(MailController::tr("Search · cached + server"));
     });
 }
+
 void MailController::setUnreadOnly(bool unreadOnly) {
     if (m_unreadOnly == unreadOnly) return;
     ++m_generation; m_busy = false; m_cachedOnly = true; m_unreadOnly = unreadOnly; m_offset = 0;
@@ -655,10 +505,8 @@ void MailController::setRefreshInterval(int seconds) {
     emit refreshIntervalChanged();
 }
 void MailController::setSendDelay(int seconds) {
-    seconds = qMax(0, seconds);
-    if (m_sendDelay == seconds) return;
-    m_sendDelay = seconds;
-    emit sendDelayChanged();
+    if (sendDelay() == qBound(0, seconds, 60)) return;
+    m_send->setDelay(seconds); emit sendDelayChanged();
 }
 void MailController::startRefreshTimer() {
     if (m_demo || !configured()) { m_refreshTimer.stop(); return; }
@@ -698,902 +546,152 @@ void MailController::loadMore() {
     else fetchPage(true);
 }
 void MailController::fetchPage(bool append, bool quiet) {
-    if (m_busy || m_demo || m_account.password.isEmpty()) return;
+    if (m_busy || m_commands->busy() || m_demo || m_account.password.isEmpty()) return;
     if (!m_search.isEmpty()) { loadCached(append); return; }
     const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
     const auto offset = append ? m_offset : 0;
     m_busy = true; if (!quiet) setStatus(tr("Fetching message headers…"));
-    QPointer<MailController> self(this);
-    run([self, account, folder, offset, generation, append, quiet] {
-        try {
-            auto page = MailioBackend::page(account, folder, offset, pageSize);
-            if (self) QMetaObject::invokeMethod(self, [self, page, generation, append, quiet] {
-                if (!self || generation != self->m_generation) return;
-                self->m_busy = false;
-                if (!self->m_database->savePage(page)) {
-                    if (!quiet) self->setStatus(MailController::tr("Could not cache messages"), self->m_database->error());
-                    return;
-                }
-                const bool changedValidity = !self->m_content.summary.uidValidity.isEmpty() && self->m_content.summary.folder == page.folder
-                    && self->m_content.summary.uidValidity != page.uidValidity;
-                const bool listChangedValidity = self->m_messages->count() > 0
-                    && self->m_messages->get(0).value("uidValidity").toString() != page.uidValidity;
-                if (changedValidity || listChangedValidity) {
-                    ++self->m_selectionGeneration; self->m_selected.clear(); self->m_selectedUid.clear(); self->m_content = {};
-                    emit self->selectionChanged();
-                }
-                if (append && listChangedValidity) {
-                    // Offsets refer to the old mailbox generation. The returned
-                    // tail cannot substitute for the new generation's first page.
-                    self->m_messages->clear(); self->m_offset = 0; self->m_hasMore = false;
-                    self->fetchPage(false, quiet);
-                    return;
-                }
-                if (self->m_unreadOnly) {
-                    // The network page is intentionally raw. Recompute filtered
-                    // offsets against the complete cache after saving it.
-                    self->loadCached(false);
-                } else {
-                    if (append) self->m_messages->append(page.messages); else self->m_messages->replace(page.messages);
-                    self->m_offset = page.nextOffset; self->m_hasMore = page.hasMore;
-                }
-                self->m_cachedOnly = self->m_unreadOnly || !self->m_search.isEmpty();
-                // Saved headers changed the cached unread totals.
-                emit self->folderUnreadChanged();
-                if (quiet && !append && page.folder == QLatin1String("INBOX")) self->checkNewMail(page);
-                if (!quiet) self->setStatus(MailController::tr("Up to date · headers cached · server flags are read-only"));
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, error, append, quiet] {
-                if (!self || generation != self->m_generation) return;
-                self->m_busy = false; self->m_cachedOnly = true;
-                self->loadCached(append);
-                if (!quiet) self->setStatus(MailController::tr("Offline · cached mail"), error);
-            }, Qt::QueuedConnection);
+    m_sync->page(account, folder, offset, pageSize, [this, generation, append, quiet](const Page &page, const QString &error) {
+        if (generation != m_generation) return;
+        m_busy = false;
+        if (!error.isEmpty()) {
+            m_cachedOnly = true; loadCached(append);
+            if (!quiet) setStatus(tr("Offline · cached mail"), error);
+            return;
         }
+        m_busy = false;
+        if (!m_database->savePage(page)) {
+            if (!quiet) setStatus(MailController::tr("Could not cache messages"), m_database->error());
+            return;
+        }
+        m_uidValidity = page.uidValidity;
+        const bool changedValidity = !m_content.summary.uidValidity.isEmpty() && m_content.summary.folder == page.folder
+            && m_content.summary.uidValidity != page.uidValidity;
+        const bool listChangedValidity = m_messages->count() > 0
+            && m_messages->get(0).value("uidValidity").toString() != page.uidValidity;
+        if (changedValidity || listChangedValidity) {
+            ++m_selectionGeneration; m_selected.clear(); m_selectedUid.clear(); m_content = {};
+            emit selectionChanged();
+        }
+        if (append && listChangedValidity) {
+            // Offsets refer to the old mailbox generation. The returned
+            // tail cannot substitute for the new generation's first page.
+            m_messages->clear(); m_offset = 0; m_hasMore = false;
+            fetchPage(false, quiet);
+            return;
+        }
+        if (m_unreadOnly) {
+            // The network page is intentionally raw. Recompute filtered
+            // offsets against the complete cache after saving it.
+            loadCached(false);
+        } else {
+            if (append) m_messages->append(page.messages); else m_messages->replace(page.messages);
+            m_offset = page.nextOffset; m_hasMore = page.hasMore;
+        }
+        m_cachedOnly = m_unreadOnly || !m_search.isEmpty();
+        // Saved headers changed the cached unread totals.
+        emit folderUnreadChanged();
+        if (quiet && !append && page.folder == QLatin1String("INBOX")) checkNewMail(page);
+        if (!quiet) setStatus(MailController::tr("Up to date · headers cached"));
     });
 }
+
 void MailController::present(const Content &content) {
-    m_content = content; m_selectedUid = content.summary.uid; m_selected = contentMap(content);
+    m_content = content;
+    m_content.html = m_images->cached(RemoteImageLoader::key(m_account.id, content.summary), content.html);
+    m_selectedUid = content.summary.uid; m_selected = contentMap(m_content);
     emit selectionChanged();
 }
 int MailController::blockedImageCount() const {
     return int(m_content.html.count(QStringLiteral("data-nkmail-src=\"")));
 }
 void MailController::loadRemoteImages() {
-    const QString html = m_content.html;
-    if (html.isEmpty()) return;
-    const Summary summary = m_content.summary;
-    const QString messageKey = summary.folder + QLatin1Char('|') + summary.uidValidity
-        + QLatin1Char('|') + summary.uid;
-    if (m_loadedImageMessages.contains(messageKey)) return;
-
-    // Collect the distinct placeholder URLs, capped so a hostile message cannot
-    // turn one click into an unbounded number of requests.
-    static const QRegularExpression srcPattern(QStringLiteral("data-nkmail-src=\"([^\"]*)\""));
-    QList<QPair<QString, QString>> sources; // escaped attribute text, fetch URL
-    QSet<QString> seen;
-    auto matches = srcPattern.globalMatch(html);
-    while (matches.hasNext() && sources.size() < 20) {
-        const QString escaped = matches.next().captured(1);
-        const QString url = htmlAttributeText(escaped).trimmed();
-        if (!remoteHttpUrl(url) || seen.contains(url)) continue;
-        seen.insert(url);
-        sources.append({escaped, url});
-    }
-    if (sources.isEmpty()) return;
-    m_loadedImageMessages.insert(messageKey);
-
-    const quint64 selectionGeneration = m_selectionGeneration;
-    QPointer<MailController> self(this);
-    run([self, sources, selectionGeneration, messageKey] {
-        constexpr qint64 maxBytes = 2 * 1024 * 1024;
-        constexpr int timeoutMs = 10000;
-        // One manager per batch, created inside the task and never shared.
-        QNetworkAccessManager manager;
-        QList<QPair<QString, QString>> results; // escaped attribute text, replacement HTML
-        for (const auto &source : sources) {
-            const QString &escaped = source.first;
-            const QUrl url(source.second);
-            const bool schemeOk = url.isValid()
-                && (url.scheme() == QLatin1String("http") || url.scheme() == QLatin1String("https"));
-            QString replacement = QStringLiteral("<span>[图片加载失败]</span>");
-            if (schemeOk) {
-                // No Referer, no cookies: only the bare image request goes out.
-                QNetworkRequest request(url);
-                request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                                     QNetworkRequest::NoLessSafeRedirectPolicy);
-                request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("NkMail"));
-                QNetworkReply *reply = manager.get(request);
-                QEventLoop loop;
-                QTimer timer;
-                timer.setSingleShot(true);
-                QObject::connect(&timer, &QTimer::timeout, &loop, [&reply, &loop] {
-                    reply->abort();
-                    loop.quit();
-                });
-                // Stop buffering once a response clearly exceeds the size cap.
-                QObject::connect(reply, &QNetworkReply::readyRead, &loop, [&reply, &loop, maxBytes] {
-                    if (reply->bytesAvailable() > maxBytes) {
-                        reply->abort();
-                        loop.quit();
-                    }
-                });
-                QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-                timer.start(timeoutMs);
-                if (!reply->isFinished()) loop.exec();
-                timer.stop();
-
-                const QUrl finalUrl = reply->url();
-                const bool finalSchemeOk = finalUrl.scheme() == QLatin1String("http")
-                    || finalUrl.scheme() == QLatin1String("https");
-                QString contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString().trimmed();
-                const auto semi = contentType.indexOf(QLatin1Char(';'));
-                if (semi >= 0) contentType = contentType.left(semi).trimmed();
-                const QByteArray data = reply->error() == QNetworkReply::NoError ? reply->readAll() : QByteArray();
-                if (reply->error() == QNetworkReply::NoError && finalSchemeOk
-                    && contentType.toLower().startsWith(QStringLiteral("image/"))
-                    && data.size() <= maxBytes && !data.isEmpty()) {
-                    replacement = QStringLiteral("<img src=\"data:%1;base64,%2\">")
-                                      .arg(contentType,
-                                           QString::fromLatin1(data.toBase64()));
-                }
-            }
-            results.append({escaped, replacement});
-        }
-
-        if (self) QMetaObject::invokeMethod(self, [self, results, selectionGeneration, messageKey] {
-            if (!self) return;
-            if (selectionGeneration != self->m_selectionGeneration) {
-                // The user moved on mid-download; drop the guard so returning to
-                // this message can try again.
-                self->m_loadedImageMessages.remove(messageKey);
-                return;
-            }
-            const QString current = self->m_content.html;
-            static const QRegularExpression imgPattern(
-                QStringLiteral("<img\\b[^>]*\\bdata-nkmail-src=\"([^\"]*)\"[^>]*>"));
-            QHash<QString, QString> replacements;
-            for (const auto &result : results) replacements.insert(result.first, result.second);
-            QString out;
-            qsizetype last = 0;
-            auto matches = imgPattern.globalMatch(current);
-            while (matches.hasNext()) {
-                const auto match = matches.next();
-                const auto it = replacements.constFind(match.captured(1));
-                if (it == replacements.constEnd()) continue;
-                out += current.mid(last, match.capturedStart() - last);
-                out += it.value();
-                last = match.capturedEnd();
-            }
-            out += current.mid(last);
-            self->m_content.html = out;
-            if (!self->m_selected.isEmpty()) self->m_selected["html"] = self->m_content.html;
-            emit self->selectionChanged();
-        }, Qt::QueuedConnection);
-    });
+    m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary), m_content.html);
 }
 void MailController::openMessage(const QString &uid, const QString &validity) {
+    if (m_commands->busy()) return;
     const auto selectionGeneration = ++m_selectionGeneration;
     if (auto cached = m_database->content(m_folder, validity, uid)) { present(*cached); return; }
     m_selectedUid = uid; m_selected.clear(); m_content = {}; emit selectionChanged();
     if (m_demo || m_account.password.isEmpty()) { setStatus(tr("This message is not cached"), tr("Connect to download its content.")); return; }
     const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
-    setStatus(tr("Loading message without changing server flags…")); QPointer<MailController> self(this);
-    run([self, account, folder, validity, uid, generation, selectionGeneration] {
-        try {
-            auto content = MailioBackend::content(account, folder, validity, uid);
-            if (self) QMetaObject::invokeMethod(self, [self, content, generation, selectionGeneration] {
-                if (!self || generation != self->m_generation || selectionGeneration != self->m_selectionGeneration) return;
-                if (!self->m_database->saveContent(content)) { self->setStatus(self->tr("Could not cache content"), self->m_database->error()); return; }
-                self->present(content); self->setStatus(self->tr("Message cached · remote content blocked"));
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, selectionGeneration, error] {
-                if (self && generation == self->m_generation && selectionGeneration == self->m_selectionGeneration) self->setStatus(self->tr("Could not load message"), error);
-            }, Qt::QueuedConnection);
-        }
+    setStatus(tr("Loading message without changing server flags…"));
+    m_sync->content(account, folder, validity, uid, [this, generation, selectionGeneration](const Content &content, const QString &error) {
+        if (generation != m_generation || selectionGeneration != m_selectionGeneration) return;
+        if (!error.isEmpty()) { setStatus(tr("Could not load message"), error); return; }
+        if (!m_database->saveContent(content)) { setStatus(tr("Could not cache content"), m_database->error()); return; }
+        present(content); setStatus(tr("Message cached · remote content blocked"));
     });
 }
-QVariantMap MailController::newDraft(const QString &mode) {
-    if (mode != "new" && mode != "reply" && mode != "replyAll" && mode != "forward") {
-        setStatus(tr("Could not create draft"), tr("Choose new, reply, reply all or forward.")); return {};
-    }
-    if (mode != "new" && m_selected.isEmpty()) {
-        setStatus(tr("Could not create draft"), tr("Select a message before replying or forwarding.")); return {};
-    }
-    Draft draft; draft.id = QUuid::createUuid().toString(QUuid::WithoutBraces); draft.updated = QDateTime::currentDateTimeUtc();
-    if (mode != "new") {
-        const auto &s = m_content.summary;
-        draft.subject = cleanSubject(mode == "forward" ? "Fwd: " : "Re: ", s.subject);
-        if (mode != "forward") {
-            QStringList primary;
-            if (!replyAddresses(m_content.replyTo.isEmpty() ? s.senderAddress : m_content.replyTo, &primary) || primary.isEmpty()) {
-                setStatus(tr("Could not create reply"), tr("This message has an unsupported recipient format. Create a new draft and enter recipients manually.")); return {};
-            }
-            QSet<QString> seen;
-            QStringList recipients;
-            for (const auto &address : primary) {
-                const auto key = address.toCaseFolded();
-                if (!seen.contains(key)) { seen.insert(key); recipients.append(address); }
-            }
-            draft.to = recipients.join(", ");
-            if (mode == "replyAll") {
-                const QString self = m_account.address.trimmed().toCaseFolded();
-                recipients.removeIf([&self](const QString &address) { return address.toCaseFolded() == self; });
-                draft.to = recipients.join(", ");
-                seen.insert(self);
-                QStringList others;
-                for (const auto &field : {m_content.to, m_content.cc}) {
-                    QStringList parsed;
-                    if (!replyAddresses(field, &parsed)) {
-                        setStatus(tr("Could not create reply all"), tr("This message has an unsupported recipient format. Create a new draft and enter recipients manually.")); return {};
-                    }
-                    for (const auto &address : parsed) {
-                        const auto key = address.toCaseFolded();
-                        if (!seen.contains(key)) { seen.insert(key); others.append(address); }
-                    }
-                }
-                if (recipients.isEmpty() && !others.isEmpty()) {
-                    draft.to = others.takeFirst();
-                }
-                draft.cc = others.join(", ");
-            }
-            draft.inReplyTo = m_content.messageId; draft.references = m_content.messageId;
-        }
-        draft.body = QStringLiteral("\n\n— %1 · %2 —\n").arg(s.sender, s.date);
-        for (const auto &line : m_content.text.split('\n')) draft.body += "> " + line + '\n';
-        QString quoted = m_content.html;
-        if (quoted.isEmpty()) {
-            quoted = escapeHtml(m_content.text);
-            quoted.replace(QStringLiteral("\n"), QStringLiteral("<br>"));
-        }
-        draft.html = QStringLiteral("<p></p><p>— %1 · %2 —</p><blockquote>%3</blockquote>")
-                         .arg(escapeHtml(s.sender), escapeHtml(s.date), quoted);
-        if (mode == "forward") for (const auto &attachment : m_content.attachments) {
-            const auto path = QDir(m_root).filePath("attachments/" + QUuid::createUuid().toString(QUuid::WithoutBraces));
-            QDir().mkpath(QFileInfo(path).absolutePath()); QSaveFile file(path);
-            if (!file.open(QIODevice::WriteOnly) || file.write(attachment.bytes) != attachment.bytes.size() || !file.commit()) continue;
-            QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-            auto copy = attachment; copy.path = path; copy.bytes.clear(); draft.attachments.append(copy);
-        }
-    }
-    if (!m_database->saveDraft(draft)) { setStatus(tr("Could not save draft"), m_database->error()); return {}; }
-    emit draftsChanged(); return draftMap(draft);
+
+QVariantMap MailController::newDraft(const QString &mode) { return m_drafts->newDraft(mode, m_account, m_content); }
+QVariantMap MailController::loadDraft(const QString &id) { return m_drafts->loadDraft(id); }
+QVariantMap MailController::saveDraft(const QVariantMap &draft) { return m_drafts->saveDraft(draft); }
+void MailController::discardDraft(const QString &id) { if (!sending() && !sendPending()) m_drafts->discardDraft(id); }
+QVariantMap MailController::addAttachment(const QString &url) { return m_drafts->addAttachment(url); }
+void MailController::saveAttachment(int index, const QString &url) { m_drafts->saveAttachment(m_content, index, url); }
+void MailController::sendDraft(const QVariantMap &draft) {
+    if (m_busy || m_commands->busy()) return;
+    m_send->sendDraft(m_account, draft);
 }
-QVariantMap MailController::loadDraft(const QString &id) {
-    for (const auto &draft : m_database->drafts()) if (draft.id == id) return draftMap(draft);
-    return {};
-}
-QVariantMap MailController::saveDraft(const QVariantMap &map) {
-    Draft draft = draftFromMap(map);
-    if (draft.id.isEmpty()) draft.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    draft.updated = QDateTime::currentDateTimeUtc();
-    if (!m_database->saveDraft(draft)) { setStatus(tr("Could not save draft"), m_database->error()); return {}; }
-    emit draftsChanged();
-    return loadDraft(draft.id);
-}
-void MailController::discardDraft(const QString &id) {
-    if (m_sending) return;
-    if (!m_database->deleteDraft(id)) setStatus(tr("Could not remove local draft"), m_database->error());
-    emit draftsChanged();
-}
-QVariantMap MailController::addAttachment(const QString &url) {
-    const QString path = localPath(url); QFile file(path); const QFileInfo info(path);
-    if (path.isEmpty() || !info.isFile() || info.size() > 15 * 1024 * 1024 || !file.open(QIODevice::ReadOnly)) {
-        setStatus(tr("Could not attach file"), tr("Choose a readable local file smaller than 15 MiB (25 MiB total encoded message limit).")); return {};
-    }
-    const auto target = QDir(m_root).filePath("attachments/" + QUuid::createUuid().toString(QUuid::WithoutBraces));
-    QDir().mkpath(QFileInfo(target).absolutePath()); QSaveFile out(target);
-    if (!out.open(QIODevice::WriteOnly)) { setStatus(tr("Could not copy attachment"), tr("Check available disk space and permissions.")); return {}; }
-    const auto bytes = file.read(attachmentLimit + 1);
-    if (bytes.size() > attachmentLimit || out.write(bytes) != bytes.size() || !out.commit()) { setStatus(tr("Could not copy attachment")); return {}; }
-    QFile::setPermissions(target, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-    return {{"name", info.fileName()}, {"path", target}, {"mimeType", QMimeDatabase().mimeTypeForFile(info).name()}, {"size", bytes.size()}};
-}
-void MailController::saveAttachment(int index, const QString &url) {
-    if (index < 0 || index >= m_content.attachments.size()) return;
-    const auto path = localPath(url);
-    if (path.isEmpty() || QFileInfo::exists(path)) { setStatus(tr("Choose a new file name"), tr("Existing files are not overwritten.")); return; }
-    QFile file(path); if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly)) { setStatus(tr("Could not save attachment")); return; }
-    const auto &bytes = m_content.attachments[index].bytes;
-    if (file.write(bytes) != bytes.size()) { file.close(); file.remove(); setStatus(tr("Could not save complete attachment")); return; }
-    file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner); file.close(); setStatus(tr("Attachment saved"));
-}
-void MailController::sendDraft(const QVariantMap &map) {
-    if (m_demo) { setStatus(tr("Preview mode"), tr("Sending is disabled. Your draft is saved locally.")); saveDraft(map); return; }
-    if (m_sending || m_busy) return;
-    if (m_sendPending) { setStatus(tr("A send is already pending")); return; }
-    if (!configured() || m_account.password.isEmpty()) { setStatus(tr("Account needs attention"), tr("Enter an application password before sending.")); return; }
-    const auto existing = loadDraft(map.value("id").toString());
-    const auto existingState = existing.value("state").toString();
-    if (existingState == "accepted" || existingState == "sending" || existingState == "unknown") {
-        setStatus(tr("This draft may already have been sent"), tr("Create a new draft rather than automatically retransmitting it.")); return;
-    }
-    const auto saved = saveDraft(map); if (saved.isEmpty()) return;
-    const auto draft = draftFromMap(saved);
-    if (draft.state == "accepted" || draft.state == "sending" || draft.state == "unknown") { setStatus(tr("This draft may already have been sent"), tr("Create a new draft rather than automatically retransmitting it.")); return; }
-    if (draft.to.trimmed().isEmpty() && draft.cc.trimmed().isEmpty() && draft.bcc.trimmed().isEmpty()) { setStatus(tr("Add a recipient")); return; }
-    if (m_sendDelay <= 0) { submitDraft(draft); return; }
-    // Hold the draft at "draft" until the delay expires, so a cancel leaves the
-    // saved draft intact and nothing reaches the SMTP server.
-    m_pendingSend = draft; m_sendPending = true;
-    m_sendTimer.start(m_sendDelay * 1000);
-    setStatus(tr("Sending in %1 s").arg(m_sendDelay));
-    emit sendPendingChanged();
-}
-void MailController::submitDraft(const Draft &draft) {
-    if (!m_database->markDraftState(draft.id, "sending")) { setStatus(tr("Could not persist send state"), m_database->error()); return; }
-    emit draftsChanged(); m_sending = true; setStatus(tr("Submitting to SMTP server…"));
-    const auto account = m_account; QPointer<MailController> self(this);
-    run([self, account, draft] {
-        SendResult result;
-        QByteArray raw;
-        try { result = MailioBackend::send(account, draft, &raw); }
-        catch (...) { result.state = SendResult::Unknown; result.message = QStringLiteral("Connection ended before the result could be confirmed."); }
-        if (self) QMetaObject::invokeMethod(self, [self, result, account, raw, id = draft.id] {
-            if (!self) return;
-            self->m_sending = false;
-            const QString state = result.state == SendResult::Accepted ? "accepted" : result.state == SendResult::Rejected ? "rejected" : "unknown";
-            self->m_database->markDraftState(id, state); emit self->draftsChanged();
-            if (result.state == SendResult::Accepted) {
-                self->setStatus(self->tr("SMTP server accepted this message · delivery not confirmed")); emit self->draftAccepted(id);
-                self->run([self, account, raw] {
-                    const auto folder = MailioBackend::sentFolder(account);
-                    if (folder.isEmpty()) {
-                        if (self) QMetaObject::invokeMethod(self, [self] {
-                            if (self) self->setStatus(self->tr("SMTP server accepted this message · no Sent folder found, no copy saved"));
-                        }, Qt::QueuedConnection);
-                        return;
-                    }
-                    bool saved = false;
-                    if (!raw.isEmpty()) {
-                        try { MailioBackend::appendSent(account, folder, raw); saved = true; } catch (...) { saved = false; }
-                    }
-                    if (self) QMetaObject::invokeMethod(self, [self, folder, saved] {
-                        if (!self) return;
-                        self->setStatus(saved
-                            ? self->tr("SMTP server accepted this message · copy saved to %1").arg(folder)
-                            : self->tr("SMTP server accepted this message · copy could not be saved to %1").arg(folder));
-                    }, Qt::QueuedConnection);
-                });
-            } else self->setStatus(result.state == SendResult::Unknown ? self->tr("Send result unknown · not retried") : self->tr("Message not accepted · draft preserved"), result.message);
-        }, Qt::QueuedConnection);
-    });
-}
-void MailController::cancelSend() {
-    if (!m_sendPending) return;
-    m_sendTimer.stop();
-    m_pendingSend = {}; m_sendPending = false;
-    setStatus(tr("Send cancelled"));
-    emit sendPendingChanged();
-}
-void MailController::clearPendingSend() {
-    m_sendTimer.stop();
-    const bool wasPending = !m_pendingSend.id.isEmpty();
-    m_pendingSend = {}; m_sendPending = false;
-    if (wasPending) emit sendPendingChanged();
-}
+void MailController::cancelSend() { m_send->cancelSend(); }
+void MailController::clearPendingSend() { m_send->clearPendingSend(); }
+bool MailController::sending() const { return m_send->sending(); }
+bool MailController::sendPending() const { return m_send->pending(); }
+int MailController::sendDelay() const { return m_send->delay(); }
 void MailController::clearError() { m_error.clear(); emit statusChanged(); }
 void MailController::disconnectAccount() {
-    if (m_sending) return;
+    if (sending()) return;
     clearPendingSend();
-    ++m_generation; ++m_selectionGeneration; m_pool.clear(); m_account.password.clear(); m_busy = false; m_restorePending = false; m_switchCredentialPending = false; m_cachedOnly = true;
+    ++m_generation; ++m_selectionGeneration; m_account.password.clear(); m_busy = false; m_restorePending = false; m_switchCredentialPending = false; m_cachedOnly = true;
     m_refreshTimer.stop();
+    m_credentials->suspend(m_account);
     QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
     settings.setValue("restoreAllowed", false); settings.sync();
     setStatus(tr("Disconnected · cached mail available"));
 }
-void MailController::setMessageRead(int index, bool read) {
-    if (m_mutating) { setStatus(tr("Another mail operation is in progress")); return; }
-    const QVariantMap map = m_messages->get(index);
-    if (map.isEmpty()) return;
-    Summary summary = summaryFromMap(map);
-    if (summary.unread == !read) return;
-    if (!m_demo && (!configured() || m_account.password.isEmpty())) {
-        setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages.")); return;
-    }
-    const bool wasUnread = summary.unread;
-    summary.unread = !read;
-    m_messages->update(summary);
-    if (!m_selected.isEmpty() && sameMessage(summaryFromMap(m_selected), summary)) {
-        m_selected["unread"] = summary.unread; m_content.summary.unread = summary.unread; emit selectionChanged();
-    }
-    emit folderUnreadChanged();
-    if (m_demo) { setStatus(tr("Preview · flags are local only")); return; }
-    m_mutating = true; setStatus(tr("Updating message flags…"));
-    const auto account = m_account; const auto generation = m_generation;
-    const auto folder = summary.folder, validity = summary.uidValidity, uid = summary.uid;
-    const QStringList flags{QStringLiteral("\\Seen")};
-    QPointer<MailController> self(this);
-    run([self, account, folder, validity, uid, flags, read, wasUnread, generation] {
-        try {
-            MailioBackend::storeFlags(account, folder, validity, uid, flags, read);
-            if (self) QMetaObject::invokeMethod(self, [self, generation, read] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation == self->m_generation)
-                    self->setStatus(read ? MailController::tr("Message marked as read") : MailController::tr("Message marked as unread"));
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, folder, validity, uid, wasUnread, error] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation != self->m_generation) return;
-                const int row = self->m_messages->indexOf(folder, validity, uid);
-                if (row >= 0) {
-                    auto rollback = summaryFromMap(self->m_messages->get(row));
-                    rollback.unread = wasUnread; self->m_messages->update(rollback);
-                    if (!self->m_selected.isEmpty() && sameMessage(summaryFromMap(self->m_selected), rollback)) {
-                        self->m_selected["unread"] = wasUnread; self->m_content.summary.unread = wasUnread;
-                        emit self->selectionChanged();
-                    }
-                }
-                self->setStatus(MailController::tr("Could not update message flags"), error);
-            }, Qt::QueuedConnection);
-        }
-    });
-}
-void MailController::toggleFlagged(int index) {
-    if (m_mutating) { setStatus(tr("Another mail operation is in progress")); return; }
-    const QVariantMap map = m_messages->get(index);
-    if (map.isEmpty()) return;
-    Summary summary = summaryFromMap(map);
-    if (!m_demo && (!configured() || m_account.password.isEmpty())) {
-        setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages.")); return;
-    }
-    const bool wasFlagged = summary.flagged;
-    summary.flagged = !wasFlagged;
-    m_messages->update(summary);
-    if (!m_selected.isEmpty() && sameMessage(summaryFromMap(m_selected), summary)) {
-        m_selected["flagged"] = summary.flagged; m_content.summary.flagged = summary.flagged; emit selectionChanged();
-    }
-    if (m_demo) { setStatus(tr("Preview · flags are local only")); return; }
-    m_mutating = true; setStatus(tr("Updating message flags…"));
-    const auto account = m_account; const auto generation = m_generation;
-    const auto folder = summary.folder, validity = summary.uidValidity, uid = summary.uid;
-    const QStringList flags{QStringLiteral("\\Flagged")};
-    QPointer<MailController> self(this);
-    run([self, account, folder, validity, uid, flags, add = !wasFlagged, wasFlagged, generation] {
-        try {
-            MailioBackend::storeFlags(account, folder, validity, uid, flags, add);
-            if (self) QMetaObject::invokeMethod(self, [self, generation, add] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation == self->m_generation)
-                    self->setStatus(add ? MailController::tr("Message flagged") : MailController::tr("Message unflagged"));
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, folder, validity, uid, wasFlagged, error] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation != self->m_generation) return;
-                const int row = self->m_messages->indexOf(folder, validity, uid);
-                if (row >= 0) {
-                    auto rollback = summaryFromMap(self->m_messages->get(row));
-                    rollback.flagged = wasFlagged; self->m_messages->update(rollback);
-                    if (!self->m_selected.isEmpty() && sameMessage(summaryFromMap(self->m_selected), rollback)) {
-                        self->m_selected["flagged"] = wasFlagged; self->m_content.summary.flagged = wasFlagged;
-                        emit self->selectionChanged();
-                    }
-                }
-                self->setStatus(MailController::tr("Could not update message flags"), error);
-            }, Qt::QueuedConnection);
-        }
-    });
-}
-void MailController::deleteMessage(int index) {
-    if (m_mutating) { setStatus(tr("Another mail operation is in progress")); return; }
-    const QVariantMap map = m_messages->get(index);
-    if (map.isEmpty()) return;
-    const Summary summary = summaryFromMap(map);
-    if (!m_demo && (!configured() || m_account.password.isEmpty())) {
-        setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages.")); return;
-    }
-    const auto snapshot = modelSnapshot(m_messages);
-    const auto oldSelected = m_selected; const auto oldSelectedUid = m_selectedUid; const auto oldContent = m_content;
-    QList<Summary> remaining;
-    for (const auto &item : snapshot) if (!sameMessage(item, summary)) remaining.append(item);
-    m_messages->replace(remaining);
-    const bool selectedThis = !m_selectedUid.isEmpty() && m_selectedUid == summary.uid
-        && (m_selected.isEmpty() || sameMessage(summaryFromMap(m_selected), summary));
-    if (selectedThis) { m_selected.clear(); m_selectedUid.clear(); m_content = {}; emit selectionChanged(); }
-    if (m_demo) { setStatus(tr("Preview · message removed locally")); return; }
-    m_mutating = true; setStatus(tr("Deleting message…"));
-    const auto account = m_account; const auto generation = m_generation;
-    const auto folder = summary.folder, validity = summary.uidValidity, uid = summary.uid;
-    const QStringList deleted{QStringLiteral("\\Deleted")};
-    QPointer<MailController> self(this);
-    run([self, account, folder, validity, uid, deleted, generation, snapshot, oldSelected, oldSelectedUid, oldContent] {
-        bool usedFullExpunge = false;
-        try {
-            MailioBackend::storeFlags(account, folder, validity, uid, deleted, true);
-            MailioBackend::expunge(account, folder, validity, uid, &usedFullExpunge);
-            if (self) QMetaObject::invokeMethod(self, [self, generation, folder, validity, uid, usedFullExpunge] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (self->m_database) self->m_database->removeMessage(folder, validity, uid);
-                emit self->folderUnreadChanged();
-                if (generation == self->m_generation) self->setStatus(usedFullExpunge
-                    ? MailController::tr("Message deleted · mailbox was expunged")
-                    : MailController::tr("Message deleted"));
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, snapshot, oldSelected, oldSelectedUid, oldContent, error] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation != self->m_generation) return;
-                self->m_messages->replace(snapshot);
-                if (self->m_selectedUid.isEmpty()) {
-                    self->m_selected = oldSelected; self->m_selectedUid = oldSelectedUid; self->m_content = oldContent;
-                    emit self->selectionChanged();
-                }
-                self->setStatus(MailController::tr("Could not delete message"), error);
-            }, Qt::QueuedConnection);
-        }
-    });
-}
-void MailController::archiveMessage(int index) {
-    if (m_mutating) { setStatus(tr("Another mail operation is in progress")); return; }
-    QString destination;
-    const QStringList names{QStringLiteral("Archive"), QStringLiteral("Archives"), QStringLiteral("All Mail")};
-    for (const auto &name : names) {
-        for (const auto &value : m_folders) {
-            const auto folder = value.toMap();
-            const auto id = folder.value("id").toString();
-            if (id.isEmpty()) continue;
-            if (folder.value("title").toString().compare(name, Qt::CaseInsensitive) == 0
-                || id.compare(name, Qt::CaseInsensitive) == 0) { destination = id; break; }
-        }
-        if (!destination.isEmpty()) break;
-    }
-    if (destination.isEmpty()) {
-        setStatus(tr("Archive folder unavailable"), tr("This account has no Archive, Archives or All Mail folder.")); return;
-    }
-    moveMessage(index, destination);
-}
-void MailController::moveMessage(int index, const QString &destination) {
-    if (m_mutating) { setStatus(tr("Another mail operation is in progress")); return; }
-    if (destination.trimmed().isEmpty()) { setStatus(tr("Choose a destination folder")); return; }
-    const QVariantMap map = m_messages->get(index);
-    if (map.isEmpty()) return;
-    const Summary summary = summaryFromMap(map);
-    if (!m_demo && (!configured() || m_account.password.isEmpty())) {
-        setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages.")); return;
-    }
-    const auto snapshot = modelSnapshot(m_messages);
-    const auto oldSelected = m_selected; const auto oldSelectedUid = m_selectedUid; const auto oldContent = m_content;
-    QList<Summary> remaining;
-    for (const auto &item : snapshot) if (!sameMessage(item, summary)) remaining.append(item);
-    m_messages->replace(remaining);
-    const bool selectedThis = !m_selectedUid.isEmpty() && m_selectedUid == summary.uid
-        && (m_selected.isEmpty() || sameMessage(summaryFromMap(m_selected), summary));
-    if (selectedThis) { m_selected.clear(); m_selectedUid.clear(); m_content = {}; emit selectionChanged(); }
-    if (m_demo) { setStatus(tr("Preview · message moved locally")); return; }
-    m_mutating = true; setStatus(tr("Moving message…"));
-    const auto account = m_account; const auto generation = m_generation;
-    const auto folder = summary.folder, validity = summary.uidValidity, uid = summary.uid;
-    const bool toArchive = isArchiveFolder(m_folders, destination);
-    const QStringList deleted{QStringLiteral("\\Deleted")};
-    QPointer<MailController> self(this);
-    run([self, account, folder, validity, uid, destination, deleted, generation, snapshot, oldSelected, oldSelectedUid, oldContent, toArchive] {
-        bool usedFullExpunge = false;
-        try {
-            MailioBackend::copyTo(account, folder, validity, uid, destination);
-            MailioBackend::storeFlags(account, folder, validity, uid, deleted, true);
-            MailioBackend::expunge(account, folder, validity, uid, &usedFullExpunge);
-            if (self) QMetaObject::invokeMethod(self, [self, generation, usedFullExpunge, toArchive, folder, validity, uid] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (self->m_database) self->m_database->removeMessage(folder, validity, uid);
-                emit self->folderUnreadChanged();
-                if (generation != self->m_generation) return;
-                if (toArchive) self->setStatus(usedFullExpunge
-                    ? MailController::tr("Moved to Archive · mailbox was expunged")
-                    : MailController::tr("Moved to Archive"));
-                else self->setStatus(usedFullExpunge
-                    ? MailController::tr("Moved · mailbox was expunged")
-                    : MailController::tr("Moved"));
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, snapshot, oldSelected, oldSelectedUid, oldContent, error] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation != self->m_generation) return;
-                self->m_messages->replace(snapshot);
-                if (self->m_selectedUid.isEmpty()) {
-                    self->m_selected = oldSelected; self->m_selectedUid = oldSelectedUid; self->m_content = oldContent;
-                    emit self->selectionChanged();
-                }
-                self->setStatus(MailController::tr("Could not move message"), error);
-            }, Qt::QueuedConnection);
-        }
-    });
-}
-void MailController::setMessagesRead(const QVariantList &indices, bool read) {
-    if (m_mutating) { setStatus(tr("Another mail operation is in progress")); return; }
-    QList<Summary> selected;
-    for (const auto &value : indices) {
-        const QVariantMap map = m_messages->get(value.toInt());
-        if (map.isEmpty()) continue;
-        const Summary summary = summaryFromMap(map);
-        if (summary.folder != m_folder || summary.uidValidity != m_uidValidity) continue;
-        selected.append(summary);
-    }
-    if (selected.isEmpty()) return;
-    if (!m_demo && (!configured() || m_account.password.isEmpty())) {
-        setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages.")); return;
-    }
-    const QList<Summary> before = selected;
-    const auto oldSelected = m_selected; const auto oldContent = m_content;
-    bool touchedSelection = false;
-    for (const auto &summary : before) {
-        Summary updated = summary; updated.unread = !read;
-        m_messages->update(updated);
-        if (!m_selected.isEmpty() && sameMessage(summaryFromMap(m_selected), summary)) {
-            m_selected["unread"] = updated.unread; m_content.summary.unread = updated.unread; touchedSelection = true;
-        }
-    }
-    if (touchedSelection) emit selectionChanged();
-    emit folderUnreadChanged();
-    if (m_demo) { setStatus(tr("Preview · flags are local only")); return; }
-    m_mutating = true; setStatus(tr("Updating message flags…"));
-    const auto account = m_account; const auto generation = m_generation;
-    const auto folder = m_folder, validity = m_uidValidity;
-    QStringList uids; for (const auto &summary : before) uids << summary.uid;
-    const QStringList flags{QStringLiteral("\\Seen")};
-    const int count = before.size();
-    QPointer<MailController> self(this);
-    run([self, account, folder, validity, uids, flags, read, count, before, oldSelected, oldContent, touchedSelection, generation] {
-        try {
-            MailioBackend::storeFlagsMany(account, folder, validity, uids, flags, read);
-            if (self) QMetaObject::invokeMethod(self, [self, generation, read, count] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation == self->m_generation)
-                    self->setStatus(read ? MailController::tr("%1 messages marked read").arg(count)
-                                         : MailController::tr("%1 messages marked unread").arg(count));
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, before, oldSelected, oldContent, touchedSelection, count, error] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation != self->m_generation) return;
-                for (const auto &summary : before) {
-                    const int row = self->m_messages->indexOf(summary.folder, summary.uidValidity, summary.uid);
-                    if (row >= 0) self->m_messages->update(summary);
-                }
-                if (touchedSelection) {
-                    self->m_selected = oldSelected; self->m_content = oldContent;
-                    emit self->selectionChanged();
-                }
-                self->setStatus(MailController::tr("Could not update %1 messages").arg(count), error);
-            }, Qt::QueuedConnection);
-        }
-    });
-}
-void MailController::setMessagesFlagged(const QVariantList &indices, bool flagged) {
-    if (m_mutating) { setStatus(tr("Another mail operation is in progress")); return; }
-    QList<Summary> selected;
-    for (const auto &value : indices) {
-        const QVariantMap map = m_messages->get(value.toInt());
-        if (map.isEmpty()) continue;
-        const Summary summary = summaryFromMap(map);
-        if (summary.folder != m_folder || summary.uidValidity != m_uidValidity) continue;
-        selected.append(summary);
-    }
-    if (selected.isEmpty()) return;
-    if (!m_demo && (!configured() || m_account.password.isEmpty())) {
-        setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages.")); return;
-    }
-    const QList<Summary> before = selected;
-    const auto oldSelected = m_selected; const auto oldContent = m_content;
-    bool touchedSelection = false;
-    for (const auto &summary : before) {
-        Summary updated = summary; updated.flagged = flagged;
-        m_messages->update(updated);
-        if (!m_selected.isEmpty() && sameMessage(summaryFromMap(m_selected), summary)) {
-            m_selected["flagged"] = updated.flagged; m_content.summary.flagged = updated.flagged; touchedSelection = true;
-        }
-    }
-    if (touchedSelection) emit selectionChanged();
-    if (m_demo) { setStatus(tr("Preview · flags are local only")); return; }
-    m_mutating = true; setStatus(tr("Updating message flags…"));
-    const auto account = m_account; const auto generation = m_generation;
-    const auto folder = m_folder, validity = m_uidValidity;
-    QStringList uids; for (const auto &summary : before) uids << summary.uid;
-    const QStringList flags{QStringLiteral("\\Flagged")};
-    const int count = before.size();
-    QPointer<MailController> self(this);
-    run([self, account, folder, validity, uids, flags, flagged, count, before, oldSelected, oldContent, touchedSelection, generation] {
-        try {
-            MailioBackend::storeFlagsMany(account, folder, validity, uids, flags, flagged);
-            if (self) QMetaObject::invokeMethod(self, [self, generation, flagged, count] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation == self->m_generation)
-                    self->setStatus(flagged ? MailController::tr("%1 messages flagged").arg(count)
-                                            : MailController::tr("%1 messages unflagged").arg(count));
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, before, oldSelected, oldContent, touchedSelection, count, error] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation != self->m_generation) return;
-                for (const auto &summary : before) {
-                    const int row = self->m_messages->indexOf(summary.folder, summary.uidValidity, summary.uid);
-                    if (row >= 0) self->m_messages->update(summary);
-                }
-                if (touchedSelection) {
-                    self->m_selected = oldSelected; self->m_content = oldContent;
-                    emit self->selectionChanged();
-                }
-                self->setStatus(MailController::tr("Could not update %1 messages").arg(count), error);
-            }, Qt::QueuedConnection);
-        }
-    });
-}
-void MailController::deleteMessages(const QVariantList &indices) {
-    if (m_mutating) { setStatus(tr("Another mail operation is in progress")); return; }
-    QList<Summary> selected;
-    for (const auto &value : indices) {
-        const QVariantMap map = m_messages->get(value.toInt());
-        if (map.isEmpty()) continue;
-        const Summary summary = summaryFromMap(map);
-        if (summary.folder != m_folder || summary.uidValidity != m_uidValidity) continue;
-        selected.append(summary);
-    }
-    if (selected.isEmpty()) return;
-    if (!m_demo && (!configured() || m_account.password.isEmpty())) {
-        setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages.")); return;
-    }
-    const auto snapshot = modelSnapshot(m_messages);
-    const auto oldSelected = m_selected; const auto oldSelectedUid = m_selectedUid; const auto oldContent = m_content;
-    QList<Summary> remaining;
-    for (const auto &item : snapshot) {
-        bool remove = false;
-        for (const auto &summary : selected) if (sameMessage(item, summary)) { remove = true; break; }
-        if (!remove) remaining.append(item);
-    }
-    m_messages->replace(remaining);
-    bool selectedRemoved = false;
-    for (const auto &summary : selected) {
-        if (!m_selectedUid.isEmpty() && m_selectedUid == summary.uid
-            && (m_selected.isEmpty() || sameMessage(summaryFromMap(m_selected), summary))) { selectedRemoved = true; break; }
-    }
-    if (selectedRemoved) { m_selected.clear(); m_selectedUid.clear(); m_content = {}; emit selectionChanged(); }
-    if (m_demo) { setStatus(tr("Preview · messages removed locally")); return; }
-    m_mutating = true; setStatus(tr("Deleting messages…"));
-    const auto account = m_account; const auto generation = m_generation;
-    const auto folder = m_folder, validity = m_uidValidity;
-    QStringList uids; for (const auto &summary : selected) uids << summary.uid;
-    const int count = selected.size();
-    const QStringList deleted{QStringLiteral("\\Deleted")};
-    QPointer<MailController> self(this);
-    run([self, account, folder, validity, uids, deleted, count, generation, snapshot, oldSelected, oldSelectedUid, oldContent] {
-        try {
-            MailioBackend::storeFlagsMany(account, folder, validity, uids, deleted, true);
-            MailioBackend::expungeMany(account, folder, validity, uids);
-            if (self) QMetaObject::invokeMethod(self, [self, generation, folder, validity, uids, count] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (self->m_database) for (const auto &uid : uids) self->m_database->removeMessage(folder, validity, uid);
-                emit self->folderUnreadChanged();
-                if (generation == self->m_generation)
-                    self->setStatus(MailController::tr("%1 messages deleted").arg(count));
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, snapshot, oldSelected, oldSelectedUid, oldContent, count, error] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation != self->m_generation) return;
-                self->m_messages->replace(snapshot);
-                if (self->m_selectedUid.isEmpty()) {
-                    self->m_selected = oldSelected; self->m_selectedUid = oldSelectedUid; self->m_content = oldContent;
-                    emit self->selectionChanged();
-                }
-                self->setStatus(MailController::tr("Could not update %1 messages").arg(count), error);
-            }, Qt::QueuedConnection);
-        }
-    });
-}
+void MailController::setMessageRead(int index, bool read) { setMessagesRead({index}, read); }
+void MailController::toggleFlagged(int index) { setMessagesFlagged({index}, !m_messages->get(index).value("flagged").toBool()); }
+void MailController::deleteMessage(int index) { deleteMessages({index}); }
+void MailController::archiveMessage(int index) { archiveMessages({index}); }
+void MailController::moveMessage(int index, const QString &destination) { moveMessages({index}, destination); }
+void MailController::setMessagesRead(const QVariantList &indices, bool read) { executeCommand(indices, MailboxCommands::Action::Read, read); }
+void MailController::setMessagesFlagged(const QVariantList &indices, bool flagged) { executeCommand(indices, MailboxCommands::Action::Flag, flagged); }
+void MailController::deleteMessages(const QVariantList &indices) { executeCommand(indices, MailboxCommands::Action::Remove); }
 void MailController::archiveMessages(const QVariantList &indices) {
-    if (m_mutating) { setStatus(tr("Another mail operation is in progress")); return; }
-    QString destination;
-    const QStringList names{QStringLiteral("Archive"), QStringLiteral("Archives"), QStringLiteral("All Mail")};
-    for (const auto &name : names) {
-        for (const auto &value : m_folders) {
-            const auto folder = value.toMap();
-            const auto id = folder.value("id").toString();
-            if (id.isEmpty()) continue;
-            if (folder.value("title").toString().compare(name, Qt::CaseInsensitive) == 0
-                || id.compare(name, Qt::CaseInsensitive) == 0) { destination = id; break; }
+    for (const auto &value : m_folders) {
+        const auto folder = value.toMap();
+        if (isArchiveFolder(m_folders, folder.value("id").toString())) {
+            moveMessages(indices, folder.value("id").toString()); return;
         }
-        if (!destination.isEmpty()) break;
     }
-    if (destination.isEmpty()) {
-        setStatus(tr("Archive folder unavailable"), tr("This account has no Archive, Archives or All Mail folder.")); return;
-    }
-    moveMessagesTo(indices, destination, true);
+    setStatus(tr("Archive folder unavailable"), tr("This account has no Archive, Archives or All Mail folder."));
 }
 void MailController::moveMessages(const QVariantList &indices, const QString &destination) {
-    if (m_mutating) { setStatus(tr("Another mail operation is in progress")); return; }
-    if (destination.trimmed().isEmpty()) { setStatus(tr("Choose a destination folder")); return; }
-    moveMessagesTo(indices, destination, false);
-}
-void MailController::moveMessagesTo(const QVariantList &indices, const QString &destination, bool archive) {
-    QList<Summary> selected;
-    for (const auto &value : indices) {
-        const QVariantMap map = m_messages->get(value.toInt());
-        if (map.isEmpty()) continue;
-        const Summary summary = summaryFromMap(map);
-        if (summary.folder != m_folder || summary.uidValidity != m_uidValidity) continue;
-        selected.append(summary);
+    if (destination.trimmed().isEmpty() || destination == m_folder) {
+        setStatus(tr("Choose a different destination folder")); return;
     }
-    if (selected.isEmpty()) return;
+    executeCommand(indices, MailboxCommands::Action::Move, false, destination);
+}
+void MailController::executeCommand(const QVariantList &indices, MailboxCommands::Action action,
+                                     bool value, const QString &destination) {
+    if (m_commands->busy() || m_busy || sending() || sendPending()) { setStatus(tr("Another mail operation is in progress")); return; }
     if (!m_demo && (!configured() || m_account.password.isEmpty())) {
         setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages.")); return;
     }
-    const auto snapshot = modelSnapshot(m_messages);
-    const auto oldSelected = m_selected; const auto oldSelectedUid = m_selectedUid; const auto oldContent = m_content;
-    QList<Summary> remaining;
-    for (const auto &item : snapshot) {
-        bool remove = false;
-        for (const auto &summary : selected) if (sameMessage(item, summary)) { remove = true; break; }
-        if (!remove) remaining.append(item);
+    QList<Summary> selected;
+    QSet<QString> seen;
+    for (const auto &index : indices) {
+        const auto map = m_messages->get(index.toInt());
+        if (map.isEmpty()) continue;
+        const auto summary = summaryFromMap(map);
+        if (summary.folder != m_folder || summary.uidValidity != m_uidValidity || seen.contains(summary.uid)) continue;
+        seen.insert(summary.uid); selected.append(summary);
     }
-    m_messages->replace(remaining);
-    bool selectedRemoved = false;
-    for (const auto &summary : selected) {
-        if (!m_selectedUid.isEmpty() && m_selectedUid == summary.uid
-            && (m_selected.isEmpty() || sameMessage(summaryFromMap(m_selected), summary))) { selectedRemoved = true; break; }
-    }
-    if (selectedRemoved) { m_selected.clear(); m_selectedUid.clear(); m_content = {}; emit selectionChanged(); }
-    if (m_demo) { setStatus(archive ? tr("Preview · messages archived locally") : tr("Preview · messages moved locally")); return; }
-    m_mutating = true; setStatus(archive ? tr("Archiving messages…") : tr("Moving messages…"));
-    const auto account = m_account; const auto generation = m_generation;
-    const auto folder = m_folder, validity = m_uidValidity;
-    QStringList uids; for (const auto &summary : selected) uids << summary.uid;
-    const int count = selected.size();
-    const QStringList deleted{QStringLiteral("\\Deleted")};
-    QPointer<MailController> self(this);
-    run([self, account, folder, validity, uids, destination, deleted, count, archive, generation, snapshot, oldSelected, oldSelectedUid, oldContent] {
-        try {
-            MailioBackend::copyMany(account, folder, validity, uids, destination);
-            MailioBackend::storeFlagsMany(account, folder, validity, uids, deleted, true);
-            MailioBackend::expungeMany(account, folder, validity, uids);
-            if (self) QMetaObject::invokeMethod(self, [self, generation, folder, validity, uids, count, archive] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (self->m_database) for (const auto &uid : uids) self->m_database->removeMessage(folder, validity, uid);
-                emit self->folderUnreadChanged();
-                if (generation != self->m_generation) return;
-                self->setStatus(archive ? MailController::tr("%1 messages archived").arg(count)
-                                        : MailController::tr("%1 messages moved").arg(count));
-            }, Qt::QueuedConnection);
-        } catch (const std::exception &e) {
-            const auto error = QString::fromUtf8(e.what());
-            if (self) QMetaObject::invokeMethod(self, [self, generation, snapshot, oldSelected, oldSelectedUid, oldContent, count, error] {
-                if (!self) return;
-                self->m_mutating = false;
-                if (generation != self->m_generation) return;
-                self->m_messages->replace(snapshot);
-                if (self->m_selectedUid.isEmpty()) {
-                    self->m_selected = oldSelected; self->m_selectedUid = oldSelectedUid; self->m_content = oldContent;
-                    emit self->selectionChanged();
-                }
-                self->setStatus(MailController::tr("Could not update %1 messages").arg(count), error);
-            }, Qt::QueuedConnection);
-        }
-    });
+    if (selected.isEmpty()) return;
+    ++m_generation; ++m_selectionGeneration; m_serverSearching = false;
+    setStatus(tr("Updating messages…"));
+    m_commands->execute(m_account, selected, action, value, destination, m_demo);
+    emit statusChanged();
 }
 }

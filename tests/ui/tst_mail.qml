@@ -37,6 +37,8 @@ TestCase {
         property bool hasMore: false
         property string search: ""
         property bool failSave: false
+        property int deletedRow: -1
+        function deleteMessage(row) { deletedRow = row }
         property int refreshCount: 0
         property int saveCount: 0
         property var lastSaved: ({})
@@ -46,6 +48,13 @@ TestCase {
         signal draftAccepted(string id)
         ListModel {
             id: messageModel
+            function indexOf(folder, validity, uid) {
+                for (let i = 0; i < count; ++i) {
+                    const message = get(i)
+                    if (message.folder === folder && message.uidValidity === validity && message.uid === uid) return i
+                }
+                return -1
+            }
             ListElement { uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false; threadKey: ""; threadCount: 1; threadFirst: true }
         }
         function configureAccount(config, password, remember) {}
@@ -86,6 +95,9 @@ TestCase {
         function clearError() { error = "" }
         function disconnectAccount() { configured = false }
     }
+    Component { id: readerComponent; App.MessageReader {} }
+    Component { id: sidebarComponent; App.MailSidebar {} }
+    Component { id: paneComponent; App.MessagePane { selection: App.MailSelection {} } }
     Component { id: appComponent; App.Main {} }
     function init() {
         AppTheme.reduceMotion = true
@@ -106,6 +118,40 @@ TestCase {
     function activateApp() {
         app.requestActivate()
         wait(40)
+    }
+    function test_toolbar_resolves_row_after_model_removal() {
+        const original = JSON.parse(JSON.stringify(messageModel.get(0)))
+        const selected = mock.selectedMessage
+        const second = Object.assign({}, original, {uid: "2"})
+        messageModel.append(second)
+        mock.selectedMessage = Object.assign({}, selected, {uid: "2"})
+        mock.selectedUid = "2"
+        messageModel.remove(0)
+        mock.deletedRow = -1
+        findChild(app, "messageOpsGroup").triggered(0)
+        compare(mock.deletedRow, 0)
+        messageModel.clear(); messageModel.append(original)
+        mock.selectedMessage = selected; mock.selectedUid = "1"
+    }
+    function test_views_load_without_shell_context() {
+        const reader = createTemporaryObject(readerComponent, testCase, {
+            mail: mock, message: mock.selectedMessage, hasMessage: true, width: 600, height: 500
+        })
+        const sidebar = createTemporaryObject(sidebarComponent, testCase, {
+            mail: mock, surface: testCase, sidebarAccounts: mock.accounts, width: 240, height: 500
+        })
+        const pane = createTemporaryObject(paneComponent, testCase, {
+            mail: mock, surface: testCase, width: 320, height: 500
+        })
+        verify(reader !== null && sidebar !== null && pane !== null)
+        wait(50)
+        compare(findChild(pane, "messageList").count, 1)
+        compare(findChild(reader, "messageBody").text, mock.selectedMessage.text)
+        const selection = pane.selection
+        selection.toggleRow(0)
+        compare(selection.selectionSize, 1)
+        selection.clearSelection()
+        compare(selection.selectionSize, 0)
     }
     function test_shell_planes_and_window_chrome_are_stable() {
         const planes = findChild(app, "chromePlanes")

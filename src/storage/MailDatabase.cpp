@@ -20,26 +20,6 @@ QVariantMap mapFromJson(const QVariant &value)
 {
     return QJsonDocument::fromJson(value.toString().toUtf8()).object().toVariantMap();
 }
-Summary summaryFromMap(const QVariantMap &m)
-{
-    Summary s;
-    s.folder = m.value("folder").toString();
-    s.uidValidity = m.value("uidValidity").toString();
-    s.uid = m.value("uid").toString();
-    s.sender = m.value("sender").toString();
-    s.senderAddress = m.value("senderAddress").toString();
-    s.recipients = m.value("recipients").toString();
-    s.subject = m.value("subject").toString();
-    s.date = m.value("date").toString();
-    s.preview = m.value("preview").toString();
-    s.messageId = m.value("messageId").toString();
-    s.inReplyTo = m.value("inReplyTo").toString();
-    s.references = m.value("references").toString();
-    s.unread = m.value("unread").toBool();
-    s.flagged = m.value("flagged").toBool();
-    s.hasAttachments = m.value("hasAttachments").toBool();
-    return s;
-}
 bool validIdentity(const Summary &s)
 {
     return !s.folder.isEmpty() && !s.uidValidity.isEmpty() && !s.uid.isEmpty();
@@ -137,14 +117,47 @@ bool MailDatabase::open(const QString &root, const QString &accountId)
         || !exec(m_db, QStringLiteral("PRAGMA foreign_keys=ON"), {}, &m_error)
         || !exec(m_db, QStringLiteral("PRAGMA journal_mode=WAL"), {}, &m_error)
         || !exec(m_db, QStringLiteral("PRAGMA synchronous=FULL"), {}, &m_error)
-        || !migrate()
-        // A crash during SMTP submission has an ambiguous outcome. Never retry it.
-        || !exec(m_db, QStringLiteral("UPDATE drafts SET state='unknown' WHERE state='sending' AND account=?"), {m_accountId}, &m_error)) {
+        || !migrate()) {
         const QString message = m_error.isEmpty() ? QStringLiteral("Cannot protect database permissions") : m_error;
         close();
         return fail(message);
     }
     return true;
+}
+bool MailDatabase::recoverInterruptedSends()
+{
+    return check() && exec(m_db, QStringLiteral("UPDATE drafts SET state='unknown' WHERE state='sending'"), {}, &m_error);
+}
+bool MailDatabase::updateFlags(const QList<Summary> &messages)
+{
+    if (!check()) return false;
+    Transaction tx(m_db);
+    if (!tx.active()) return fail(m_db.lastError().text());
+    for (const auto &s : messages) {
+        if (!validIdentity(s) || validity(s.folder) != s.uidValidity)
+            return fail(QStringLiteral("Cannot update flags for a stale mailbox"));
+        for (const auto &table : {"summaries", "contents"}) {
+            QSqlQuery query(m_db);
+            query.prepare(QStringLiteral("SELECT payload FROM ") + QLatin1String(table)
+                + QStringLiteral(" WHERE account=? AND folder=? AND uid_validity=? AND uid=?"));
+            const QVariantList key{m_accountId, s.folder, s.uidValidity, s.uid};
+            for (const auto &v : key) query.addBindValue(v);
+            if (!query.exec()) return fail(query.lastError().text());
+            if (!query.next()) continue;
+            auto payload = mapFromJson(query.value(0));
+            query.finish();
+            payload["unread"] = s.unread; payload["flagged"] = s.flagged;
+            if (QLatin1String(table) == QLatin1String("contents")) {
+                auto summary = payload.value("summary").toMap();
+                summary["unread"] = s.unread; summary["flagged"] = s.flagged;
+                payload["summary"] = summary;
+            }
+            QVariantList values{json(payload)}; values.append(key);
+            if (!exec(m_db, QStringLiteral("UPDATE ") + QLatin1String(table)
+                + QStringLiteral(" SET payload=? WHERE account=? AND folder=? AND uid_validity=? AND uid=?"), values, &m_error)) return false;
+        }
+    }
+    return tx.commit() || fail(m_db.lastError().text());
 }
 bool MailDatabase::migrate()
 {
@@ -358,14 +371,14 @@ bool MailDatabase::removeAccount(const QString &id)
         return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
-QList<Folder> MailDatabase::folders() const
+QList<Folder> MailDatabase::folders(const QString &accountId) const
 {
     QList<Folder> result;
     if (!check())
         return result;
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral("SELECT id,title,total FROM folders WHERE account=? ORDER BY position,id"));
-    q.addBindValue(m_accountId);
+    q.addBindValue(accountId.isEmpty() ? m_accountId : accountId);
     if (!q.exec()) {
         fail(q.lastError().text());
         return result;
@@ -519,14 +532,14 @@ Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, cons
     page.nextOffset = offset + int(page.messages.size());
     return page;
 }
-QMap<QString, int> MailDatabase::unreadCounts() const
+QMap<QString, int> MailDatabase::unreadCounts(const QString &accountId) const
 {
     QMap<QString, int> result;
     if (!check())
         return result;
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral("SELECT folder,payload FROM summaries WHERE account=?"));
-    q.addBindValue(m_accountId);
+    q.addBindValue(accountId.isEmpty() ? m_accountId : accountId);
     if (!q.exec()) {
         fail(q.lastError().text());
         return {};
@@ -592,6 +605,7 @@ std::optional<Content> MailDatabase::content(const QString &folder, const QStrin
     Content c;
     c.summary = summaryFromMap(m.value("summary").toMap());
     c.text = m.value("text").toString();
+    c.html = m.value("html").toString();
     c.messageId = m.value("messageId").toString();
     c.replyTo = m.value("replyTo").toString();
     c.to = m.value("to").toString();
@@ -648,12 +662,12 @@ bool MailDatabase::saveDraft(const Draft &draft)
     if (d.state.isEmpty())
         d.state = QStringLiteral("draft");
     QSqlQuery existing(m_db);
-    existing.prepare(QStringLiteral("SELECT state FROM drafts WHERE id=? AND account=?"));
+    existing.prepare(QStringLiteral("SELECT state,account FROM drafts WHERE id=?"));
     existing.addBindValue(d.id);
-    existing.addBindValue(m_accountId);
     if (!existing.exec())
         return fail(existing.lastError().text());
     if (existing.next()) {
+        if (existing.value(1).toString() != m_accountId) return fail(QStringLiteral("Draft belongs to another account"));
         const QString persisted = existing.value(0).toString();
         // The UI often holds a stale draft map during/after an asynchronous send.
         // Only markDraftState may finalize an in-flight submission. Autosave may

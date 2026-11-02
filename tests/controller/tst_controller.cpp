@@ -1,6 +1,12 @@
 #include "MailController.h"
 #include "MessageListModel.h"
 #include "mail/backend.h"
+#include "mail/MailTransport.h"
+#include "services/AccountSession.h"
+#include "services/RemoteImageLoader.h"
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QElapsedTimer>
 #include "storage/CredentialStore.h"
 #include "storage/MailDatabase.h"
 #include <QDir>
@@ -103,6 +109,7 @@ QList<QVariantMap> MailioBackend::search(const Account &, const QString &, const
 {
     return {};
 }
+void MailioBackend::removeOrMove(const Account &, const QString &, const QString &, const QStringList &, const QString &) {}
 void MailioBackend::storeFlags(const Account &, const QString &, const QString &, const QString &, const QStringList &, bool)
 {
 }
@@ -196,6 +203,13 @@ private slots:
     void init() { synthetic::reset(); }
     void demoNeverUsesExternalBoundaries();
     void refreshAndPagination();
+    void batchCommandsUseFreshValidityAndPersist();
+    void failedCommandPreservesCache();
+    void commandServiceRejectsInvalidMove();
+    void backgroundCredentialsResolvePerAccount();
+    void disconnectPermissionSurvivesRestart();
+    void imagesCacheRenderedContentPerAccount();
+    void closingImageLoaderCancelsStalledRequest();
     void cachedSearchNeverFetches();
     void refreshFailureStillPaginatesCache();
     void failedNetworkAppendUsesCachedTail();
@@ -210,6 +224,9 @@ private slots:
     void lateCredentialCompletionPreservesDisconnectTombstone();
     void accountTransportChangeClearsVisibleCache();
     void staleDraftMapNeverResends();
+    void liveSendSurvivesSidebarProbes();
+    void pendingSendCanBeCancelled();
+    void draftsStayWithTheirAccount();
     void interruptedSendRestoresUnknown();
     void composeReplyAndForward();
     void replyAllQuotedNamesAndExactSelfExclusion();
@@ -236,6 +253,142 @@ void ControllerTests::demoNeverUsesExternalBoundaries()
     QCOMPARE(synthetic::credentialReads.load(), 0);
     QCOMPARE(synthetic::credentialWrites.load(), 0);
     QCOMPARE(synthetic::credentialDeletes.load(), 0);
+}
+namespace {
+class RecordingTransport final : public MailTransport {
+public:
+    std::atomic_int flagCalls{0}, removeCalls{0};
+    void removeOrMove(const Account &, const QString &, const QString &, const QStringList &, const QString &) override { ++removeCalls; }
+    bool fail = false;
+    void storeFlagsMany(const Account &, const QString &, const QString &validity,
+                        const QStringList &uids, const QStringList &, bool) override {
+        if (validity != "100" || uids.size() != 2) throw BackendError("Wrong command identity");
+        ++flagCalls;
+        if (fail) throw BackendError("Synthetic command failure");
+    }
+};
+}
+void ControllerTests::commandServiceRejectsInvalidMove()
+{
+    QTemporaryDir root(temporaryTemplate()); MailDatabase db; QVERIFY(db.open(root.path()));
+    auto backend = std::make_shared<RecordingTransport>();
+    MailboxCommands commands(db, backend);
+    QSignalSpy done(&commands, &MailboxCommands::completed);
+    Summary message; message.folder = "INBOX"; message.uidValidity = "100"; message.uid = "1";
+    commands.execute(account(), {message}, MailboxCommands::Action::Move);
+    QCOMPARE(done.count(), 1); QVERIFY(!done.last().at(2).toString().isEmpty());
+    auto other = account(); other.id = "other";
+    commands.execute(other, {message}, MailboxCommands::Action::Remove);
+    QCOMPARE(done.count(), 2); QVERIFY(!done.last().at(2).toString().isEmpty());
+    QCOMPARE(backend->removeCalls.load(), 0);
+}
+void ControllerTests::batchCommandsUseFreshValidityAndPersist()
+{
+    QTemporaryDir root(temporaryTemplate());
+    QVERIFY(seed(root.path())); // No cached UIDVALIDITY before network refresh.
+    auto backend = std::make_shared<RecordingTransport>();
+    MailController controller(false, root.path(), nullptr, backend);
+    QTRY_VERIFY(controller.status().contains("restored"));
+    controller.refresh(); QTRY_VERIFY(!controller.busy());
+    controller.setMessagesRead({0, 1}, false);
+    QTRY_COMPARE(backend->flagCalls.load(), 1);
+    QTRY_VERIFY(controller.status().contains("updated"));
+    MailDatabase probe; QVERIFY(probe.open(root.path()));
+    QCOMPARE(probe.unreadCounts().value("INBOX"), 2);
+    controller.setMessagesFlagged({0, 1}, true);
+    QTRY_COMPARE(backend->flagCalls.load(), 2);
+    QTRY_VERIFY(messages(controller)->get(0).value("flagged").toBool());
+    controller.setSearch("even"); controller.setSearch("");
+    QVERIFY(messages(controller)->get(0).value("flagged").toBool());
+}
+void ControllerTests::failedCommandPreservesCache()
+{
+    QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path()));
+    auto backend = std::make_shared<RecordingTransport>(); backend->fail = true;
+    MailController controller(false, root.path(), nullptr, backend);
+    QTRY_VERIFY(controller.status().contains("restored"));
+    controller.refresh(); QTRY_VERIFY(!controller.busy());
+    controller.setMessagesRead({0, 1}, false);
+    QTRY_VERIFY(!controller.error().isEmpty());
+    QVERIFY(!messages(controller)->get(0).value("unread").toBool());
+    MailDatabase probe; QVERIFY(probe.open(root.path()));
+    QCOMPARE(probe.unreadCounts().value("INBOX"), 0);
+}
+void ControllerTests::backgroundCredentialsResolvePerAccount()
+{
+    QTemporaryDir root(temporaryTemplate());
+    AccountSession session(root.path());
+    auto a = account(); a.id = "second"; a.password = "synthetic-session";
+    session.write(session.key(a), a.password);
+    session.clear(); a.password.clear();
+    bool resolved = false;
+    session.resolve(a, [&](const Account &ready) { resolved = ready.id == "second" && !ready.password.isEmpty(); });
+    QTRY_VERIFY(resolved);
+    QCOMPARE(synthetic::credentialReadKeys.last(), session.key(a));
+    auto other = a; other.id = "third";
+    QVERIFY(session.key(a) != session.key(other));
+}
+void ControllerTests::disconnectPermissionSurvivesRestart()
+{
+    QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path()));
+    {
+        MailController controller(false, root.path());
+        QTRY_VERIFY(controller.status().contains("restored"));
+        controller.configureAccount(controller.account(), "synthetic-session", true);
+        controller.disconnectAccount();
+    }
+    const auto before = synthetic::credentialReads.load();
+    MailController restarted(false, root.path());
+    QTRY_VERIFY(restarted.configured());
+    QTest::qWait(50);
+    QCOMPARE(synthetic::credentialReads.load(), before);
+    restarted.refresh(); QCOMPARE(synthetic::folderCalls.load(), 0);
+}
+void ControllerTests::imagesCacheRenderedContentPerAccount()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+    int requests = 0;
+    connect(&server, &QTcpServer::newConnection, this, [&] {
+        auto socket = server.nextPendingConnection();
+        connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+            socket->readAll(); ++requests;
+            const auto image = QByteArray::fromBase64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX2kAAAAASUVORK5CYII=");
+            socket->write("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: " + QByteArray::number(image.size()) + "\r\nConnection: close\r\n\r\n" + image);
+            socket->disconnectFromHost();
+        });
+        connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+    });
+    RemoteImageLoader loader;
+    QSignalSpy loaded(&loader, &RemoteImageLoader::loaded);
+    Summary message; message.folder = "INBOX"; message.uidValidity = "100"; message.uid = "1";
+    const auto key = RemoteImageLoader::key("first", message);
+    const auto second = RemoteImageLoader::key("second", message);
+    const QString html = QString("<img data-nkmail-src=\"http://127.0.0.1:%1/image\">").arg(server.serverPort());
+    loader.load(key, html);
+    QTRY_COMPARE(loaded.count(), 1);
+    QVERIFY(loader.cached(key, html).contains("data:image/png;base64,"));
+    loader.load(key, html);
+    QCOMPARE(loaded.count(), 2); QCOMPARE(requests, 1);
+    QVERIFY(second != key);
+    QCOMPARE(loader.cached(second, html), html);
+    loader.load(second, html);
+    QTRY_COMPARE(loaded.count(), 3); QCOMPARE(requests, 2);
+}
+void ControllerTests::closingImageLoaderCancelsStalledRequest()
+{
+    QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
+    bool requested = false;
+    connect(&server, &QTcpServer::newConnection, this, [&] {
+        auto socket = server.nextPendingConnection();
+        connect(socket, &QTcpSocket::readyRead, socket, [&, socket] { socket->readAll(); requested = true; });
+    });
+    auto *loader = new RemoteImageLoader;
+    loader->load("stalled", QString("<img data-nkmail-src=\"http://127.0.0.1:%1/stall\">").arg(server.serverPort()));
+    QTRY_VERIFY(requested);
+    QElapsedTimer elapsed; elapsed.start();
+    delete loader;
+    QVERIFY(elapsed.elapsed() < 1500);
 }
 void ControllerTests::refreshAndPagination()
 {
@@ -551,6 +704,49 @@ void ControllerTests::accountTransportChangeClearsVisibleCache()
     QVERIFY(controller.selectedMessage().isEmpty());
     QVERIFY(controller.selectedUid().isEmpty());
     QVERIFY(controller.folders().isEmpty());
+}
+void ControllerTests::liveSendSurvivesSidebarProbes()
+{
+    QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path()));
+    QSemaphore release;
+    synthetic::send = [&release](const Account &, const Draft &) {
+        release.acquire(); return SendResult{SendResult::Accepted, {}};
+    };
+    MailController controller(false, root.path()); ReleaseOnExit cleanup{release};
+    QTRY_VERIFY(controller.status().contains("restored"));
+    auto draft = controller.newDraft(); draft["to"] = "nobody@example.invalid";
+    controller.sendDraft(draft);
+    QTRY_COMPARE(synthetic::sendCalls.load(), 1);
+    controller.accountUnread(controller.currentAccountId()); controller.foldersFor(controller.currentAccountId());
+    QCOMPARE(controller.loadDraft(draft["id"].toString())["state"].toString(), QString("sending"));
+    release.release(); QTRY_VERIFY(!controller.sending());
+    QCOMPARE(controller.loadDraft(draft["id"].toString())["state"].toString(), QString("accepted"));
+}
+void ControllerTests::pendingSendCanBeCancelled()
+{
+    QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path()));
+    MailController controller(false, root.path());
+    QTRY_VERIFY(controller.status().contains("restored"));
+    auto draft = controller.newDraft(); draft["to"] = "nobody@example.invalid";
+    controller.setSendDelay(1); controller.sendDraft(draft);
+    QVERIFY(controller.sendPending());
+    controller.cancelSend(); QVERIFY(!controller.sendPending());
+    QTest::qWait(1100);
+    QCOMPARE(synthetic::sendCalls.load(), 0);
+    QCOMPARE(controller.loadDraft(draft["id"].toString())["state"].toString(), QString("draft"));
+}
+void ControllerTests::draftsStayWithTheirAccount()
+{
+    QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path()));
+    MailDatabase db; QVERIFY(db.open(root.path())); auto other = account(); other.id = "second";
+    QVERIFY(db.saveAccount(other));
+    MailController controller(false, root.path());
+    QTRY_VERIFY(controller.status().contains("restored"));
+    auto draft = controller.newDraft(); draft["body"] = "original"; draft = controller.saveDraft(draft);
+    controller.switchAccount("second");
+    draft["body"] = "wrong account"; QVERIFY(controller.saveDraft(draft).isEmpty());
+    controller.switchAccount("default");
+    QCOMPARE(controller.loadDraft(draft["id"].toString())["body"].toString(), QString("original"));
 }
 void ControllerTests::staleDraftMapNeverResends()
 {
