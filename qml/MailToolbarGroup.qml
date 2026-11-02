@@ -39,13 +39,38 @@ Item {
                 objectName: root.objectNames[index] || ""
                 enabled: root.enabledActions[index] !== false
                 height: root.height
-                width: root.showLabels ? inlineContent.implicitWidth + 20 : 28
+                width: root.showLabels ? Math.ceil(inlineContent.implicitWidth + 20) : 28
                 materialForm: true
                 flat: true
                 surfaceColor: "transparent"
                 // Transparent action cells sit on the group's shared glass.
                 textColor: !enabled ? AppTheme.disabledText : root.materialForm
                     ? AppTheme.text : (AppTheme.dark ? "#D6D6DA" : "#55555A")
+                // A segment is not a separate capsule: match the shared surface
+                // only at the group's outside ends. Keep glyphs unscaled.
+                scale: 1
+                background: Item {
+                    clip: true
+                    Rectangle {
+                        readonly property bool outerEnd: action.index === 0 || action.index === root.icons.length - 1
+                        radius: outerEnd ? height / 2 : 0
+                        x: action.index > 0 && action.index === root.icons.length - 1 ? -radius : 0
+                        width: parent.width + (outerEnd && root.icons.length > 1 ? radius : 0)
+                        height: parent.height
+                        color: AppTheme.text
+                        opacity: !action.enabled ? 0 : action.down ? 0.13 : action.hovered ? 0.07 : 0
+                        antialiasing: true
+                    }
+                    Rectangle {
+                        anchors.fill: parent; anchors.margins: 2
+                        radius: 4
+                        color: "transparent"
+                        border.width: 2
+                        border.color: AppTheme.focusRing
+                        visible: action.visualFocus
+                        antialiasing: true
+                    }
+                }
                 Accessible.name: root.labels[index] || root.icons[index]
                 contentItem: Row {
                     id: inlineContent

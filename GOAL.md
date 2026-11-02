@@ -1,5 +1,11 @@
 # NkMail local delivery goal
 
+## Joined toolbar hover surfaces · 2026-11-02
+
+- Replaced independent capsule hover backgrounds inside toolbar groups with clipped segment highlights: rounded only at the two outside ends, square at internal boundaries, explicitly antialiased. Preserved the canonical shared liquid surface and keyboard focus ring. Rounded segment widths to whole pixels and disabled per-cell scaling.
+- VM UI/catalog regressions passed 2/2 in 9.87s. A temporary offscreen hover capture exercised first/middle/last segments; inspected the captured hover geometry (software rendering, not GPU acceptance). Initial capture harness lacked visible:true and incorrectly treated save() as returning a bool; corrected the harness and reran successfully.
+- Host build succeeded and the prior preview exited through guarded tray quit before replacement; single-instance preview retained.
+
 ## Softer row edges · 2026-11-02
 
 - Reduced message selection/hover corner radius to 6px. Separators now render at half their existing theme opacity, preserving light/dark colors and horizontal insets.
