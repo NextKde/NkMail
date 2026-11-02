@@ -45,6 +45,7 @@ struct SendResult {
 };
 QVariantMap accountMap(const Account &account);
 Account accountFromMap(const QVariantMap &map);
+Summary summaryFromMap(const QVariantMap &map);
 QVariantMap summaryMap(const Summary &summary);
 QVariantMap contentMap(const Content &content);
 QVariantMap draftMap(const Draft &draft);

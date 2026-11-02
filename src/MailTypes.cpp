@@ -38,6 +38,25 @@ Account accountFromMap(const QVariantMap &m)
     a.caFile = m.value("caFile").toString();
     return a;
 }
+Summary summaryFromMap(const QVariantMap &map) {
+    Summary summary;
+    summary.folder = map.value("folder").toString();
+    summary.uidValidity = map.value("uidValidity").toString();
+    summary.uid = map.value("uid").toString();
+    summary.sender = map.value("sender").toString();
+    summary.senderAddress = map.value("senderAddress").toString();
+    summary.recipients = map.value("recipients").toString();
+    summary.subject = map.value("subject").toString();
+    summary.date = map.value("date").toString();
+    summary.preview = map.value("preview").toString();
+    summary.messageId = map.value("messageId").toString();
+    summary.inReplyTo = map.value("inReplyTo").toString();
+    summary.references = map.value("references").toString();
+    summary.unread = map.value("unread").toBool();
+    summary.flagged = map.value("flagged").toBool();
+    summary.hasAttachments = map.value("hasAttachments").toBool();
+    return summary;
+}
 QVariantMap summaryMap(const Summary &s)
 {
     return {{"folder", s.folder}, {"uidValidity", s.uidValidity}, {"uid", s.uid},

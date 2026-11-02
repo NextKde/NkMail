@@ -583,6 +583,35 @@ void MailioBackend::appendSent(const Account &a, const QString &folder, const QB
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError("Unable to save a copy to the Sent folder. Check account, connection and trusted TLS certificate."); }
 }
+void MailioBackend::removeOrMove(const Account &a, const QString &folder,
+                               const QString &validity, const QStringList &uids,
+                               const QString &destination)
+{
+    if (uids.isEmpty()) return;
+    bool writeStarted = false;
+    try {
+        accountValid(a, false); folderValid(folder);
+        if (!destination.isEmpty()) {
+            folderValid(destination);
+            if (destination == folder) throw BackendError("Choose a different destination folder.");
+        }
+        const auto expected = identity(validity);
+        const auto set = uidSet(uids);
+        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        const auto stat = imap.select(utf8(folder), false);
+        if (stat.uid_validity != expected) throw BackendError("Folder identity changed. Refresh the message list.");
+        if (!imap.capabilities().count("UIDPLUS"))
+            throw BackendError("Safe deletion/move requires UIDPLUS. No messages were changed.");
+        writeStarted = true;
+        if (!destination.isEmpty()) imap.copy(set, utf8(destination));
+        imap.store_flags(set, flagList({QStringLiteral("\\Deleted")}), true);
+        imap.expunge(set);
+    } catch (const BackendError &) { throw; }
+      catch (...) {
+        if (writeStarted) throw BackendError("Operation may be partially complete. Refresh both folders before retrying; no automatic retry was made.");
+        throw BackendError("Unable to prepare mailbox operation. No messages were changed.");
+      }
+}
 void MailioBackend::storeFlags(const Account &a, const QString &folder, const QString &validity,
                                const QString &uid, const QStringList &flags, bool add)
 {
@@ -626,9 +655,9 @@ void MailioBackend::expunge(const Account &a, const QString &folder, const QStri
                 imap.expunge(id, true);
                 return;
             }
-            if (usedFullExpunge) *usedFullExpunge = true;
+            throw BackendError("Safe deletion requires UIDPLUS; no mailbox-wide expunge was performed.");
         }
-        imap.expunge();
+        throw BackendError("Safe deletion requires explicit UIDs and UIDPLUS.");
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError("Unable to expunge deleted messages. Check account, connection and trusted TLS certificate."); }
 }
@@ -679,8 +708,8 @@ void MailioBackend::expungeMany(const Account &a, const QString &folder, const Q
             imap.expunge(set);
             return;
         }
-        if (usedFullExpunge) *usedFullExpunge = true;
-        imap.expunge();
+        throw BackendError("Safe deletion requires UIDPLUS; no mailbox-wide expunge was performed.");
+        throw BackendError("Safe deletion requires explicit UIDs and UIDPLUS.");
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError("Unable to expunge deleted messages. Check account, connection and trusted TLS certificate."); }
 }

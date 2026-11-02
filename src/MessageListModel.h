@@ -20,6 +20,7 @@ public:
     void replace(const QList<Summary> &messages);
     void append(const QList<Summary> &messages);
     bool update(const Summary &message);
+    void remove(int row);
     void clear() { replace({}); }
     Q_INVOKABLE QVariantMap get(int row) const;
     Q_INVOKABLE int indexOf(const QString &folder, const QString &uidValidity,

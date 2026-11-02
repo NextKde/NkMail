@@ -7,8 +7,10 @@ find_package(Qt6 REQUIRED COMPONENTS Core Sql Test Concurrent DBus Network)
 enable_testing()
 # Compile the real controller/database/model. Only the blocking protocol and
 # credential boundary are synthetic: no mailio, network or system keyring calls.
+include(../../cmake/NkMailServices.cmake)
 add_executable(nkmail_controller_tests
     tst_controller.cpp
+    ${NKMAIL_SERVICE_SOURCES}
     ../../src/MailController.cpp ../../src/MailController.h
     ../../src/MailTypes.cpp
     ../../src/NotificationService.cpp

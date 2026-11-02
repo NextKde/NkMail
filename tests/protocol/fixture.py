@@ -97,6 +97,18 @@ class Server:
                 if self.scenario == "refuse-starttls": self.write(tag + b" NO unavailable\r\n"); continue
                 self.write(tag + b" OK begin TLS\r\n"); self.upgrade(); continue
             if upper.startswith(b"LOGIN "): self.write(tag + b" OK logged in\r\n")
+            elif upper == b"CAPABILITY":
+                capabilities = b"IMAP4rev1" if self.scenario == "no-uidplus" else b"IMAP4rev1 UIDPLUS"
+                self.write(b"* CAPABILITY " + capabilities + b"\r\n" + tag + b" OK capabilities\r\n")
+            elif upper.startswith(b"SELECT "):
+                self.write(b"* 2 EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n" + tag + b" OK [READ-WRITE] selected\r\n")
+            elif upper.startswith(b"UID COPY "):
+                self.write(tag + b" OK copied\r\n")
+            elif upper.startswith(b"UID STORE "):
+                self.write(tag + (b" NO synthetic failure\r\n" if self.scenario == "partial-move" else b" OK stored\r\n"))
+            elif upper.startswith(b"UID EXPUNGE "):
+                assert b"102" in upper
+                self.write(b"* 2 EXPUNGE\r\n" + tag + b" OK expunged\r\n")
             elif upper.startswith(b"EXAMINE "):
                 self.write(b"* 2 EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n* OK [UIDNEXT 103] next\r\n" + tag + b" OK [READ-ONLY] examined\r\n")
             elif upper.startswith(b"UID SEARCH "):
@@ -198,6 +210,21 @@ def main():
         seen_sni = []
         good.set_servername_callback(lambda sock, name, ctx: seen_sni.append(name))
         ca = root / "ca.pem"
+        for operation in ("remove", "move"):
+            for scenario in ("normal", "no-uidplus"):
+                result, server = invoke("imap", good, ca, operation, scenario=scenario)
+                assert result["ok"] == (scenario == "normal"), result
+                assert not any(cmd.split(" ", 1)[1] == "EXPUNGE" for cmd in server.commands), server.commands
+                if scenario == "no-uidplus":
+                    assert not any("STORE" in cmd or "COPY" in cmd or "EXPUNGE" in cmd for cmd in server.commands), server.commands
+                else:
+                    assert any("UID EXPUNGE" in cmd for cmd in server.commands), server.commands
+                passed += 1
+        result, server = invoke("imap", good, ca, "move", scenario="partial-move")
+        assert not result["ok"] and "partially" in result["error"], result
+        assert sum("UID COPY" in cmd for cmd in server.commands) == 1
+        assert not any("EXPUNGE" in cmd for cmd in server.commands)
+        passed += 1
         for starttls in (False, True):
             folders, server = invoke("imap", good, ca, "folders", starttls)
             assert folders["ok"] and len(folders["folders"]) == 2, folders

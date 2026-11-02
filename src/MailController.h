@@ -1,19 +1,23 @@
 #pragma once
 #include "MailTypes.h"
+#include "services/MailboxCommands.h"
 #include <QObject>
 #include <QVariantList>
 #include <QStringList>
 #include <QHash>
 #include <QSet>
-#include <QThreadPool>
 #include <QTimer>
 #include <memory>
-#include <functional>
 
 namespace nkmail {
 class MailDatabase;
 class MessageListModel;
-class CredentialStore;
+class AccountSession;
+class DraftService;
+class SendService;
+class MailboxSync;
+class RemoteImageLoader;
+class MailTransport;
 class MailController : public QObject {
     Q_OBJECT
     Q_PROPERTY(QObject* messages READ messages CONSTANT)
@@ -42,7 +46,7 @@ class MailController : public QObject {
     Q_PROPERTY(bool sendPending READ sendPending NOTIFY sendPendingChanged)
     Q_PROPERTY(int accountUnreadRevision READ accountUnreadRevision NOTIFY accountUnreadChanged)
 public:
-    explicit MailController(bool demo, const QString &dataRoot, QObject *parent = nullptr);
+    explicit MailController(bool demo, const QString &dataRoot, QObject *parent = nullptr, std::shared_ptr<MailTransport> transport = {});
     ~MailController() override;
     QObject *messages() const;
     QVariantList folders() const { return m_folders; }
@@ -64,8 +68,8 @@ public:
     QString currentFolder() const { return m_folder; }
     QString status() const { return m_status; }
     QString error() const { return m_error; }
-    bool busy() const { return m_busy; }
-    bool sending() const { return m_sending; }
+    bool busy() const { return m_busy || (m_commands && m_commands->busy()); }
+    bool sending() const;
     bool configured() const;
     bool demo() const { return m_demo; }
     bool hasMore() const { return m_hasMore; }
@@ -77,13 +81,12 @@ public:
     void setNotifyEnabled(bool enabled);
     int refreshInterval() const { return m_refreshInterval; }
     void setRefreshInterval(int seconds);
-    int sendDelay() const { return m_sendDelay; }
+    int sendDelay() const;
     void setSendDelay(int seconds);
-    bool sendPending() const { return m_sendPending; }
+    bool sendPending() const;
     int accountUnreadRevision() const { return m_accountUnreadRevision; }
     Q_INVOKABLE void configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
-    // Multi-account scope: only the current account is polled or pushed. There is
-    // deliberately no unified inbox/search and no concurrent connection per account.
+    // Foreground account owns browsing/search. Background accounts poll inbox stats.
     Q_INVOKABLE void switchAccount(const QString &id);
     // Read-only cache probe: lists another account's folders without touching the
     // active account or opening a connection.
@@ -146,27 +149,23 @@ private:
     void checkNewMail(const Page &page);
     void setStatus(const QString &status, const QString &error = {});
     void present(const Content &content);
-    void moveMessagesTo(const QVariantList &indices, const QString &destination, bool archive);
-    void submitDraft(const Draft &draft);
+    void executeCommand(const QVariantList &indices, MailboxCommands::Action action, bool value = false, const QString &destination = {});
     void clearPendingSend();
     QString credentialKey() const;
     QString credentialKey(const Account &account) const;
     QStringList favoriteEntries() const;
     void saveFavoriteEntries(const QStringList &entries) const;
     QString favoriteAccountName(const QString &accountId) const;
-    void run(std::function<void()> task);
-    bool m_demo = false, m_busy = false, m_sending = false, m_restorePending = false, m_hasMore = false;
+    std::shared_ptr<MailTransport> m_transport;
+    bool m_demo = false, m_busy = false, m_restorePending = false, m_hasMore = false;
     bool m_switchCredentialPending = false; // Credential read was started by switchAccount.
     bool m_serverSearching = false; // Server search is in flight, but must not block paging.
-    bool m_mutating = false; // One mailbox write operation at a time.
+    MailboxCommands *m_commands = nullptr;
     bool m_cachedOnly = true; // Query offsets stay local until a successful unfiltered header fetch.
     bool m_unreadOnly = false;
     bool m_notifyEnabled = true;
     int m_refreshInterval = 300; // Seconds, clamped to at least 60.
-    int m_sendDelay = 0; // Seconds to wait before sending; 0 sends immediately.
-    bool m_sendPending = false;
-    Draft m_pendingSend;
-    QTimer m_sendTimer;
+    SendService *m_send = nullptr;
     QTimer m_refreshTimer;
     QHash<QString, int> m_accountUnread; // Network-reported INBOX unread per account.
     int m_accountUnreadRevision = 0;
@@ -178,12 +177,11 @@ private:
     QVariantList m_folders;
     QVariantMap m_selected;
     Content m_content;
-    // Messages whose remote images were already fetched this session, keyed
-    // folder|uidValidity|uid, so repeated clicks do not re-download.
-    QSet<QString> m_loadedImageMessages;
+    DraftService *m_drafts = nullptr;
+    RemoteImageLoader *m_images = nullptr;
     std::unique_ptr<MailDatabase> m_database;
     MessageListModel *m_messages = nullptr;
-    CredentialStore *m_credentials = nullptr;
-    QThreadPool m_pool;
+    AccountSession *m_credentials = nullptr;
+    MailboxSync *m_sync = nullptr;
 };
 }

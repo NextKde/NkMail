@@ -16,6 +16,9 @@ public:
     MailDatabase &operator=(const MailDatabase &) = delete;
 
     bool open(const QString &root, const QString &accountId = QStringLiteral("default"));
+    // Explicit startup recovery, once after acquiring the profile process lock.
+    bool recoverInterruptedSends();
+    bool updateFlags(const QList<Summary> &messages);
     void close();
     bool isOpen() const;
     QString error() const { return m_error; }
@@ -25,13 +28,13 @@ public:
     Account account() const;
     bool saveAccount(const Account &account);
     bool removeAccount(const QString &id);
-    QList<Folder> folders() const;
+    QList<Folder> folders(const QString &accountId = {}) const;
     bool saveFolders(const QList<Folder> &folders);
     bool invalidateUidValidity(const QString &folder, const QString &uidValidity);
     bool savePage(const Page &page);
     Page cachedPage(const QString &folder, int offset = 0, int limit = 50,
                     const QString &search = {}, bool unreadOnly = false) const;
-    QMap<QString, int> unreadCounts() const;
+    QMap<QString, int> unreadCounts(const QString &accountId = {}) const;
 
     bool saveContent(const Content &content);
     std::optional<Content> content(const QString &folder, const QString &uidValidity,
@@ -43,7 +46,7 @@ public:
     bool saveDraft(const Draft &draft);
     bool deleteDraft(const QString &id);
     // Compare-and-set: sending can finish; accepted/unknown can never be retried.
-    // Interrupted sending is restored as unknown when opening the database.
+    // Interrupted sending is restored only by explicit startup recovery.
     bool markDraftState(const QString &id, const QString &state);
 
 private:
