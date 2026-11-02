@@ -277,7 +277,7 @@ ApplicationWindow {
             Item {
                 id: listHeader
                 objectName: "listHeader"
-                visible: messagePane.visible && !readerHeader.searching
+                visible: messagePane.visible
                 x: contentScene.x + messagePane.x
                 width: messagePane.width
                 height: parent.height

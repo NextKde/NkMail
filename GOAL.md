@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Preserve inbox header during search · 2026-11-02
+
+- Removed search-state coupling from the message-list header visibility. Opening search only replaces reader-toolbar actions; the mailbox title and unread filter remain visible.
+- Added assertions for title/filter visibility during compact search. VM UI regression passed in 9.98s; host build and guarded single-instance preview replacement succeeded.
+
 ## Consistent toolbar sizing and compact search · 2026-11-02
 
 - Unified filter, sidebar, action groups and search to the shared 28px toolbar height. Visible groups retain horizontal labels; operations that do not fit move to existing menu commands. Search/back controls no longer use stacked labels. Compact options retain a View route through More.
