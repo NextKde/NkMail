@@ -51,7 +51,6 @@ Item {
         spacing: 6
         anchors.right: parent.right
         anchors.rightMargin: 10.5
-        anchors.top: parent.top
-        anchors.topMargin: 14.5
+        y: (parent.height - height) / 2
     }
 }

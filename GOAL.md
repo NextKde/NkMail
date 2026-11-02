@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Header layout and four-pixel offset · 2026-11-02
+
+- Set the control centre to 23.5px, 4px below its original position, and centre all titles/controls within a 47px header. List, reader, sidebar and dividers follow the header bottom. Replaced rounded centre anchors with exact centre expressions after VM assertions exposed a half-pixel mismatch.
+- VM UI regression passed in 10.44s, including title/control centre alignment and content geometry. Host build and guarded preview replacement succeeded.
+
 ## Refined header offset · 2026-11-02
 
 - Reduced requested downward offset from 10px to 6px (4px upward from previous preview), retaining the common alignment. VM UI regression passed in 10.32s; host build and guarded preview replacement succeeded.

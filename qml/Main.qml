@@ -265,7 +265,9 @@ ApplicationWindow {
                 width: sidebarPlane.width
                 height: parent.height
                 Text {
-                    x: 14; y: 4
+                    objectName: "mailTitle"
+                    x: 14
+                    y: (parent.height - height) / 2
                     width: parent.width - 28; height: 26
                     text: qsTr("Mail"); font.pixelSize: 24; font.weight: Font.Bold
                     color: window.ink; elide: Text.ElideRight
