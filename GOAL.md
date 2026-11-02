@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Compact initial message list · 2026-11-02
+
+- Reduced the message list default/reset width from 320 to 280; retained drag resizing, the 260 minimum and saved custom widths. Updated keyboard/reset geometry expectations.
+- Host build succeeded; previous preview exited through its guarded tray menu before replacement. VM UI regression passed in 9.43s.
+
 ## Narrower navigation sidebar · 2026-11-02
 
 - Reduced the navigation sidebar default/reset width from 236 to 189 (approximately 20%) and its minimum from 190 to 152. Explicit saved custom widths remain respected; list/reader widths are unchanged.

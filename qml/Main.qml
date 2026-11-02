@@ -70,7 +70,7 @@ ApplicationWindow {
     // Preferred widths survive temporary narrow layouts; actual widths always
     // leave space for the reader and never squeeze the list below its minimum.
     property int sidebarPreferredWidth: 189
-    property int listPreferredWidth: 320
+    property int listPreferredWidth: 280
     readonly property int sidebarWidth: Math.max(152, Math.min(340, sidebarPreferredWidth,
         width - (narrow ? 260 : 560)))
     readonly property int listWidth: Math.max(260, Math.min(520, listPreferredWidth,
@@ -498,7 +498,7 @@ ApplicationWindow {
             }
             onDoubleClicked: {
                 if (sidebarHandle) window.sidebarPreferredWidth = 189
-                else window.listPreferredWidth = 320
+                else window.listPreferredWidth = 280
             }
             Keys.onLeftPressed: resizeTo((sidebarHandle ? window.sidebarWidth : window.listWidth) - 10)
             Keys.onRightPressed: resizeTo((sidebarHandle ? window.sidebarWidth : window.listWidth) + 10)
