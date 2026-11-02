@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Header alignment and spacing · 2026-11-02
+
+- Aligned the unread filter to the shared window-control/toolbar center instead of its independent 44px row. Reduced shell header height from 68 to 44, removing 24px of unused space above the list and bringing all panes upward together.
+- VM UI regression passed in 9.69s, including an explicit filter/toolbar center alignment assertion and updated header geometry checks. Inspected the 1180×760 synthetic screenshot. Host build succeeded; replaced the previous preview via guarded tray exit, retaining one instance.
+
 ## Smaller default window · 2026-11-02
 
 - Reduced the initial window from 1280×820 to 1180×760, retaining the compact 189px sidebar and 280px message list. Saved user window sizes remain respected.

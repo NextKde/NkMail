@@ -296,7 +296,7 @@ ApplicationWindow {
                     id: unreadFilterButton
                     anchors.right: parent.right
                     anchors.rightMargin: 14
-                    y: (44 - height) / 2
+                    y: windowChrome.controlsCenterY - height / 2
                     objectName: "unreadFilterButton"
                     visible: messagePane.visible && !window.draftsVisible
                     iconOnly: true

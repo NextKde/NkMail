@@ -199,9 +199,9 @@ TestCase {
         verify(controls !== null)
         compare(backdrop.sourceItem, planes)
         verify(backdrop.sourceItem !== findChild(app, "mailScene"))
-        compare(App.MailStyle.shellHeaderHeight, 68)
+        compare(App.MailStyle.shellHeaderHeight, 44)
         compare(App.MailStyle.toolbarButtonHeight, 26)
-        compare(chrome.height, 68)
+        compare(chrome.height, 44)
         compare(chrome.width, app.width)
         verify(chrome.visible)
         verify(controls.width > 0 && controls.height > 0)
@@ -216,9 +216,13 @@ TestCase {
         compare(sidebar.parent, scene)
         compare(content.parent, scene)
         compare(header.y, 0)
-        compare(header.height, 68)
-        compare(sidebar.y, 68)
-        compare(content.y, 68)
+        compare(header.height, 44)
+        const filter = findChild(app, "unreadFilterButton")
+        const toolbar = findChild(app, "readerHeader")
+        compare(filter.mapToItem(scene, 0, filter.height / 2).y,
+                toolbar.mapToItem(scene, 0, toolbar.controlsCenterY).y)
+        compare(sidebar.y, 44)
+        compare(content.y, 44)
         verify(sidebar.height > 0 && content.height > 0)
         for (const name of ["sidebarToggleButton", "searchField"]) {
             let item = findChild(app, name)
@@ -240,8 +244,8 @@ TestCase {
                 compare(owner, header, name + " must belong to the header")
             }
         }
-        compare(findChild(app, "messageList").mapToItem(scene, 0, 0).y, 68)
-        compare(findChild(app, "readerScroll").mapToItem(scene, 0, 0).y, 68)
+        compare(findChild(app, "messageList").mapToItem(scene, 0, 0).y, 44)
+        compare(findChild(app, "readerScroll").mapToItem(scene, 0, 0).y, 44)
     }
 
     function test_shell_geometry_at_width_boundaries() {
@@ -265,7 +269,7 @@ TestCase {
                     wait(25)
                     compare(header.width, width)
                     compare(content.x, app.sidebarVisible ? app.sidebarWidth : 0)
-                    compare(content.y, 68)
+                    compare(content.y, 44)
                     compare(content.y + content.height, scene.height)
                     compare(sidebar.y + sidebar.height, scene.height)
                     compare(list.visible, !app.narrow || !reading)
@@ -285,14 +289,14 @@ TestCase {
                         const top = item.mapToItem(scene, 0, 0)
                         verify(item.width > 0 && item.height > 0, name)
                         verify(top.x >= 0 && top.x + item.width <= width, name + " outside window")
-                        verify(top.y >= 0 && top.y + item.height <= 68, name + " outside header")
+                        verify(top.y >= 0 && top.y + item.height <= 44, name + " outside header")
                         verify(top.y >= controlTop.y + controls.height
                             || top.x + item.width <= controlTop.x, name + " overlaps window controls")
                     }
                     for (const name of ["sidebarDivider", "messageDivider"]) {
                         const divider = findChild(app, name)
                         if (!divider.visible) continue
-                        compare(divider.y, 68)
+                        compare(divider.y, 44)
                         compare(divider.y + divider.height, scene.height)
                     }
                 }
