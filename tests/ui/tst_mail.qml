@@ -230,6 +230,27 @@ TestCase {
         }
     }
 
+    function test_search_has_five_pixel_gap_to_traffic_lights() {
+        const toolbar = findChild(app, "readerHeader")
+        const controls = findChild(app, "windowControls")
+        for (const width of [1000, 1180, 1320, 1600]) {
+            toolbar.closeSearch()
+            app.width = width
+            wait(30)
+            for (const expanded of [false, true]) {
+                if (expanded) toolbar.openSearch()
+                wait(30)
+                const search = findChild(app, toolbar.wideSearch || expanded ? "searchField" : "searchToggleButton")
+                verify(search.visible)
+                const circleLeft = controls.mapToItem(app.contentItem, controls.buttonLayout[0].x, 0).x
+                const searchRight = search.mapToItem(app.contentItem, search.width, 0).x
+                verify(circleLeft - searchRight > 0 && circleLeft - searchRight <= 5,
+                       "Gap at width " + width + ", expanded=" + expanded + ": " + (circleLeft - searchRight))
+            }
+        }
+        toolbar.closeSearch()
+    }
+
     function test_shell_planes_and_window_chrome_are_stable() {
         const planes = findChild(app, "chromePlanes")
         const sidebarPlane = findChild(app, "sidebarPlane")

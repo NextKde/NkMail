@@ -340,7 +340,7 @@ ApplicationWindow {
                 hasMessage: window.hasMessage
                 visible: reader.visible || readerHeader.searching
                 x: contentScene.x + (window.narrow ? 0 : reader.x)
-                width: (window.narrow ? contentScene.width : reader.width) - windowChrome.controlsReservedWidth
+                width: Math.max(0, windowChrome.controlsLeft - x)
                 height: parent.height
                 onMessageCommandRequested: function(command) {
                     const row = window.selectedIndex()

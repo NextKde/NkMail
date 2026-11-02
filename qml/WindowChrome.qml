@@ -11,7 +11,8 @@ Item {
     height: MailStyle.shellHeaderHeight
     readonly property real controlsReservedWidth: controls.width + 29
     readonly property real controlsCenterY: controls.y + controls.height / 2
-    readonly property real controlsLeft: controls.x
+    // Visible circle edge, excluding the larger click target.
+    readonly property real controlsLeft: controls.x + (controls.buttonWidth - controls.circleSize) / 2
 
     MouseArea {
         id: moveArea

@@ -33,7 +33,7 @@ Item {
 
     objectName: "readerHeader"
     readonly property real leadingInset: readerHeader.narrow && !readerHeader.sidebarVisible ? 48 : 14
-    readonly property real trailingEdge: Math.floor(Math.min(width - 14, readerHeader.controlsLeft - 12))
+    readonly property real trailingEdge: Math.min(width, readerHeader.controlsLeft) - 5
     readonly property real rowWidth: Math.max(0, trailingEdge - leadingInset)
     readonly property real titleWidth: 0
     readonly property real actionLeft: leadingInset + titleWidth + (titleWidth > 0 ? 8 : 0)
@@ -222,7 +222,7 @@ Item {
             Layout.fillWidth: readerHeader.searching
             Layout.minimumWidth: 0
             Layout.fillHeight: true
-            Layout.rightMargin: shown ? 8 : 0
+            Layout.rightMargin: 0
             visible: shown
                 clip: true
                 LiquidTextField {
@@ -236,6 +236,7 @@ Item {
                     liquidIntensity: "light"
                     backdrop: readerHeader.backdrop
                     leftPadding: 30
+                    rightPadding: readerHeader.searching ? 36 : 10
                     placeholderText: qsTr("Search cached mail")
                     Accessible.name: placeholderText
                     text: mail.search
@@ -257,10 +258,20 @@ Item {
                             readerHeader.searchOpen = false
                     }
                 }
+                MailAction {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    objectName: "closeSearchButton"
+                    visible: readerHeader.searching
+                    iconOnly: true; iconName: "close"; iconSize: 14
+                    accessibleText: qsTr("Close search")
+                    floatingAction: true; shellBackdrop: readerHeader.backdrop
+                    onClicked: readerHeader.closeSearch()
+                }
             }
         MailAction {
             objectName: "searchToggleButton"
-            Layout.rightMargin: 8
+            Layout.rightMargin: 0
             visible: !readerHeader.wideSearch && !readerHeader.searchOpen && !readerHeader.draftsVisible
             iconOnly: true
             iconName: "search"
@@ -269,14 +280,7 @@ Item {
             floatingAction: true; shellBackdrop: readerHeader.backdrop
             onClicked: readerHeader.openSearch()
         }
-        MailAction {
-            objectName: "closeSearchButton"
-            visible: readerHeader.searching
-            iconOnly: true; iconName: "close"; iconSize: 14
-            accessibleText: qsTr("Close search")
-            floatingAction: true; shellBackdrop: readerHeader.backdrop
-            onClicked: readerHeader.closeSearch()
-        }
+
     }
     Timer {
         id: searchFocus

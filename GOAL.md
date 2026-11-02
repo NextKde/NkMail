@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Search beside traffic lights · 2026-11-02
+
+- Removed cumulative toolbar/search trailing margins; search now ends at most 5px before the visible first traffic-light circle. Moved compact-search close action inside the input with reserved text padding so the input itself reaches this edge.
+- VM UI passed in 11.36s, covering icon/expanded/wide input at four widths. RowLayout pixel rounding makes the gap slightly under 5px; assertions enforce the requested maximum rather than exact fractional placement. Host build and guarded preview replacement succeeded.
+
 ## Header layout and four-pixel offset · 2026-11-02
 
 - Set the control centre to 23.5px, 4px below its original position, and centre all titles/controls within a 47px header. List, reader, sidebar and dividers follow the header bottom. Replaced rounded centre anchors with exact centre expressions after VM assertions exposed a half-pixel mismatch.
