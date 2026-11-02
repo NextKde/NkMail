@@ -8,6 +8,8 @@ import Kos.Ui
 ApplicationWindow {
     id: window
     required property var mail
+    property var desktop: null
+    property string lifecycleNotice: ""
     objectName: "mailWindow"
     width: 1280
     height: 820
@@ -139,14 +141,34 @@ ApplicationWindow {
         if (typeof reviewAppearance !== "undefined" && (reviewAppearance === "light" || reviewAppearance === "dark"))
             AppTheme.appearanceMode = reviewAppearance
     }
+    function prepareForQuit() {
+        if (mail.sending || mail.sendPending) {
+            lifecycleNotice = qsTr("邮件正在发送或等待发送，请等待完成或撤销发送后再退出。")
+            return false
+        }
+        if (composer.visible && !composer.persist()) {
+            composer.forceActiveFocus()
+            return false
+        }
+        lifecycleNotice = ""
+        return true
+    }
     onClosing: close => {
-        if (composer.visible && (mail.sending || !composer.persist())) {
+        if (composer.visible && !composer.persist()) {
             close.accepted = false
             composer.forceActiveFocus()
+            return
         }
+        if (desktop && desktop.hideToTray()) {
+            close.accepted = false
+            return
+        }
+        close.accepted = window.prepareForQuit()
     }
     Connections {
         target: mail
+        function onStatusChanged() { if (!mail.sending && !mail.sendPending) window.lifecycleNotice = "" }
+        function onSendPendingChanged() { if (!mail.sending && !mail.sendPending) window.lifecycleNotice = "" }
         function onSelectionChanged() { if (window.narrow && window.hasMessage) window.readerVisible = true }
         function onFolderChanged() { window.clearSelection() }
         function onAccountChanged() {
@@ -512,7 +534,7 @@ ApplicationWindow {
                 anchors.fill: parent; anchors.leftMargin: 18; anchors.rightMargin: 14; spacing: 10
                 Rectangle { width: 5; height: 5; radius: 3; color: mail.error ? AppTheme.destructive : mail.busy ? AppTheme.accent : window.muted }
                 Text {
-                    text: mail.error || (mail.demo ? qsTr("Demo · synthetic mail only · sending disabled") : mail.status || qsTr("Ready"))
+                    text: window.lifecycleNotice || mail.error || (mail.demo ? qsTr("Demo · synthetic mail only · sending disabled") : mail.status || qsTr("Ready"))
                     color: mail.error ? AppTheme.destructive : window.muted; font.pixelSize: 10
                     Layout.fillWidth: true; elide: Text.ElideRight
                 }
@@ -676,6 +698,7 @@ ApplicationWindow {
         fileMode: FileDialog.SaveFile
         onAccepted: mail.saveAttachment(attachmentIndex, selectedFile.toString())
     }
+    Shortcut { sequence: "Ctrl+Q"; onActivated: { if (window.desktop) window.desktop.requestQuit(); else if (window.prepareForQuit()) window.close() } }
     Shortcut { sequence: "Ctrl+N"; enabled: !composer.visible && !accountDialog.visible && (mail.configured || mail.demo); onActivated: window.compose("new") }
     Shortcut { sequence: "Ctrl+F"; enabled: !composer.visible && !accountDialog.visible; onActivated: readerHeader.openSearch() }
     Shortcut {

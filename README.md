@@ -16,10 +16,21 @@ daemon. Server acceptance is not delivery; uncertain sends remain non-resendable
 
 Mailio is a protocol/MIME library, not a complete application backend. NkMail supplies the application state, cache, credentials, UI and workflows. The vendored dependency includes the documented [TLS verification and PEEK patch](patches/mailio/0001-verified-tls-peek-timeouts.patch); its loopback acceptance tests do not by themselves prove real-provider compatibility.
 
+## System tray
+
+Closing the window saves the open draft and hides NkMail in the system tray; background
+work continues. Click the tray icon or choose **显示 NkMail** to restore it. Choose
+**退出 NkMail** or press Ctrl+Q to exit. Explicit exit is blocked while a send is pending
+or in progress, or when the current draft cannot be saved. Without a supported tray,
+closing exits normally with the same protections. If the tray host disappears while
+NkMail is hidden, the window is restored. Screenshot mode does not create a tray icon.
+This does not install login autostart or a separate background daemon.
+
 ## Module boundaries
 
 | Module | Owns | Must not own |
 | --- | --- | --- |
+| `TrayService` / `TrayBackend` | Window visibility, guarded exit, tray-host availability / native icon and menu | Mail protocols, draft persistence or send state |
 | `MailController` | QML facade, active view generation, result presentation | Protocol calls, SMTP state machine, HTTP downloads |
 | `AccountSession` | Profile/account credential keys, session secrets, asynchronous credential resolution | Mailbox/cache contents |
 | `MailboxSync` | Serial read-operation scheduling, typed results on the GUI thread | Current QML selection or cache writes |
@@ -49,7 +60,7 @@ one shared mutable controller across multiple implementation files.
 ## Dependencies
 
 - CMake 3.30+, C++20 compiler, Ninja (optional)
-- Qt 6.8+: Core, Gui, Qml, Quick, QuickControls2, QuickDialogs2, Network, Concurrent, Sql; QtTest/QuickTest for testing
+- Qt 6.8+: Core, Gui, Widgets, Qml, Quick, QuickControls2, QuickDialogs2, Network, Concurrent, Sql; QtTest/QuickTest for testing
 - Qt graphical-effects compatibility module and SVG support as required by Kos.Ui
 - QtKeychain for Qt 6; system Secret Service or equivalent
 - Boost development files (`date_time`, `regex`) and OpenSSL

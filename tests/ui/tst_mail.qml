@@ -95,6 +95,11 @@ TestCase {
         function clearError() { error = "" }
         function disconnectAccount() { configured = false }
     }
+    QtObject {
+        id: desktopMock
+        property int hides: 0
+        function hideToTray() { hides++; app.hide(); return true }
+    }
     Component { id: readerComponent; App.MessageReader {} }
     Component { id: sidebarComponent; App.MailSidebar {} }
     Component { id: paneComponent; App.MessagePane { selection: App.MailSelection {} } }
@@ -118,6 +123,32 @@ TestCase {
     function activateApp() {
         app.requestActivate()
         wait(40)
+    }
+    function test_tray_close_keeps_window_and_sending_alive() {
+        app.desktop = desktopMock; desktopMock.hides = 0
+        mock.sending = true
+        app.close()
+        compare(desktopMock.hides, 1)
+        compare(app.visible, false)
+        compare(mock.sending, true)
+        app.show()
+        compare(app.prepareForQuit(), false)
+        mock.sending = false; mock.sendPending = true
+        compare(app.prepareForQuit(), false)
+        mock.sendPending = false
+        compare(app.prepareForQuit(), true)
+    }
+    function test_failed_draft_save_blocks_explicit_exit() {
+        app.compose("new")
+        const editor = findChild(app, "composerDialog")
+        verify(editor !== null)
+        const subject = findChild(app, "composerSubject")
+        subject.text = "Unsaved synthetic changes"
+        mock.failSave = true
+        compare(app.prepareForQuit(), false)
+        verify(editor.visible)
+        mock.failSave = false
+        compare(app.prepareForQuit(), true)
     }
     function test_toolbar_resolves_row_after_model_removal() {
         const original = JSON.parse(JSON.stringify(messageModel.get(0)))

@@ -90,7 +90,7 @@ jobs:
           listing = json.loads(subprocess.check_output(
               ["ctest", "--test-dir", "build/ci-release", "--show-only=json-v1"], text=True
           ))
-          required = {"nkmail_cli", "nkmail_ui", "nkmail_core", "nkmail_controller", "loopback-protocol"}
+          required = {"nkmail_cli", "nkmail_ui", "nkmail_tray", "nkmail_core", "nkmail_controller", "loopback-protocol"}
           registered = {test["name"] for test in listing["tests"]}
           missing = required - registered
           if missing:

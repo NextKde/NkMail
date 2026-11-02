@@ -1,4 +1,7 @@
 #include "MailController.h"
+#include "platform/TrayService.h"
+#include <QApplication>
+#include <QIcon>
 #include <QCommandLineParser>
 #include <QDir>
 #include <QFile>
@@ -19,7 +22,8 @@
 #include <memory>
 
 int main(int argc, char **argv) {
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
+    app.setWindowIcon(QIcon(QStringLiteral(":/data/nkmail.svg")));
     app.setApplicationName(QStringLiteral("nkmail"));
     app.setApplicationDisplayName(QStringLiteral("NkMail"));
     app.setOrganizationName(QStringLiteral("NextKde"));
@@ -55,6 +59,8 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "This mailbox data directory is already open in another NkMail instance.\n"); return 2;
     }
     nkmail::MailController mail(demo, root);
+    std::unique_ptr<nkmail::TrayService> desktop;
+    if (!parser.isSet("screenshot")) desktop = std::make_unique<nkmail::TrayService>(nkmail::createSystemTray());
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("reviewAppearance"), demo ? parser.value("appearance") : QStringLiteral("system"));
     engine.rootContext()->setContextProperty(QStringLiteral("forceGlassPreview"),
@@ -64,6 +70,7 @@ int main(int argc, char **argv) {
     const bool persistWindow = !parser.isSet("screenshot");
     std::unique_ptr<QSettings> windowSettings;
     QVariantMap initialProperties{{QStringLiteral("mail"), QVariant::fromValue(&mail)}};
+    initialProperties.insert(QStringLiteral("desktop"), QVariant::fromValue(desktop.get()));
     if (persistWindow) {
         windowSettings = std::make_unique<QSettings>(QDir(root).filePath("window.ini"), QSettings::IniFormat);
         initialProperties.insert(QStringLiteral("sidebarPreferredWidth"), qBound(190, windowSettings->value("sidebarWidth", 236).toInt(), 340));
@@ -74,6 +81,14 @@ int main(int argc, char **argv) {
     engine.loadFromModule(QStringLiteral("NextKde.Mail"), QStringLiteral("Main"));
     if (engine.rootObjects().isEmpty()) return 1;
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+    if (desktop && window) {
+        desktop->attach(window, [window] {
+            QVariant accepted;
+            return QMetaObject::invokeMethod(window, "prepareForQuit", Q_RETURN_ARG(QVariant, accepted))
+                && accepted.toBool();
+        });
+        QObject::connect(desktop.get(), &nkmail::TrayService::exitRequested, &app, &QCoreApplication::quit);
+    }
     QRect normalGeometry;
     bool maximized = false;
     QTimer preferenceSave;
