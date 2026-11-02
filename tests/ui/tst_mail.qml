@@ -200,7 +200,7 @@ TestCase {
         compare(backdrop.sourceItem, planes)
         verify(backdrop.sourceItem !== findChild(app, "mailScene"))
         compare(App.MailStyle.shellHeaderHeight, 44)
-        compare(App.MailStyle.toolbarButtonHeight, 26)
+        compare(App.MailStyle.toolbarButtonHeight, 28)
         compare(chrome.height, 44)
         compare(chrome.width, app.width)
         verify(chrome.visible)
@@ -219,6 +219,9 @@ TestCase {
         compare(header.height, 44)
         const filter = findChild(app, "unreadFilterButton")
         const toolbar = findChild(app, "readerHeader")
+        compare(filter.height, 28)
+        compare(findChild(app, "sidebarToggleButton").height, filter.height)
+        compare(findChild(app, "mailboxActionGroup").height, filter.height)
         compare(filter.mapToItem(scene, 0, filter.height / 2).y,
                 toolbar.mapToItem(scene, 0, toolbar.controlsCenterY).y)
         compare(sidebar.y, 44)
@@ -324,8 +327,13 @@ TestCase {
         keyClick(Qt.Key_F, Qt.ControlModifier)
         compare(app.readerVisible, false)
         const search = findChild(app, "searchField")
-        // 580 宽下搜索框收成按钮，输入框不常显；焦点仍应落在可输入的搜索入口上
-        compare(search.visible, false)
+        // Compact search replaces header actions with a visible, usable input.
+        tryCompare(search, "visible", true)
+        tryCompare(search, "activeFocus", true)
+        keyClick(Qt.Key_A)
+        tryCompare(mock, "search", "a")
+        keyClick(Qt.Key_Escape)
+        tryCompare(search, "visible", false)
         verify(findChild(app, "searchToggleButton") !== null)
     }
 

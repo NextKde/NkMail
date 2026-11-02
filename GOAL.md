@@ -1,5 +1,11 @@
 # NkMail local delivery goal
 
+## Consistent toolbar sizing and compact search · 2026-11-02
+
+- Unified filter, sidebar, action groups and search to the shared 28px toolbar height. Visible groups retain horizontal labels; operations that do not fit move to existing menu commands. Search/back controls no longer use stacked labels. Compact options retain a View route through More.
+- Compact search now exposes a visible input and close control; header actions give it room. Escape prioritizes active search over sidebar collapse. Updated geometry assertions and exercised compact typing/escape. Initial regressions exposed the old Escape priority; fixed without weakening the test.
+- VM UI/catalog checks passed 2/2 in 10.12s. Host build succeeded and old preview exited through guarded tray quit before replacement; single instance retained.
+
 ## Top-only message separators · 2026-11-02
 
 - Moved each message separator to the top of its row, leaving no trailing line below the final message. Preserved horizontal insets, lighter opacity and selected-row treatment.

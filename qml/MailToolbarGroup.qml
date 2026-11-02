@@ -14,7 +14,7 @@ Item {
     property LiquidBackdrop backdrop: null
     signal triggered(int index)
     implicitWidth: actions.implicitWidth
-    implicitHeight: 28
+    implicitHeight: MailStyle.toolbarButtonHeight
 
     // One canonical glass surface for the entire action group.
     LiquidActionButton {
@@ -39,7 +39,7 @@ Item {
                 objectName: root.objectNames[index] || ""
                 enabled: root.enabledActions[index] !== false
                 height: root.height
-                width: root.showLabels ? Math.ceil(inlineContent.implicitWidth + 20) : 28
+                width: root.showLabels ? Math.ceil(inlineContent.implicitWidth + 20) : MailStyle.toolbarButtonHeight
                 materialForm: true
                 flat: true
                 surfaceColor: "transparent"

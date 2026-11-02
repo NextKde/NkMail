@@ -8,7 +8,7 @@ QtObject {
     readonly property int chromeHeight: 30
     readonly property int shellHeaderHeight: 44
     readonly property int toolbarHeight: 44
-    readonly property int toolbarButtonHeight: 26
+    readonly property int toolbarButtonHeight: 28
     readonly property int fieldHeight: 28
     readonly property int sidebarRowHeight: 32
     readonly property int messageRowHeight: 68

@@ -277,7 +277,7 @@ ApplicationWindow {
             Item {
                 id: listHeader
                 objectName: "listHeader"
-                visible: messagePane.visible
+                visible: messagePane.visible && !readerHeader.searching
                 x: contentScene.x + messagePane.x
                 width: messagePane.width
                 height: parent.height
@@ -302,6 +302,7 @@ ApplicationWindow {
                     visible: messagePane.visible && !window.draftsVisible
                     iconOnly: true
                     iconName: "filter"
+                    iconSize: 14
                     checkable: true
                     checked: mail.unreadOnly
                     highlighted: mail.unreadOnly
@@ -335,7 +336,7 @@ ApplicationWindow {
                 draftsVisible: window.draftsVisible
                 liquidControls: window.liquidControls
                 hasMessage: window.hasMessage
-                visible: reader.visible
+                visible: reader.visible || readerHeader.searching
                 x: contentScene.x + (window.narrow ? 0 : reader.x)
                 width: (window.narrow ? contentScene.width : reader.width) - windowChrome.controlsReservedWidth
                 height: parent.height
@@ -648,6 +649,11 @@ ApplicationWindow {
         id: moreMenu
         objectName: "moreMessageMenu"
         LiquidPopoverItem {
+            visible: readerHeader.compactOptions
+            text: qsTr("显示"); iconName: "sliders"
+            onTriggered: { moreMenu.close(); listOptions.openAtAnchor() }
+        }
+        LiquidPopoverItem {
             objectName: "languageSystem"
             text: qsTr("Language: follow system") + (window.i18n && window.i18n.language === "system" ? " ✓" : "")
             onTriggered: { if (window.i18n) window.i18n.language = "system"; moreMenu.close() }
@@ -674,17 +680,17 @@ ApplicationWindow {
         LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: window.detailsVisible = true }
         LiquidPopoverItem {
             text: qsTr("删除"); iconName: "trash"
-            enabled: window.hasMessage && window.width < 1100
+            enabled: window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.deleteMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: qsTr("归档"); iconName: "archive"
-            enabled: window.hasMessage && window.width < 1100
+            enabled: window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.archiveMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: window.message.flagged ? qsTr("取消旗标") : qsTr("标为旗标"); iconName: "flag"
-            enabled: window.hasMessage && window.width < 1100
+            enabled: window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.toggleFlagged(window.selectedIndex())
         }
     }
@@ -742,9 +748,9 @@ ApplicationWindow {
         onActivated: {
             if (window.selectionSize > 0) { window.clearSelection(); return }
             if (window.detailsVisible) { window.detailsVisible = false; return }
+            if (readerHeader.searchActive) { readerHeader.closeSearch(); return }
             if (window.width < 1080 && window.sidebarExpanded) window.sidebarExpanded = false
             else if (window.narrow && window.readerVisible) window.readerVisible = false
-            else if (readerHeader.searchActive) readerHeader.closeSearch()
         }
     }
     Shortcut { sequence: "Ctrl+R"; enabled: !composer.visible && !accountDialog.visible && !mail.busy; onActivated: mail.refresh() }

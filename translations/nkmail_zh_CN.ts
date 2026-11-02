@@ -796,102 +796,98 @@
     <context>
         <name>MailToolbar</name>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="82" />
-            <source>返回</source>
-            <translation>返回</translation>
-        </message>
-        <message>
-            <location filename="../qml/MailToolbar.qml" line="82" />
+            <location filename="../qml/MailToolbar.qml" line="88" />
             <source>Back to messages</source>
             <translation>返回邮件列表</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="95" />
+            <location filename="../qml/MailToolbar.qml" line="101" />
             <source>收取</source>
             <translation>收取</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="95" />
+            <location filename="../qml/MailToolbar.qml" line="101" />
             <source>撰写</source>
             <translation>撰写</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="112" />
-            <location filename="../qml/MailToolbar.qml" line="133" />
+            <location filename="../qml/MailToolbar.qml" line="119" />
+            <location filename="../qml/MailToolbar.qml" line="140" />
             <source>删除</source>
             <translation>删除</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="112" />
-            <location filename="../qml/MailToolbar.qml" line="133" />
+            <location filename="../qml/MailToolbar.qml" line="119" />
+            <location filename="../qml/MailToolbar.qml" line="140" />
             <source>归档</source>
             <translation>归档</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="112" />
-            <location filename="../qml/MailToolbar.qml" line="133" />
+            <location filename="../qml/MailToolbar.qml" line="119" />
+            <location filename="../qml/MailToolbar.qml" line="140" />
             <source>旗标</source>
             <translation>旗标</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="121" />
+            <location filename="../qml/MailToolbar.qml" line="128" />
             <source>%1 selected</source>
             <translation>已选择 %1 封</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="133" />
+            <location filename="../qml/MailToolbar.qml" line="140" />
             <source>已读</source>
             <translation>已读</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="133" />
+            <location filename="../qml/MailToolbar.qml" line="140" />
             <source>移动</source>
             <translation>移动</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="174" />
-            <location filename="../qml/MailToolbar.qml" line="174" />
+            <location filename="../qml/MailToolbar.qml" line="183" />
+            <location filename="../qml/MailToolbar.qml" line="183" />
             <source>回复</source>
             <translation>回复</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="174" />
+            <location filename="../qml/MailToolbar.qml" line="183" />
             <source>全部回复</source>
             <translation>全部回复</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="174" />
-            <location filename="../qml/MailToolbar.qml" line="174" />
+            <location filename="../qml/MailToolbar.qml" line="183" />
+            <location filename="../qml/MailToolbar.qml" line="183" />
             <source>转发</source>
             <translation>转发</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="189" />
-            <location filename="../qml/MailToolbar.qml" line="189" />
+            <location filename="../qml/MailToolbar.qml" line="198" />
+            <location filename="../qml/MailToolbar.qml" line="198" />
             <source>显示</source>
             <translation>显示</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="189" />
+            <location filename="../qml/MailToolbar.qml" line="198" />
             <source>详情</source>
             <translation>详情</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="189" />
-            <location filename="../qml/MailToolbar.qml" line="189" />
+            <location filename="../qml/MailToolbar.qml" line="198" />
+            <location filename="../qml/MailToolbar.qml" line="198" />
+            <location filename="../qml/MailToolbar.qml" line="198" />
             <source>更多</source>
             <translation>更多</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="228" />
-            <location filename="../qml/MailToolbar.qml" line="257" />
+            <location filename="../qml/MailToolbar.qml" line="239" />
+            <location filename="../qml/MailToolbar.qml" line="268" />
             <source>Search cached mail</source>
             <translation>搜索缓存邮件</translation>
         </message>
         <message>
-            <location filename="../qml/MailToolbar.qml" line="255" />
-            <source>搜索</source>
-            <translation>搜索</translation>
+            <location filename="../qml/MailToolbar.qml" line="276" />
+            <source>Close search</source>
+            <translation>关闭搜索</translation>
         </message>
     </context>
     <context>
@@ -957,148 +953,153 @@ Alex
             <translation>%1 · 未读（缓存）</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="308" />
+            <location filename="../qml/Main.qml" line="309" />
             <source>Show all cached messages</source>
             <translation>显示全部缓存邮件</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="308" />
+            <location filename="../qml/Main.qml" line="309" />
             <source>Show unread cached messages</source>
             <translation>显示未读缓存邮件</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="378" />
+            <location filename="../qml/Main.qml" line="379" />
             <source>Hide sidebar</source>
             <translation>隐藏侧边栏</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="378" />
+            <location filename="../qml/Main.qml" line="379" />
             <source>Show sidebar</source>
             <translation>显示侧边栏</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="487" />
+            <location filename="../qml/Main.qml" line="488" />
             <source>Mailbox column width</source>
             <translation>导航栏宽度</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="487" />
+            <location filename="../qml/Main.qml" line="488" />
             <source>Message column width</source>
             <translation>邮件列表宽度</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="488" />
+            <location filename="../qml/Main.qml" line="489" />
             <source>Drag or use Left and Right to resize. Double-click to reset.</source>
             <translation>拖动或使用左右方向键调整宽度。双击恢复默认值。</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="556" />
+            <location filename="../qml/Main.qml" line="557" />
             <source>Dismiss</source>
             <translation>关闭提示</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="597" />
+            <location filename="../qml/Main.qml" line="598" />
             <source>Unread messages only (cached)</source>
             <translation>仅显示未读邮件（缓存）</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="604" />
+            <location filename="../qml/Main.qml" line="605" />
             <source>按会话聚合</source>
             <translation>按会话聚合</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="611" />
+            <location filename="../qml/Main.qml" line="612" />
             <source>新邮件通知</source>
             <translation>新邮件通知</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="618" />
+            <location filename="../qml/Main.qml" line="619" />
             <source>Show message summaries</source>
             <translation>显示邮件摘要</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="625" />
+            <location filename="../qml/Main.qml" line="626" />
             <source>富文本显示</source>
             <translation>富文本显示</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="633" />
+            <location filename="../qml/Main.qml" line="634" />
             <source>Check for mail</source>
             <translation>收取邮件</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="641" />
+            <location filename="../qml/Main.qml" line="642" />
             <source>New message</source>
             <translation>新邮件</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="652" />
+            <location filename="../qml/Main.qml" line="653" />
+            <source>显示</source>
+            <translation>显示</translation>
+        </message>
+        <message>
+            <location filename="../qml/Main.qml" line="658" />
             <source>Language: follow system</source>
             <translation>语言：跟随系统</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="666" />
+            <location filename="../qml/Main.qml" line="672" />
             <source>Switch light / dark appearance</source>
             <translation>切换浅色／深色外观</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="671" />
+            <location filename="../qml/Main.qml" line="677" />
             <source>Reply</source>
             <translation>回复</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="672" />
+            <location filename="../qml/Main.qml" line="678" />
             <source>Reply to all</source>
             <translation>全部回复</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="673" />
+            <location filename="../qml/Main.qml" line="679" />
             <source>Forward</source>
             <translation>转发</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="674" />
+            <location filename="../qml/Main.qml" line="680" />
             <source>Message details</source>
             <translation>邮件详情</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="676" />
-            <location filename="../qml/Main.qml" line="718" />
+            <location filename="../qml/Main.qml" line="682" />
+            <location filename="../qml/Main.qml" line="724" />
             <source>删除</source>
             <translation>删除</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="681" />
+            <location filename="../qml/Main.qml" line="687" />
             <source>归档</source>
             <translation>归档</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="686" />
+            <location filename="../qml/Main.qml" line="692" />
             <source>取消旗标</source>
             <translation>取消旗标</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="686" />
+            <location filename="../qml/Main.qml" line="692" />
             <source>标为旗标</source>
             <translation>标为旗标</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="701" />
+            <location filename="../qml/Main.qml" line="707" />
             <source>删除账号？</source>
             <translation>删除账号？</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="703" />
+            <location filename="../qml/Main.qml" line="709" />
             <source>%1 的本地缓存和记住的口令会被删除，服务器上的邮件不受影响。</source>
             <translation>%1 的本地缓存和记住的口令会被删除，服务器上的邮件不受影响。</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="715" />
+            <location filename="../qml/Main.qml" line="721" />
             <source>取消</source>
             <translation>取消</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="732" />
+            <location filename="../qml/Main.qml" line="738" />
             <source>Save attachment</source>
             <translation>保存附件</translation>
         </message>
@@ -1146,93 +1147,93 @@ Alex
             <translation>删除</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="172" />
+            <location filename="../qml/MessagePane.qml" line="186" />
             <source>(No subject)</source>
             <translation>（无主题）</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="173" />
+            <location filename="../qml/MessagePane.qml" line="187" />
             <source>Flagged</source>
             <translation>已加旗标</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="174" />
+            <location filename="../qml/MessagePane.qml" line="188" />
             <source>Has attachment</source>
             <translation>有附件</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="182" />
+            <location filename="../qml/MessagePane.qml" line="196" />
             <source>Load older messages</source>
             <translation>加载更早的邮件</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="190" />
+            <location filename="../qml/MessagePane.qml" line="204" />
             <source>Getting your mail…</source>
             <translation>正在获取邮件…</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="190" />
+            <location filename="../qml/MessagePane.qml" line="204" />
             <source>No cached matches</source>
             <translation>缓存中没有匹配的邮件</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="190" />
+            <location filename="../qml/MessagePane.qml" line="204" />
             <source>No unread messages in cached mail</source>
             <translation>缓存中没有未读邮件</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="190" />
+            <location filename="../qml/MessagePane.qml" line="204" />
             <source>No messages here</source>
             <translation>这里没有邮件</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="190" />
+            <location filename="../qml/MessagePane.qml" line="204" />
             <source>Welcome to your new inbox</source>
             <translation>欢迎使用你的新收件箱</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="191" />
+            <location filename="../qml/MessagePane.qml" line="205" />
             <source>Only cached unread messages are shown. Clear the filter to browse all messages.</source>
             <translation>当前仅显示缓存的未读邮件。清除筛选后可浏览全部邮件。</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="191" />
+            <location filename="../qml/MessagePane.qml" line="205" />
             <source>Try a different search term.</source>
             <translation>试试其他搜索词。</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="191" />
+            <location filename="../qml/MessagePane.qml" line="205" />
             <source>There is nothing to show in this mailbox yet.</source>
             <translation>此邮箱中暂时没有可显示的内容。</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="191" />
+            <location filename="../qml/MessagePane.qml" line="205" />
             <source>Add an account to start reading mail locally.</source>
             <translation>添加账号，开始在本地阅读邮件。</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="192" />
+            <location filename="../qml/MessagePane.qml" line="206" />
             <source>Show all cached messages</source>
             <translation>显示全部缓存邮件</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="192" />
+            <location filename="../qml/MessagePane.qml" line="206" />
             <source>Add an account</source>
             <translation>添加账号</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="207" />
-            <location filename="../qml/MessagePane.qml" line="212" />
+            <location filename="../qml/MessagePane.qml" line="221" />
+            <location filename="../qml/MessagePane.qml" line="226" />
             <source>Untitled draft</source>
             <translation>无标题草稿</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="213" />
+            <location filename="../qml/MessagePane.qml" line="227" />
             <source>No recipient</source>
             <translation>未填写收件人</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="218" />
+            <location filename="../qml/MessagePane.qml" line="232" />
             <source>Your drafts will be saved here.</source>
             <translation>你的草稿将保存在这里。</translation>
         </message>
