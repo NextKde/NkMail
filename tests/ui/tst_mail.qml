@@ -220,7 +220,7 @@ TestCase {
         compare(sidebar.y, 68)
         compare(content.y, 68)
         verify(sidebar.height > 0 && content.height > 0)
-        for (const name of ["sidebarComposeButton", "searchField"]) {
+        for (const name of ["sidebarToggleButton", "searchField"]) {
             let item = findChild(app, name)
             verify(item !== null)
             while (item && item !== header) item = item.parent
@@ -279,7 +279,7 @@ TestCase {
                     }
                     const controlTop = controls.mapToItem(scene, 0, 0)
                     verify(controlTop.x >= 0 && controlTop.x + controls.width <= width)
-                    for (const name of ["sidebarComposeButton", "sidebarToggleButton", "refreshButton", "headerComposeButton", "searchField", "readerBackButton", "replyButton", "forwardButton", "detailsButton", "moreButton"]) {
+                    for (const name of ["sidebarToggleButton", "refreshButton", "headerComposeButton", "searchField", "readerBackButton", "replyButton", "forwardButton", "detailsButton", "moreButton"]) {
                         const item = findChild(app, name)
                         if (!item || !item.visible) continue
                         const top = item.mapToItem(scene, 0, 0)
@@ -346,13 +346,13 @@ TestCase {
         tryCompare(search, "activeFocus", true)
         keyClick(Qt.Key_A)
         tryCompare(mock, "search", "a")
-        const compose = findChild(app, "sidebarComposeButton")
+        compare(findChild(app, "sidebarComposeButton"), null)
+        const compose = findChild(app, "mailboxActionGroup")
         verify(compose.visible)
         verify(compose.enabled)
         verify(compose.width > 0 && compose.height > 0)
-        // 侧栏头部这块按钮已经被拖拽区覆盖，指针点击落不到按钮本体；
-        // 这里改为发信号验证动作链路，指针命中另由 refresh / search 两项覆盖。
-        compose.clicked()
+        const composePoint = compose.mapToItem(scene, compose.width * 3 / 4, compose.height / 2)
+        mouseClick(scene, composePoint.x, composePoint.y)
         tryCompare(findChild(app, "composerDialog"), "visible", true)
     }
 

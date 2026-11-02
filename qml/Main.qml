@@ -270,15 +270,7 @@ ApplicationWindow {
                     color: window.ink; elide: Text.ElideRight
                     verticalAlignment: Text.AlignVCenter
                 }
-                MailAction {
-                    anchors.right: parent.right; anchors.rightMargin: 14
-                    y: 36
-                    iconOnly: true; iconName: "editRounded"; accessibleText: qsTr("New message")
-                    floatingAction: true; shellBackdrop: chromeBackdrop
-                    objectName: "sidebarComposeButton"
-                    enabled: mail.configured || mail.demo
-                    onClicked: window.compose("new")
-                }
+
             }
 
             Item {
@@ -371,17 +363,25 @@ ApplicationWindow {
                 x: window.sidebarVisible ? 0 : 14
                 width: window.sidebarVisible ? sidebarPlane.width : sidebarToggleButton.width
                 height: parent.height
-                MailAction {
+                KosSidebarToggle {
                     id: sidebarToggleButton
                     objectName: "sidebarToggleButton"
                     anchors.right: parent.right
                     anchors.rightMargin: window.sidebarVisible ? 12 : 0
                     y: windowChrome.controlsCenterY - height / 2
-                    iconOnly: true; iconName: "panelLeft"
-                    accessibleText: window.sidebarVisible ? qsTr("Hide sidebar") : qsTr("Show sidebar")
-                    floatingAction: true; shellBackdrop: chromeBackdrop
-                    liquidIntensity: "strong"
-                    focusRingColor: materialForm ? AppTheme.focusRing : "transparent"
+                    implicitWidth: MailStyle.toolbarButtonHeight
+                    implicitHeight: implicitWidth
+                    // Same shared sidebar control as Weather; never use panelLeft.
+                    glyphColor: AppTheme.text
+                    glyphPaneColor: glyphColor
+                    Accessible.name: window.sidebarVisible ? qsTr("Hide sidebar") : qsTr("Show sidebar")
+                    background: LiquidActionButton {
+                        enabled: false
+                        Accessible.ignored: true
+                        materialForm: !window.liquidControls
+                        backdrop: chromeBackdrop
+                        liquidIntensity: "strong"
+                    }
                     focusPolicy: Qt.TabFocus
                     onClicked: window.toggleSidebar()
                 }
