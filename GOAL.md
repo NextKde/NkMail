@@ -282,3 +282,9 @@ The user rejected the previous shell presentation. The current uncommitted itera
 First runnable milestone published. Second workflow/window milestone published as `d5d5b7d46cfa3a6435a283b0b1b3c505d747abbe`, including two further reviewed synthetic screenshots. Final committed code verified in **Debug: 5/5 CTest passed, 27.96 seconds** and **Release: 5/5 passed, 27.92 seconds**. Coverage: core 16 / controller 23 / UI 14 pass (Qt tests include init/cleanup), CLI 3 process cases, protocol 32 loopback scenarios. Working tree was clean after publication; no real mailbox data or credentials were included.
 
 The scoped local implementation is substantially complete, but real-provider read-only verification is blocked at an unidentified authenticated phase. Do not report the whole first release or real-account compatibility complete. Next useful work is credential-free phase diagnostics and controlled resolution with account-owner input, not repeated password attempts or arbitrary UI expansion.
+
+## Sidebar heading review · 2026-11-02
+
+- Reduced the sidebar Mail heading from 24px Bold to 15px DemiBold; aligned it with the existing top-row controls and reserved space for the shared sidebar toggle. No dependency or mail behavior changes.
+- Fresh default pinned-source VM build succeeded. VM CTest `nkmail_ui`, `nkmail_i18n`, and `nkmail_translations`: 3/3 passed. Actual synthetic X11/GPU screenshots inspected at 1240px light/Chinese and dark/English, plus 900px Chinese. No heading/control overlap observed. Nested Wayland screenshot attempts returned “Preview window is not exposed”; Wayland visual acceptance is not claimed. No real mailbox was accessed.
+- Rebuilt the existing host `build-clean/nkmail` entry without launching it or running tests. Its existing sibling Kos.Ui development override was preserved; default-source validation refers to the separate VM build. No commit, publication or dependency upgrade performed.

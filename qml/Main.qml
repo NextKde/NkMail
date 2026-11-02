@@ -267,9 +267,10 @@ ApplicationWindow {
                 Text {
                     objectName: "mailTitle"
                     x: 14
-                    y: (parent.height - height) / 2
-                    width: parent.width - 28; height: 26
-                    text: qsTr("Mail"); font.pixelSize: 24; font.weight: Font.Bold
+                    y: windowChrome.controlsCenterY - height / 2
+                    width: Math.max(0, parent.width - 14 - 12 - sidebarToggleButton.width - 12)
+                    height: MailStyle.toolbarButtonHeight
+                    text: qsTr("Mail"); font.pixelSize: 15; font.weight: Font.DemiBold
                     color: window.ink; elide: Text.ElideRight
                     verticalAlignment: Text.AlignVCenter
                 }
