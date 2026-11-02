@@ -8,7 +8,7 @@ All builds, automated suites and graphical acceptance run in the designated virt
 | `nkmail_controller` | Real facade/services, SQLite and message model; asynchronous dispatch and stale-result handling | Injected transport regressions plus linked legacy synthetic protocol/credential boundaries; remote-image tests use a synthetic loopback HTTP fixture, never external hosts |
 | `loopback-protocol` | Real mailio adapter, patched TLS/IMAP/SMTP, MIME encoding/decoding | Python services bound to loopback, generated test CA/certificates, synthetic credentials and `.invalid` recipients; no relay |
 | `nkmail_ui` | Real QML views and canonical Kos.Ui components, focus and editor interactions | Behavioral controller mock; offscreen software rendering |
-| `nkmail_cli` | Actual application process, demo capture guard, private data directory and process locking | Fresh XDG directories, no configured account, synthetic demo |
+| `nkmail_cli` | Actual application process, demo capture guard, private data directory, session-wide activation, demo relaunch and independent screenshots | Private D-Bus session, fresh XDG directories, no configured account, synthetic demo |
 
 A controller mock or linked boundary replacement is not protocol acceptance. Conversely a passing protocol fixture does not prove that QML/controller workflows use it correctly; this is why the suites are separate.
 

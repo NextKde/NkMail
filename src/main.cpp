@@ -1,5 +1,6 @@
 #include "MailController.h"
 #include "platform/TrayService.h"
+#include "platform/SingleInstance.h"
 #include <QApplication>
 #include <QIcon>
 #include <QCommandLineParser>
@@ -46,6 +47,19 @@ int main(int argc, char **argv) {
     if (parser.isSet("screenshot") && !demo) {
         std::fprintf(stderr, "Screenshot export is only permitted with isolated --demo data.\n"); return 2;
     }
+    nkmail::SingleInstance instance;
+    // Screenshot exports have no tray and must not activate a live user's window.
+    if (!parser.isSet("screenshot")) {
+        const auto ownership = instance.acquire();
+        if (ownership == nkmail::SingleInstance::Result::Activated) {
+            std::fprintf(stdout, "Activated existing NkMail window.\n");
+            return 0;
+        }
+        if (ownership == nkmail::SingleInstance::Result::Error) {
+            std::fprintf(stderr, "Cannot acquire or activate NkMail's desktop session instance.\n");
+            return 2;
+        }
+    }
     QTemporaryDir demoDirectory;
     QString root = parser.isSet("data-dir") ? parser.value("data-dir") : QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (demo) {
@@ -82,6 +96,8 @@ int main(int argc, char **argv) {
     if (engine.rootObjects().isEmpty()) return 1;
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
     if (desktop && window) {
+        QObject::connect(&instance, &nkmail::SingleInstance::activationRequested,
+                         desktop.get(), &nkmail::TrayService::showWindow);
         desktop->attach(window, [window] {
             QVariant accepted;
             return QMetaObject::invokeMethod(window, "prepareForQuit", Q_RETURN_ARG(QVariant, accepted))

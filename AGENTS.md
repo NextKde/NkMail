@@ -22,3 +22,5 @@
 - Sidebar toggle must use the shared KosSidebarToggle rounded sidebar glyph, consistent with Weather/Calendar; do not replace it with VectorIcon panelLeft. The sidebar header has no compose button; compose remains in the main toolbar.
 
 - No permanent bottom status bar, including an empty footer or Demo caption. Content extends to the window bottom; show actionable errors/lifecycle notices only on demand. Theme switching lives in More.
+
+- Interactive previews must respect session-wide SingleInstance ownership. Do not accumulate demo windows/tray icons during UI iterations; replace the owned preview when updating the binary. Screenshot exports are isolated and create no tray.

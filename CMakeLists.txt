@@ -30,7 +30,7 @@ add_library(nkmail_core STATIC
 target_include_directories(nkmail_core PUBLIC src)
 target_link_libraries(nkmail_core PUBLIC Qt6::Core Qt6::Gui Qt6::Sql Qt6Keychain::Qt6Keychain mailio)
 include(cmake/NkMailServices.cmake)
-qt_add_executable(nkmail ${NKMAIL_SERVICE_SOURCES} src/platform/TrayService.cpp src/platform/TrayService.h src/platform/SystemTray.cpp src/main.cpp src/MailController.cpp src/MailController.h src/NotificationService.cpp src/NotificationService.h src/RichTextEditor.cpp src/RichTextEditor.h)
+qt_add_executable(nkmail ${NKMAIL_SERVICE_SOURCES} src/platform/TrayService.cpp src/platform/TrayService.h src/platform/SystemTray.cpp src/platform/SingleInstance.cpp src/platform/SingleInstance.h src/main.cpp src/MailController.cpp src/MailController.h src/NotificationService.cpp src/NotificationService.h src/RichTextEditor.cpp src/RichTextEditor.h)
 qt_add_resources(nkmail nkmail_icons PREFIX "/" FILES data/nkmail.svg)
 set_source_files_properties(qml/MailLabels.qml qml/MailStyle.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(nkmail

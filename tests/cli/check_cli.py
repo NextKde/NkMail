@@ -24,7 +24,13 @@ class CliTests(unittest.TestCase):
             directory.mkdir(mode=0o700)
             self.env[variable] = str(directory)
 
+        bus = subprocess.check_output(["dbus-daemon", "--session", "--fork",
+                                       "--print-address=1", "--print-pid=1"], text=True).splitlines()
+        self.env["DBUS_SESSION_BUS_ADDRESS"] = bus[0]
+        self.bus_pid = int(bus[1])
+
     def tearDown(self):
+        os.kill(self.bus_pid, signal.SIGTERM)
         self.temporary.cleanup()
 
     def run_app(self, *arguments):
@@ -64,8 +70,12 @@ class CliTests(unittest.TestCase):
                 time.sleep(0.05)
             self.assertTrue(database.exists(), "first instance did not initialize storage")
             result = self.run_app("--data-dir", mailbox)
-            self.assertEqual(result.returncode, 2)
-            self.assertIn(b"already open", result.stderr)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(b"Activated existing", result.stdout)
+            other = self.root / "other-mailbox"
+            activated = self.run_app("--data-dir", other)
+            self.assertEqual(activated.returncode, 0, activated.stderr)
+            self.assertFalse(other.exists())
             self.assertEqual(mailbox.stat().st_mode & 0o777, 0o700)
             self.assertEqual(database.stat().st_mode & 0o777, 0o600)
         finally:
@@ -76,6 +86,46 @@ class CliTests(unittest.TestCase):
             except subprocess.TimeoutExpired:
                 first.kill()
                 first.wait(timeout=5)
+
+    def test_demo_relaunch_activates_and_screenshot_stays_independent(self):
+        first = subprocess.Popen([BINARY, "--demo"], env=self.env,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                self.assertIsNone(first.poll())
+                owner = subprocess.check_output([
+                    "dbus-send", "--session", "--print-reply", "--dest=org.freedesktop.DBus",
+                    "/org/freedesktop/DBus", "org.freedesktop.DBus.NameHasOwner",
+                    "string:org.NextKde.NkMail"], env=self.env)
+                if b"boolean true" in owner:
+                    break
+                time.sleep(0.05)
+            else:
+                self.fail("demo did not claim the desktop instance")
+            result = self.run_app("--demo")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(b"Activated existing", result.stdout)
+            screenshot = self.root / "independent.png"
+            capture = self.run_app("--demo", "--screenshot", screenshot)
+            self.assertEqual(capture.returncode, 0, capture.stderr)
+            self.assertTrue(screenshot.exists())
+            self.assertIsNone(first.poll())
+        finally:
+            first.terminate()
+            first.wait(timeout=5)
+        # Ownership is released on process exit; a later launch can claim it again.
+        replacement = subprocess.Popen([BINARY, "--demo"], env=self.env,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            time.sleep(0.5)
+            self.assertIsNone(replacement.poll())
+            result = self.run_app("--demo")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(b"Activated existing", result.stdout)
+        finally:
+            replacement.terminate()
+            replacement.wait(timeout=5)
 
 
 if __name__ == "__main__":

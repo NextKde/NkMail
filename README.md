@@ -16,6 +16,16 @@ daemon. Server acceptance is not delivery; uncertain sends remain non-resendable
 
 Mailio is a protocol/MIME library, not a complete application backend. NkMail supplies the application state, cache, credentials, UI and workflows. The vendored dependency includes the documented [TLS verification and PEEK patch](patches/mailio/0001-verified-tls-peek-timeouts.patch); its loopback acceptance tests do not by themselves prove real-provider compatibility.
 
+## Single instance
+
+Interactive NkMail windows share one instance per desktop D-Bus session, including
+`--demo`. Launching again restores the existing window (also when hidden in the tray)
+and exits successfully, before opening any new data directory. A different `--data-dir`
+does not create another interactive instance; exit the running client before switching
+profiles or between demo and normal mode. Mailbox locking remains a separate storage
+safeguard. Screenshot exports bypass desktop ownership and never create a tray icon.
+An unavailable session bus is reported as a startup error rather than allowing duplicates.
+
 ## System tray
 
 Closing the window saves the open draft and hides NkMail in the system tray; background
@@ -179,7 +189,7 @@ Screenshot export is intentionally blocked outside synthetic preview mode. Publi
 
 ## Regression tests (virtual machine only)
 
-Tests additionally require Qt Test / QuickTest, Python 3 and the `openssl` executable (for short-lived loopback certificates). They do not need a real account. Core/controller tests use temporary data directories; protocol services bind only `127.0.0.1`; UI tests run offscreen with synthetic state.
+Tests additionally require Qt Test / QuickTest, Python 3, `dbus-daemon`, `dbus-send` and the `openssl` executable (for short-lived loopback certificates). They do not need a real account. Core/controller tests use temporary data directories; protocol services bind only `127.0.0.1`; UI tests run offscreen with synthetic state.
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DNKMAIL_BUILD_TESTS=ON
