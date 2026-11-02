@@ -35,7 +35,7 @@ qt_add_resources(nkmail nkmail_icons PREFIX "/" FILES data/nkmail.svg)
 set_source_files_properties(qml/MailLabels.qml qml/MailStyle.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(nkmail
     URI NextKde.Mail VERSION 1.0 RESOURCE_PREFIX /qt/qml
-    QML_FILES qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/Main.qml qml/WindowChrome.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
+    QML_FILES qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/Main.qml qml/WindowChrome.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
 target_link_libraries(nkmail PRIVATE nkmail_core Kos::Ui Kos::UiPlugin
     Qt6::Quick Qt6::QuickControls2 Qt6::QuickDialogs2 Qt6::Concurrent Qt6::Network Qt6::DBus Qt6::Widgets)
 target_compile_definitions(nkmail PRIVATE NKMAIL_VERSION="${PROJECT_VERSION}")
@@ -56,7 +56,7 @@ if(NKMAIL_BUILD_TESTS)
     qt_add_executable(nkmail_ui_tests tests/ui/main.cpp src/RichTextEditor.cpp src/RichTextEditor.h)
     qt_add_qml_module(nkmail_ui_tests
         URI NextKde.Mail.TestViews VERSION 1.0 RESOURCE_PREFIX /qt/qml
-        QML_FILES qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/Main.qml qml/WindowChrome.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
+        QML_FILES qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/Main.qml qml/WindowChrome.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
     target_compile_definitions(nkmail_ui_tests PRIVATE QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/ui")
     target_link_libraries(nkmail_ui_tests PRIVATE Qt6::QuickTest Qt6::QuickControls2 Qt6::QuickDialogs2 Kos::Ui Kos::UiPlugin)
     add_test(NAME nkmail_ui COMMAND nkmail_ui_tests -input "${CMAKE_CURRENT_SOURCE_DIR}/tests/ui")

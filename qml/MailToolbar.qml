@@ -83,36 +83,30 @@ Item {
             floatingAction: true; shellBackdrop: readerHeader.backdrop
             onClicked: readerHeader.backRequested()
         }
-        LiquidActionButtonGroup {
+        MailToolbarGroup {
             id: mailboxActions
-            Layout.rightMargin: 8
+            Layout.rightMargin: 14
+            showLabels: readerHeader.windowWidth >= 1180
             objectName: "mailboxActionGroup"
-            stacked: true
             visible: !readerHeader.compactActions && !readerHeader.searching && readerHeader.windowWidth >= 1180
-            buttonSize: MailStyle.toolbarButtonHeight
             icons: ["refreshRounded", "editRounded"]
             labels: [qsTr("收取"), qsTr("撰写")]
             objectNames: ["refreshButton", "headerComposeButton"]
             enabledActions: [!mail.busy && !readerHeader.draftsVisible && (mail.configured || mail.demo), mail.configured || mail.demo]
-            backdrop: readerHeader.backdrop
-            materialForm: !readerHeader.liquidControls
             onTriggered: index => {
                 if (index === 0) mail.refresh()
                 else readerHeader.composeRequested("new")
             }
         }
-        LiquidActionButtonGroup {
+        MailToolbarGroup {
             id: messageOpsGroup
+            showLabels: readerHeader.windowWidth >= 1180
             objectName: "messageOpsGroup"
-            Layout.rightMargin: 8
+            Layout.rightMargin: 14
             visible: !readerHeader.draftsVisible && readerHeader.windowWidth >= 1100 && readerHeader.selection.selectionSize === 0
-            stacked: true
-            buttonSize: 38
             icons: ["trash", "archive", "flag"]
             labels: [qsTr("删除"), qsTr("归档"), qsTr("旗标")]
             enabledActions: [readerHeader.hasMessage, readerHeader.hasMessage, readerHeader.hasMessage]
-            backdrop: readerHeader.backdrop
-            materialForm: !readerHeader.liquidControls
             onTriggered: index => {
                 readerHeader.messageCommandRequested(index)
             }
@@ -124,16 +118,13 @@ Item {
             color: readerHeader.muted; font.pixelSize: 11
             Layout.alignment: Qt.AlignVCenter
         }
-        LiquidActionButtonGroup {
+        MailToolbarGroup {
             id: selectionOpsGroup
+            showLabels: readerHeader.windowWidth >= 1180
             objectName: "selectionOpsGroup"
-            stacked: true
-            buttonSize: 38
             visible: !readerHeader.draftsVisible && readerHeader.selection.selectionSize > 0
             icons: ["envelope", "flag", "archive", "trash", "folder"]
             labels: [qsTr("已读"), qsTr("旗标"), qsTr("归档"), qsTr("删除"), qsTr("移动")]
-            backdrop: readerHeader.backdrop
-            materialForm: !readerHeader.liquidControls
             onTriggered: index => {
                 if (index === 0) mail.setMessagesRead(readerHeader.selection.selectedIndexList(), true)
                 else if (index === 1) mail.setMessagesFlagged(readerHeader.selection.selectedIndexList(), true)
@@ -165,38 +156,32 @@ Item {
                 }
             }
         }
-        LiquidActionButtonGroup {
+        MailToolbarGroup {
             id: replyActions
-            Layout.rightMargin: 8
+            Layout.rightMargin: 14
+            showLabels: readerHeader.windowWidth >= 1180
             objectName: "replyActionGroup"
-            stacked: true
             visible: readerHeader.showReplyGroup && !readerHeader.searching && readerHeader.windowWidth >= 1480
-            buttonSize: MailStyle.toolbarButtonHeight
             icons: readerHeader.fullReplyGroup ? ["undo", "arrows", "forward"] : ["undo", "forward"]
             labels: readerHeader.fullReplyGroup ? [qsTr("回复"), qsTr("全部回复"), qsTr("转发")] : [qsTr("回复"), qsTr("转发")]
             objectNames: readerHeader.fullReplyGroup ? ["replyButton", "replyAllButton", "forwardButton"] : ["replyButton", "forwardButton"]
             enabledActions: [readerHeader.hasMessage && !mail.sending, readerHeader.hasMessage && !mail.sending, readerHeader.hasMessage && !mail.sending]
-            backdrop: readerHeader.backdrop
-            materialForm: !readerHeader.liquidControls
             onTriggered: index => readerHeader.composeRequested(readerHeader.fullReplyGroup ? ["reply", "replyAll", "forward"][index] : ["reply", "forward"][index])
             onVisibleChanged: { if (!visible && readerHeader.focusWithin(replyActions)) readerHeader.forceActiveFocus() }
         }
-        LiquidActionButtonGroup {
+        MailToolbarGroup {
             id: messageOptionsGroup
+            showLabels: readerHeader.windowWidth >= 1180
             objectName: "messageOptionsGroup"
-            Layout.rightMargin: 8
+            Layout.rightMargin: 14
             visible: !readerHeader.draftsVisible
-            stacked: true
-            buttonSize: 38
             icons: readerHeader.wideSearch ? ["sliders", "info", "more"] : ["sliders", "more"]
             labels: readerHeader.wideSearch ? [qsTr("显示"), qsTr("详情"), qsTr("更多")] : [qsTr("显示"), qsTr("更多")]
             objectNames: readerHeader.wideSearch ? ["listOptionsButton", "detailsButton", "moreButton"] : ["listOptionsButton", "moreButton"]
-            enabledActions: [true, readerHeader.hasMessage, readerHeader.hasMessage]
-            backdrop: readerHeader.backdrop
-            materialForm: !readerHeader.liquidControls
+            enabledActions: readerHeader.wideSearch ? [true, readerHeader.hasMessage, true] : [true, true]
             onTriggered: index => {
                 if (index === 0) readerHeader.optionsRequested()
-                else if (index === 1) readerHeader.detailsRequested()
+                else if (readerHeader.wideSearch && index === 1) readerHeader.detailsRequested()
                 else readerHeader.moreRequested()
             }
         }
@@ -209,7 +194,7 @@ Item {
             id: toolbarSearch
             objectName: "toolbarSearch"
             property bool active: true
-            readonly property real wanted: 216
+            readonly property real wanted: 160
             readonly property bool shown: !readerHeader.draftsVisible
                 && (readerHeader.wideSearch || readerHeader.searchOpen)
                 && readerHeader.windowWidth >= 1320
