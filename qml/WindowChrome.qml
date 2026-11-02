@@ -52,6 +52,6 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: 10.5
         anchors.top: parent.top
-        anchors.topMargin: 18.5
+        anchors.topMargin: 14.5
     }
 }

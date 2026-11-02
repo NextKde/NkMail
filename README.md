@@ -247,7 +247,7 @@ the adapter reports compositor takeover. Missing modules/protocol support retain
 client drawing; no Wayland dependency is added to Kos.Ui. The compatibility mapping
 uses the pinned component's action object names and is covered by UI regression tests.
 Calendar geometry is used: 14px circles in 22px button cells, 6px spacing, with the
-row 10.5px from the right and 18.5px from the top (10px below Calendar). Native takeover requires the v2
+row 10.5px from the right and 14.5px from the top (6px below Calendar). Native takeover requires the v2
 NextKde window-controls protocol and enabled KOS window appearance. The older pinned
 fallback keeps its existing hover-glyph preference; global fallback glyph preference
 integration awaits a tested canonical UI release exposing that property.

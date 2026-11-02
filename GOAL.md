@@ -1,5 +1,9 @@
 # NkMail local delivery goal
 
+## Refined header offset · 2026-11-02
+
+- Reduced requested downward offset from 10px to 6px (4px upward from previous preview), retaining the common alignment. VM UI regression passed in 10.32s; host build and guarded preview replacement succeeded.
+
 ## Header controls vertical offset · 2026-11-02
 
 - Moved traffic-light row down 10px. Existing shared center-line bindings move toolbar groups, search, filter, folder title and sidebar toggle together; header height remains 44px. Updated expected circle Y coordinate to 22.5px.

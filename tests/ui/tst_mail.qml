@@ -209,7 +209,7 @@ TestCase {
                 compare(rect.height, 14)
                 const point = controls.mapToItem(app.contentItem, rect.x, rect.y)
                 compare(point.x - app.width, -84.5 + 28 * i)
-                compare(point.y, 22.5)
+                compare(point.y, 18.5)
             }
             compare(client.opacity, 1)
             verify(client.enabled)
