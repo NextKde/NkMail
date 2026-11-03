@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Compact rectangular formatting groups · 2026-11-03
+
+- Applied the user’s explicit formatting-toolbar correction: 24px ordinary rectangular button groups for emphasis, alignment, lists and indentation, with square action cells and group surfaces. Removed separate circular/pill buttons and the oversized emphasis capsule. Aligned font selectors and color control to the compact row.
+- VM build and existing UI/i18n/catalog checks passed (3/3, 30.38s; 46 UI cases). Final glyph-padding adjustment is covered by the VM build and light/dark software-fallback captures. No host validation performed.
+
 ## Composer editing tools · 2026-11-03
 
 - Continued from the supplied macOS Mail reference while retaining the NextKde window/material contract. Added text presets, installed font families and faces, selection-aware formatting state, paragraph alignment, numbered lists and block indentation. Added anchored emoji/link editors and body-only formatting shortcuts. Selection replacement is one undo operation.

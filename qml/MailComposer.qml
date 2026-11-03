@@ -46,8 +46,26 @@ ApplicationWindow {
         focusPolicy: Qt.TabFocus
     }
     component FormatAction: ComposerAction {
-        implicitWidth: 28
-        implicitHeight: 28
+        implicitWidth: 26
+        implicitHeight: 24
+        materialForm: true
+        flat: true
+        iconOnly: true
+        leftPadding: 0; rightPadding: 0
+        cornerRadius: 0
+    }
+    component FormatGroup: Item {
+        default property alias actions: groupActions.data
+        implicitWidth: groupActions.implicitWidth
+        implicitHeight: 24
+        LiquidActionButton {
+            anchors.fill: parent
+            materialForm: true
+            cornerRadius: 0
+            enabled: false
+            Accessible.ignored: true
+        }
+        Row { id: groupActions; spacing: 0 }
     }
     component ListAction: FormatAction {
         id: listAction
@@ -401,7 +419,7 @@ ApplicationWindow {
                     enabled: root.editable
                     KosComboBox {
                         objectName: "composerParagraphStyle"
-                        implicitWidth: 104; implicitHeight: 28
+                        implicitWidth: 104; implicitHeight: 24
                         model: [qsTr("Body"), qsTr("Title"), qsTr("Heading")]
                         currentIndex: bodyField.cursorSelection.font.bold && bodyField.cursorSelection.font.pointSize === 24 ? 1
                             : bodyField.cursorSelection.font.bold && bodyField.cursorSelection.font.pointSize === 18 ? 2 : 0
@@ -410,7 +428,7 @@ ApplicationWindow {
                     }
                     KosComboBox {
                         objectName: "composerFontFamily"
-                        implicitWidth: 136; implicitHeight: 28
+                        implicitWidth: 136; implicitHeight: 24
                         model: root.availableFonts
                         currentIndex: Math.max(0, root.availableFonts.indexOf(bodyField.cursorSelection.font.family))
                         displayText: bodyField.cursorSelection.font.family || qsTr("System font")
@@ -419,7 +437,7 @@ ApplicationWindow {
                     }
                     KosComboBox {
                         objectName: "composerFontStyle"
-                        implicitWidth: 104; implicitHeight: 28
+                        implicitWidth: 104; implicitHeight: 24
                         model: [qsTr("Regular"), qsTr("Bold"), qsTr("Italic"), qsTr("Bold italic")]
                         currentIndex: (bodyField.cursorSelection.font.bold ? 1 : 0) + (bodyField.cursorSelection.font.italic ? 2 : 0)
                         Accessible.name: qsTr("Font style")
@@ -430,7 +448,7 @@ ApplicationWindow {
                     }
                     KosComboBox {
                         objectName: "composerFontSize"
-                        implicitWidth: 64; implicitHeight: 30
+                        implicitWidth: 64; implicitHeight: 24
                         model: ["10", "12", "14", "16", "18", "24", "32"]
                         currentIndex: model.indexOf(String(Math.round(bodyField.cursorSelection.font.pointSize)))
                         displayText: String(Math.round(bodyField.cursorSelection.font.pointSize > 0 ? bodyField.cursorSelection.font.pointSize : 14))
@@ -438,31 +456,31 @@ ApplicationWindow {
                         onActivated: index => root.format(() => bodyField.cursorSelection.font.pointSize = Number(model[index]))
                     }
                     FormatAction {
-                        text: qsTr("Text color"); implicitWidth: 30; implicitHeight: 30
+                        text: qsTr("Text color"); implicitWidth: 24; implicitHeight: 24; flat: false
                         contentItem: Item {
-                            Rectangle { anchors.centerIn: parent; width: 22; height: 22; color: bodyField.cursorSelection.color; radius: 6; border.width: 1; border.color: AppTheme.border }
+                            Rectangle { anchors.centerIn: parent; width: 16; height: 16; color: bodyField.cursorSelection.color; radius: 0; border.width: 1; border.color: AppTheme.border }
                         }
                         onClicked: { colorDialog.selectedColor = bodyField.cursorSelection.color; colorDialog.open() }
                     }
-                    Item {
-                        implicitWidth: styleActions.implicitWidth; implicitHeight: 32
-                        LiquidActionButton { anchors.fill: parent; materialForm: true; enabled: false; Accessible.ignored: true }
-                        Row {
-                            id: styleActions
-                            spacing: 1
-                            FormatAction { objectName: "composerBold"; flat: true; text: "B"; accessibleText: qsTr("Bold"); checkable: true; checked: bodyField.cursorSelection.font.bold; font.bold: true; onClicked: root.format(() => bodyField.cursorSelection.font.bold = !bodyField.cursorSelection.font.bold) }
-                            FormatAction { flat: true; text: "I"; accessibleText: qsTr("Italic"); checkable: true; checked: bodyField.cursorSelection.font.italic; font.italic: true; onClicked: root.format(() => bodyField.cursorSelection.font.italic = !bodyField.cursorSelection.font.italic) }
-                            FormatAction { flat: true; text: "U"; accessibleText: qsTr("Underline"); checkable: true; checked: bodyField.cursorSelection.font.underline; font.underline: true; onClicked: root.format(() => bodyField.cursorSelection.font.underline = !bodyField.cursorSelection.font.underline) }
-                            FormatAction { flat: true; text: "S"; accessibleText: qsTr("Strikethrough"); checkable: true; checked: bodyField.cursorSelection.font.strikeout; font.strikeout: true; onClicked: root.format(() => bodyField.cursorSelection.font.strikeout = !bodyField.cursorSelection.font.strikeout) }
-                        }
+                    FormatGroup {
+                        FormatAction { objectName: "composerBold"; flat: true; text: "B"; accessibleText: qsTr("Bold"); checkable: true; checked: bodyField.cursorSelection.font.bold; font.bold: true; onClicked: root.format(() => bodyField.cursorSelection.font.bold = !bodyField.cursorSelection.font.bold) }
+                        FormatAction { flat: true; text: "I"; accessibleText: qsTr("Italic"); checkable: true; checked: bodyField.cursorSelection.font.italic; font.italic: true; onClicked: root.format(() => bodyField.cursorSelection.font.italic = !bodyField.cursorSelection.font.italic) }
+                        FormatAction { flat: true; text: "U"; accessibleText: qsTr("Underline"); checkable: true; checked: bodyField.cursorSelection.font.underline; font.underline: true; onClicked: root.format(() => bodyField.cursorSelection.font.underline = !bodyField.cursorSelection.font.underline) }
+                        FormatAction { flat: true; text: "S"; accessibleText: qsTr("Strikethrough"); checkable: true; checked: bodyField.cursorSelection.font.strikeout; font.strikeout: true; onClicked: root.format(() => bodyField.cursorSelection.font.strikeout = !bodyField.cursorSelection.font.strikeout) }
                     }
-                    AlignmentAction { objectName: "composerAlign0"; paragraphAlignment: Qt.AlignLeft; accessibleText: qsTr("Align left") }
-                    AlignmentAction { objectName: "composerAlign1"; paragraphAlignment: Qt.AlignHCenter; accessibleText: qsTr("Align center") }
-                    AlignmentAction { objectName: "composerAlign2"; paragraphAlignment: Qt.AlignRight; accessibleText: qsTr("Align right") }
-                    ListAction { objectName: "composerBullets"; accessibleText: qsTr("Bullet list"); checkable: true; checked: root.paragraphState.bullets; onClicked: root.format(() => richEditor.toggleBulletList(bodyField.textDocument)) }
-                    ListAction { objectName: "composerNumbers"; numbered: true; accessibleText: qsTr("Numbered list"); checkable: true; checked: root.paragraphState.numbered; onClicked: root.format(() => richEditor.toggleNumberedList(bodyField.textDocument)) }
-                    FormatAction { objectName: "composerOutdent"; text: "⇤"; accessibleText: qsTr("Decrease indent"); onClicked: root.format(() => richEditor.changeIndent(bodyField.textDocument, -1)) }
-                    FormatAction { objectName: "composerIndent"; text: "⇥"; accessibleText: qsTr("Increase indent"); onClicked: root.format(() => richEditor.changeIndent(bodyField.textDocument, 1)) }
+                    FormatGroup {
+                        AlignmentAction { objectName: "composerAlign0"; paragraphAlignment: Qt.AlignLeft; accessibleText: qsTr("Align left") }
+                        AlignmentAction { objectName: "composerAlign1"; paragraphAlignment: Qt.AlignHCenter; accessibleText: qsTr("Align center") }
+                        AlignmentAction { objectName: "composerAlign2"; paragraphAlignment: Qt.AlignRight; accessibleText: qsTr("Align right") }
+                    }
+                    FormatGroup {
+                        ListAction { objectName: "composerBullets"; accessibleText: qsTr("Bullet list"); checkable: true; checked: root.paragraphState.bullets; onClicked: root.format(() => richEditor.toggleBulletList(bodyField.textDocument)) }
+                        ListAction { objectName: "composerNumbers"; numbered: true; accessibleText: qsTr("Numbered list"); checkable: true; checked: root.paragraphState.numbered; onClicked: root.format(() => richEditor.toggleNumberedList(bodyField.textDocument)) }
+                    }
+                    FormatGroup {
+                        FormatAction { objectName: "composerOutdent"; text: "⇤"; accessibleText: qsTr("Decrease indent"); onClicked: root.format(() => richEditor.changeIndent(bodyField.textDocument, -1)) }
+                        FormatAction { objectName: "composerIndent"; text: "⇥"; accessibleText: qsTr("Increase indent"); onClicked: root.format(() => richEditor.changeIndent(bodyField.textDocument, 1)) }
+                    }
                 }
             }
             ScrollView {
