@@ -98,6 +98,7 @@ public:
     // account binding. folderUnread() reports the bound account; accountUnread()
     // reads another account's cache in place.
     Q_INVOKABLE QVariantMap folderUnread() const;
+    Q_INVOKABLE QVariantMap folderUnreadFor(const QString &accountId) const;
     Q_INVOKABLE int accountUnread(const QString &accountId) const;
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void searchServer();

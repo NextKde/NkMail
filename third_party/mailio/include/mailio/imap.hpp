@@ -128,6 +128,7 @@ public:
     {
         std::map<std::string, mailbox_folder_t> folders;
         bool selectable = false;
+        std::vector<std::string> attributes;
     };
 
 

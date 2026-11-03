@@ -16,12 +16,13 @@ QVariant FolderListModel::data(const QModelIndex &index, int role) const
     case IdRole: return f.id;
     case TitleRole: return f.title;
     case TotalRole: return f.total;
+    case SpecialUseRole: return f.role;
     default: return {};
     }
 }
 QHash<int, QByteArray> FolderListModel::roleNames() const
 {
-    return {{IdRole, "id"}, {TitleRole, "title"}, {TotalRole, "total"}};
+    return {{IdRole, "id"}, {TitleRole, "title"}, {TotalRole, "total"}, {SpecialUseRole, "role"}};
 }
 int FolderListModel::indexOf(const QString &id) const
 {
@@ -35,7 +36,7 @@ QVariantMap FolderListModel::get(int row) const
     if (row < 0 || row >= count())
         return {};
     const auto &f = m_folders.at(row);
-    return {{"id", f.id}, {"title", f.title}, {"total", f.total}};
+    return {{"id", f.id}, {"title", f.title}, {"total", f.total}, {"role", f.role}};
 }
 bool FolderListModel::update(const Folder &folder)
 {
@@ -43,7 +44,7 @@ bool FolderListModel::update(const Folder &folder)
     if (row < 0)
         return false;
     const auto &old = m_folders.at(row);
-    if (old.title != folder.title || old.total != folder.total) {
+    if (old.title != folder.title || old.total != folder.total || old.role != folder.role) {
         m_folders[row] = folder;
         emit dataChanged(index(row), index(row));
     }

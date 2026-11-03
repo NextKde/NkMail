@@ -225,7 +225,7 @@ void MailController::initialize() {
         if (!m_database->open(m_root, first.id)) { setStatus(tr("Storage unavailable"), m_database->error()); return; }
         m_account = m_database->account();
     }
-    for (const auto &folder : m_database->folders()) m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
+    for (const auto &folder : m_database->folders()) m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}, {"role", folder.role}});
     emit accountChanged(); emit foldersChanged(); emit draftsChanged();
     loadCached();
     setStatus(configured() ? tr("Offline · cached mail") : tr("Add your email account to get started"));
@@ -242,7 +242,7 @@ void MailController::seedDemo() {
     m_account.smtpHost = QStringLiteral("smtp.example.invalid");
     const QList<Folder> folders{{"INBOX", "Inbox", 8}, {"Sent", "Sent", 1}, {"Archive", "Archive", 0}};
     m_database->saveFolders(folders);
-    for (const auto &f : folders) m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"total", f.total}});
+    for (const auto &f : folders) m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"total", f.total}, {"role", f.role}});
     const QStringList senders{"Maya Chen", "NextKde Design", "Oliver Martin", "Studio Notes", "Lin Wei", "Alex Rivera", "Open Source Weekly", "NkMail"};
     const QStringList subjects{"A quieter place for your inbox", "NextKde · the details make the difference", "Friday's design review", "A few things worth keeping", "关于下一次设计讨论", "Re: The little things", "This week in open source", "Welcome to NkMail"};
     const QStringList previews{"A first look at a more thoughtful mail experience.", "A small update on components, spacing and the next steps.", "I've added a few notes ahead of our conversation.", "References, ideas, and some room to think.", "整理了一些界面与交互建议，期待你的想法。", "Thank you for the careful feedback. Here's the revised direction.", "Good projects, thoughtful tools, and community updates.", "Your mail, with a little more breathing room."};
@@ -355,7 +355,7 @@ void MailController::switchAccount(const QString &id) {
     m_account = m_database->account();
     m_folders.clear();
     for (const auto &folder : m_database->folders())
-        m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
+        m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}, {"role", folder.role}});
     loadCached();
     // Account has no per-account interval yet; reuse the controller-wide value.
     startRefreshTimer();
@@ -379,7 +379,7 @@ QVariantList MailController::foldersFor(const QString &accountId) const {
     QVariantList out;
     if (!m_database->isOpen()) return out;
     for (const auto &folder : m_database->folders(accountId))
-        out.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
+        out.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}, {"role", folder.role}});
     return out;
 }
 QVariantMap MailController::folderUnread() const {
@@ -388,6 +388,13 @@ QVariantMap MailController::folderUnread() const {
     const auto counts = m_database->unreadCounts();
     for (auto it = counts.cbegin(); it != counts.cend(); ++it)
         out.insert(it.key(), it.value());
+    return out;
+}
+QVariantMap MailController::folderUnreadFor(const QString &accountId) const {
+    QVariantMap out;
+    if (!m_database || !m_database->isOpen()) return out;
+    const auto counts = m_database->unreadCounts(accountId);
+    for (auto it = counts.cbegin(); it != counts.cend(); ++it) out.insert(it.key(), it.value());
     return out;
 }
 int MailController::accountUnread(const QString &accountId) const {
@@ -431,7 +438,7 @@ void MailController::refresh() {
         m_busy = false;
         if (!error.isEmpty()) { m_cachedOnly = true; loadCached(); setStatus(tr("Offline · cached mail"), error); return; }
         m_database->saveFolders(folders); m_folders.clear();
-        for (const auto &f : folders) m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"total", f.total}});
+        for (const auto &f : folders) m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"total", f.total}, {"role", f.role}});
         emit foldersChanged(); m_busy = false; m_offset = 0;
         fetchPage(false);
     });

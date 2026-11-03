@@ -1,6 +1,6 @@
 # Testing and acceptance boundaries
 
-Automated suites run in the designated virtual machine. The user explicitly authorized host builds and interactive NkMail previews for the current UI work; reference projects remain untouched. NkMail has eight distinct suites. Enable them with `-DNKMAIL_BUILD_TESTS=ON` and run `ctest --test-dir build --output-on-failure`.
+The user explicitly authorized host automated tests, screenshots, builds and interactive NkMail previews on 2026-11-02; reference projects remain untouched. NkMail has eight distinct suites. Enable them with `-DNKMAIL_BUILD_TESTS=ON` and run `ctest --test-dir build --output-on-failure`.
 
 | Suite | Actual code exercised | Deliberately isolated boundary |
 | --- | --- | --- |

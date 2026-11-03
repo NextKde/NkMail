@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Account-scoped mailbox navigation · 2026-11-03
+
+- Background/favorite unread badges read account-scoped cached counts. Added independent navigation ordering, server special-use role preservation/storage (schema v5), explicit local/server drafts and transient account sync/error text. Same-named folder identities remain distinct.
+- Seven full-run suites passed; the existing folder-role count assertion was updated for the new field and core rerun passed (0.43s), including new account-scoped cache coverage. Protocol special-use and UI ordering tests passed. Screenshot inspected. Continuing compact reader header.
+
 ## Account setup wizard · 2026-11-03
 
 - Email-first setup, iCloud/manual profile choice, collapsed advanced settings, independent IMAP/SMTP verification and explicit save completion. ProviderProfiles and AccountSetup own their respective logic. Failed verification retains fields, clears password, and permits retry. Saving reports success explicitly.

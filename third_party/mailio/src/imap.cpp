@@ -1125,7 +1125,12 @@ auto imap::list_folders(const string& folder_name) -> mailbox_folder_t
                         leaf = &mbox->at(f);
                         mbox = &leaf->folders;
                     }
-                    if (leaf) leaf->selectable = selectable;
+                    if (leaf) {
+                        leaf->selectable = selectable;
+                        leaf->attributes.clear();
+                        for (const auto& flag : mandatory_part_.front()->parenthesized_list)
+                            leaf->attributes.push_back(flag->atom);
+                    }
                 }
                 else
                     throw imap_error("Parsing failure.", "Line=`" + line + "`.");

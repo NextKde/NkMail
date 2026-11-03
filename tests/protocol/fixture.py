@@ -128,7 +128,7 @@ class Server:
             elif upper == b'LIST "" ""':
                 self.write(b'* LIST (\\Noselect) "/" ""\r\n' + tag + b" OK delimiter\r\n")
             elif upper.startswith(b"LIST "):
-                self.write(b'* LIST (\\HasNoChildren) "/" "INBOX"\r\n* LIST (\\Noselect) "/" "Archive"\r\n* LIST () "/" "Archive/&bUuL1Q-"\r\n' + tag + b" OK listed\r\n")
+                self.write(b'* LIST (\\HasNoChildren) "/" "INBOX"\r\n* LIST (\\Noselect) "/" "Archive"\r\n* LIST (\\Archive) "/" "Archive/&bUuL1Q-"\r\n' + tag + b" OK listed\r\n")
             elif upper.startswith(b"STATUS "):
                 self.write(b'* STATUS "INBOX" (MESSAGES 2 RECENT 0)\r\n' + tag + b" OK status\r\n")
             elif upper == b"LOGOUT": self.write(b"* BYE goodbye\r\n" + tag + b" OK logout\r\n"); return
@@ -229,6 +229,7 @@ def main():
             folders, server = invoke("imap", good, ca, "folders", starttls)
             assert folders["ok"] and len(folders["folders"]) == 2, folders
             assert folders["folders"][0]["title"] == "Archive/测试", folders
+            assert folders["folders"][0]["role"] == "archive", folders
             passed += 1
             page, server = invoke("imap", good, ca, "page", starttls)
             assert page["ok"] and page["uidValidity"] == "42", page

@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import Kos.Ui
+import "../../qml/MailboxNavigation.js" as Navigation
 import NextKde.Mail.TestViews 1.0 as App
 
 TestCase {
@@ -66,6 +67,7 @@ TestCase {
         function foldersFor(accountId) { return folders }
         property var folderUnreadMap: ({})
         function folderUnread() { return folderUnreadMap }
+        function folderUnreadFor(accountId) { return folderUnreadMap }
         property int accountUnreadRevision: 0
         function accountUnread(accountId) { return 0 }
         property var favorites: ([])
@@ -631,6 +633,17 @@ TestCase {
         app.showReview("compose")
         compare(findChild(app, "composerDialog").visible, false)
     }
+    function test_navigation_uses_roles_without_merging_names() {
+        const folders = [{id:"custom",title:"Inbox"}, {id:"wire/sent",title:"Sent",role:"sent"}, {id:"INBOX",title:"Inbox"}]
+        const sorted = Navigation.ordered(folders)
+        compare(sorted.length, 3)
+        compare(sorted[0].id, "INBOX")
+        compare(sorted[1].id, "wire/sent")
+        compare(sorted[2].id, "custom")
+        compare(App.MailLabels.mailboxIcon(sorted[1]), "forward")
+        compare(App.MailLabels.mailboxIcon(sorted[2]), "folder")
+    }
+
     function test_account_wizard_preserves_config_on_failure() {
         const dialog = findChild(app, "accountDialog")
         dialog.addAccount()

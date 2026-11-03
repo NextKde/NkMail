@@ -14,7 +14,7 @@ struct Account {
     bool imapStartTls = false, smtpStartTls = false;
     QString caFile; // Explicit custom trust anchor; never disables verification.
 };
-struct Folder { QString id, title; int total = 0; };
+struct Folder { QString id, title; int total = 0; QString role; };
 struct Summary {
     QString folder, uidValidity, uid;
     QString sender, senderAddress, recipients, subject, date, preview;

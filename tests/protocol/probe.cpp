@@ -27,7 +27,7 @@ int main(int argc, char **argv)
             } else if (operation == QStringLiteral("folders")) {
                 const auto folders = nkmail::MailioBackend::folders(a);
                 QJsonArray array;
-                for (const auto &f : folders) array.append(QJsonObject{{"id", f.id}, {"title", f.title}, {"total", f.total}});
+                for (const auto &f : folders) array.append(QJsonObject{{"id", f.id}, {"title", f.title}, {"total", f.total}, {"role", f.role}});
                 result = {{"folders", array}};
             } else if (operation == QStringLiteral("page")) {
                 const auto p = nkmail::MailioBackend::page(a, QStringLiteral("INBOX"), 0, 1);

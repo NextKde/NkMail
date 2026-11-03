@@ -47,6 +47,19 @@ Page page(QList<Summary> messages, QString generation = QStringLiteral("100"))
 class CoreTests : public QObject {
     Q_OBJECT
 private slots:
+    void unreadCountsStayAccountScoped() {
+        QTemporaryDir dir(temporaryTemplate());
+        MailDatabase db;
+        QVERIFY(db.open(dir.path(), "first"));
+        auto first = message("1"); first.unread = true;
+        QVERIFY(db.savePage(page({first})));
+        QVERIFY(db.open(dir.path(), "second"));
+        auto second = message("2"); second.unread = true;
+        QVERIFY(db.savePage(page({second, message("3")})));
+        QCOMPARE(db.unreadCounts("first").value("INBOX"), 1);
+        QCOMPARE(db.unreadCounts("second").value("INBOX"), 1);
+        QCOMPARE(db.accountId(), QString("second"));
+    }
     void initTestCase();
     void mapRoundTrips();
     void cacheProbesDoNotRecoverLiveSends();
@@ -187,7 +200,7 @@ void CoreTests::accountAndFolderPersistence()
     a.imapHost = QStringLiteral("imap.example.invalid");
     a.smtpHost = QStringLiteral("smtp.example.invalid");
     a.password = QStringLiteral("SYNTHETIC-SECRET-MUST-NOT-REACH-SQLITE");
-    const QList<Folder> folders = {{"INBOX", "Inbox", 5}, {"Sent", "Sent mail", 2}};
+    const QList<Folder> folders = {{"INBOX", "Inbox", 5}, {"Sent", "Sent mail", 2, "sent"}};
     {
         MailDatabase db;
         QVERIFY2(db.open(dir.path()), qPrintable(db.error()));
@@ -206,6 +219,7 @@ void CoreTests::accountAndFolderPersistence()
         QCOMPARE(restored.smtpHost, a.smtpHost);
         const auto restoredFolders = db.folders();
         QCOMPARE(restoredFolders.size(), folders.size());
+        QCOMPARE(restoredFolders.at(1).role, QString("sent"));
         for (int i = 0; i < folders.size(); ++i) {
             QCOMPARE(restoredFolders[i].id, folders[i].id);
             QCOMPARE(restoredFolders[i].title, folders[i].title);
@@ -576,7 +590,8 @@ void CoreTests::folderModelIdentity()
     QVERIFY(!sent.isValid());
     QVERIFY(!model.update({"missing", "", 0}));
     QVERIFY(model.get(50).isEmpty());
-    QCOMPARE(model.roleNames().size(), 3);
+    QCOMPARE(model.roleNames().size(), 4);
+    QCOMPARE(model.roleNames().value(FolderListModel::SpecialUseRole), QByteArray("role"));
     model.clear();
     QCOMPARE(model.count(), 0);
 }

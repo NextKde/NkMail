@@ -517,146 +517,146 @@
             <translation>Folder list exceeds safety limits.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="414" />
+            <location filename="../src/mail/backend.cpp" line="421" />
             <source>Unable to list folders. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to list folders. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="420" />
+            <location filename="../src/mail/backend.cpp" line="427" />
             <source>Invalid page bounds.</source>
             <translation>Invalid page bounds.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="423" />
+            <location filename="../src/mail/backend.cpp" line="430" />
             <source>Server did not provide UIDVALIDITY.</source>
             <translation>Server did not provide UIDVALIDITY.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="432" />
+            <location filename="../src/mail/backend.cpp" line="439" />
             <source>Server returned an invalid page.</source>
             <translation>Server returned an invalid page.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="442" />
+            <location filename="../src/mail/backend.cpp" line="449" />
             <source>Unable to read message headers. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to read message headers. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="449" />
+            <location filename="../src/mail/backend.cpp" line="456" />
             <source>Invalid search query.</source>
             <translation>Invalid search query.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="450" />
+            <location filename="../src/mail/backend.cpp" line="457" />
             <source>Invalid search bounds.</source>
             <translation>Invalid search bounds.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="454" />
-            <location filename="../src/mail/backend.cpp" line="490" />
-            <location filename="../src/mail/backend.cpp" line="611" />
-            <location filename="../src/mail/backend.cpp" line="633" />
-            <location filename="../src/mail/backend.cpp" line="646" />
-            <location filename="../src/mail/backend.cpp" line="660" />
-            <location filename="../src/mail/backend.cpp" line="684" />
-            <location filename="../src/mail/backend.cpp" line="699" />
-            <location filename="../src/mail/backend.cpp" line="715" />
+            <location filename="../src/mail/backend.cpp" line="461" />
+            <location filename="../src/mail/backend.cpp" line="497" />
+            <location filename="../src/mail/backend.cpp" line="618" />
+            <location filename="../src/mail/backend.cpp" line="640" />
+            <location filename="../src/mail/backend.cpp" line="653" />
+            <location filename="../src/mail/backend.cpp" line="667" />
+            <location filename="../src/mail/backend.cpp" line="691" />
+            <location filename="../src/mail/backend.cpp" line="706" />
+            <location filename="../src/mail/backend.cpp" line="722" />
             <source>Folder identity changed. Refresh the message list.</source>
             <translation>Folder identity changed. Refresh the message list.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="468" />
+            <location filename="../src/mail/backend.cpp" line="475" />
             <source>Unable to search messages on the mail server.</source>
             <translation>Unable to search messages on the mail server.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="481" />
+            <location filename="../src/mail/backend.cpp" line="488" />
             <source>Unable to search messages. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to search messages. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="494" />
+            <location filename="../src/mail/backend.cpp" line="501" />
             <source>Message no longer exists.</source>
             <translation>Message no longer exists.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="508" />
+            <location filename="../src/mail/backend.cpp" line="515" />
             <source>Unable to read message. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to read message. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="535" />
+            <location filename="../src/mail/backend.cpp" line="542" />
             <source>SMTP server accepted the message; delivery is not confirmed.</source>
             <translation>SMTP server accepted the message; delivery is not confirmed.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="542" />
-            <location filename="../src/mail/backend.cpp" line="546" />
+            <location filename="../src/mail/backend.cpp" line="549" />
+            <location filename="../src/mail/backend.cpp" line="553" />
             <source>Submission outcome is unknown. Check Sent mail before retrying manually.</source>
             <translation>Submission outcome is unknown. Check Sent mail before retrying manually.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="543" />
+            <location filename="../src/mail/backend.cpp" line="550" />
             <source>SMTP server rejected the operation. The draft has been preserved.</source>
             <translation>SMTP server rejected the operation. The draft has been preserved.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="547" />
+            <location filename="../src/mail/backend.cpp" line="554" />
             <source>Message was not submitted. Check account, connection and trusted TLS certificate.</source>
             <translation>Message was not submitted. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="593" />
+            <location filename="../src/mail/backend.cpp" line="600" />
             <source>Unable to save a copy to the Sent folder. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to save a copy to the Sent folder. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="605" />
+            <location filename="../src/mail/backend.cpp" line="612" />
             <source>Choose a different destination folder.</source>
             <translation>Choose a different destination folder.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="613" />
+            <location filename="../src/mail/backend.cpp" line="620" />
             <source>Safe deletion/move requires UIDPLUS. No messages were changed.</source>
             <translation>Safe deletion/move requires UIDPLUS. No messages were changed.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="620" />
+            <location filename="../src/mail/backend.cpp" line="627" />
             <source>Operation may be partially complete. Refresh both folders before retrying; no automatic retry was made.</source>
             <translation>Operation may be partially complete. Refresh both folders before retrying; no automatic retry was made.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="621" />
+            <location filename="../src/mail/backend.cpp" line="628" />
             <source>Unable to prepare mailbox operation. No messages were changed.</source>
             <translation>Unable to prepare mailbox operation. No messages were changed.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="636" />
-            <location filename="../src/mail/backend.cpp" line="687" />
+            <location filename="../src/mail/backend.cpp" line="643" />
+            <location filename="../src/mail/backend.cpp" line="694" />
             <source>Unable to update message flags. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to update message flags. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="649" />
-            <location filename="../src/mail/backend.cpp" line="702" />
+            <location filename="../src/mail/backend.cpp" line="656" />
+            <location filename="../src/mail/backend.cpp" line="709" />
             <source>Unable to copy message. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to copy message. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="667" />
-            <location filename="../src/mail/backend.cpp" line="720" />
+            <location filename="../src/mail/backend.cpp" line="674" />
+            <location filename="../src/mail/backend.cpp" line="727" />
             <source>Safe deletion requires UIDPLUS; no mailbox-wide expunge was performed.</source>
             <translation>Safe deletion requires UIDPLUS; no mailbox-wide expunge was performed.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="669" />
-            <location filename="../src/mail/backend.cpp" line="721" />
+            <location filename="../src/mail/backend.cpp" line="676" />
+            <location filename="../src/mail/backend.cpp" line="728" />
             <source>Safe deletion requires explicit UIDs and UIDPLUS.</source>
             <translation>Safe deletion requires explicit UIDs and UIDPLUS.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="671" />
-            <location filename="../src/mail/backend.cpp" line="723" />
+            <location filename="../src/mail/backend.cpp" line="678" />
+            <location filename="../src/mail/backend.cpp" line="730" />
             <source>Unable to expunge deleted messages. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to expunge deleted messages. Check account, connection and trusted TLS certificate.</translation>
         </message>
@@ -701,37 +701,37 @@
             <translation>Unsupported mail database schema version %1</translation>
         </message>
         <message>
-            <location filename="../src/storage/MailDatabase.cpp" line="425" />
+            <location filename="../src/storage/MailDatabase.cpp" line="426" />
             <source>Folder and UIDVALIDITY are required</source>
             <translation>Folder and UIDVALIDITY are required</translation>
         </message>
         <message>
-            <location filename="../src/storage/MailDatabase.cpp" line="470" />
+            <location filename="../src/storage/MailDatabase.cpp" line="471" />
             <source>Page contains an invalid or mismatched message identity</source>
             <translation>Page contains an invalid or mismatched message identity</translation>
         </message>
         <message>
-            <location filename="../src/storage/MailDatabase.cpp" line="489" />
+            <location filename="../src/storage/MailDatabase.cpp" line="490" />
             <source>Invalid cache page bounds</source>
             <translation>Invalid cache page bounds</translation>
         </message>
         <message>
-            <location filename="../src/storage/MailDatabase.cpp" line="562" />
+            <location filename="../src/storage/MailDatabase.cpp" line="563" />
             <source>Content requires a complete message identity</source>
             <translation>Content requires a complete message identity</translation>
         </message>
         <message>
-            <location filename="../src/storage/MailDatabase.cpp" line="568" />
+            <location filename="../src/storage/MailDatabase.cpp" line="569" />
             <source>Content UIDVALIDITY is stale</source>
             <translation>Content UIDVALIDITY is stale</translation>
         </message>
         <message>
-            <location filename="../src/storage/MailDatabase.cpp" line="671" />
+            <location filename="../src/storage/MailDatabase.cpp" line="672" />
             <source>Draft belongs to another account</source>
             <translation>Draft belongs to another account</translation>
         </message>
         <message>
-            <location filename="../src/storage/MailDatabase.cpp" line="716" />
+            <location filename="../src/storage/MailDatabase.cpp" line="717" />
             <source>Draft not found or send state transition is unsafe</source>
             <translation>Draft not found or send state transition is unsafe</translation>
         </message>
@@ -739,57 +739,67 @@
     <context>
         <name>MailLabels</name>
         <message>
-            <location filename="../qml/MailLabels.qml" line="7" />
+            <location filename="../qml/MailLabels.qml" line="9" />
+            <location filename="../qml/MailLabels.qml" line="11" />
             <source>Inbox</source>
             <translation>Inbox</translation>
         </message>
         <message>
             <location filename="../qml/MailLabels.qml" line="9" />
+            <location filename="../qml/MailLabels.qml" line="13" />
             <source>Sent</source>
             <translation>Sent</translation>
         </message>
         <message>
-            <location filename="../qml/MailLabels.qml" line="10" />
+            <location filename="../qml/MailLabels.qml" line="9" />
+            <location filename="../qml/MailLabels.qml" line="14" />
             <source>Archive</source>
             <translation>Archive</translation>
         </message>
         <message>
-            <location filename="../qml/MailLabels.qml" line="11" />
+            <location filename="../qml/MailLabels.qml" line="9" />
+            <location filename="../qml/MailLabels.qml" line="15" />
             <source>Junk</source>
             <translation>Junk</translation>
         </message>
         <message>
-            <location filename="../qml/MailLabels.qml" line="12" />
+            <location filename="../qml/MailLabels.qml" line="9" />
+            <location filename="../qml/MailLabels.qml" line="16" />
             <source>Trash</source>
             <translation>Trash</translation>
         </message>
         <message>
-            <location filename="../qml/MailLabels.qml" line="28" />
+            <location filename="../qml/MailLabels.qml" line="9" />
+            <source>Server drafts</source>
+            <translation>Server drafts</translation>
+        </message>
+        <message>
+            <location filename="../qml/MailLabels.qml" line="36" />
             <source>Draft</source>
             <translation>Draft</translation>
         </message>
         <message>
-            <location filename="../qml/MailLabels.qml" line="29" />
+            <location filename="../qml/MailLabels.qml" line="37" />
             <source>Sending</source>
             <translation>Sending</translation>
         </message>
         <message>
-            <location filename="../qml/MailLabels.qml" line="30" />
+            <location filename="../qml/MailLabels.qml" line="38" />
             <source>Accepted</source>
             <translation>Accepted</translation>
         </message>
         <message>
-            <location filename="../qml/MailLabels.qml" line="31" />
+            <location filename="../qml/MailLabels.qml" line="39" />
             <source>Rejected</source>
             <translation>Rejected</translation>
         </message>
         <message>
-            <location filename="../qml/MailLabels.qml" line="32" />
+            <location filename="../qml/MailLabels.qml" line="40" />
             <source>Unknown</source>
             <translation>Unknown</translation>
         </message>
         <message>
-            <location filename="../qml/MailLabels.qml" line="37" />
+            <location filename="../qml/MailLabels.qml" line="45" />
             <source>Yesterday</source>
             <translation>Yesterday</translation>
         </message>
@@ -797,43 +807,39 @@
     <context>
         <name>MailSidebar</name>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="159" />
+            <location filename="../qml/MailSidebar.qml" line="160" />
             <source>收藏</source>
             <translation>Favorites</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="212" />
+            <location filename="../qml/MailSidebar.qml" line="219" />
             <source>编辑账号</source>
             <translation>Edit account</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="219" />
+            <location filename="../qml/MailSidebar.qml" line="226" />
             <source>删除账号</source>
             <translation>Remove account</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="274" />
+            <location filename="../qml/MailSidebar.qml" line="291" />
             <source>从收藏移除</source>
             <translation>Remove from favorites</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="274" />
+            <location filename="../qml/MailSidebar.qml" line="291" />
             <source>添加到收藏</source>
             <translation>Add to favorites</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="288" />
-            <source>Drafts</source>
-            <translation>Drafts</translation>
-        </message>
-        <message>
-            <location filename="../qml/MailSidebar.qml" line="291" />
+            <location filename="../qml/MailSidebar.qml" line="305" />
+            <location filename="../qml/MailSidebar.qml" line="309" />
             <source>Local drafts</source>
             <translation>Local drafts</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="297" />
-            <location filename="../qml/MailSidebar.qml" line="325" />
+            <location filename="../qml/MailSidebar.qml" line="315" />
+            <location filename="../qml/MailSidebar.qml" line="343" />
             <source>添加账号</source>
             <translation>Add account</translation>
         </message>
@@ -1591,15 +1597,15 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../src/MailController.cpp" line="220" />
             <location filename="../src/MailController.cpp" line="225" />
             <location filename="../src/MailController.cpp" line="344" />
-            <location filename="../src/MailController.cpp" line="417" />
+            <location filename="../src/MailController.cpp" line="424" />
             <source>Storage unavailable</source>
             <translation>Storage unavailable</translation>
         </message>
         <message>
             <location filename="../src/MailController.cpp" line="231" />
             <location filename="../src/MailController.cpp" line="376" />
-            <location filename="../src/MailController.cpp" line="432" />
-            <location filename="../src/MailController.cpp" line="563" />
+            <location filename="../src/MailController.cpp" line="439" />
+            <location filename="../src/MailController.cpp" line="570" />
             <source>Offline · cached mail</source>
             <translation>Offline · cached mail</translation>
         </message>
@@ -1611,19 +1617,19 @@ Synthetic demo draft. Sending is disabled.</translation>
         </message>
         <message>
             <location filename="../src/MailController.cpp" line="267" />
-            <location filename="../src/MailController.cpp" line="424" />
+            <location filename="../src/MailController.cpp" line="431" />
             <source>Preview · synthetic mail · not connected</source>
             <translation>Preview · synthetic mail · not connected</translation>
         </message>
         <message>
             <location filename="../src/MailController.cpp" line="271" />
-            <location filename="../src/MailController.cpp" line="401" />
+            <location filename="../src/MailController.cpp" line="408" />
             <source>Preview mode</source>
             <translation>Preview mode</translation>
         </message>
         <message>
             <location filename="../src/MailController.cpp" line="271" />
-            <location filename="../src/MailController.cpp" line="401" />
+            <location filename="../src/MailController.cpp" line="408" />
             <source>Account changes are disabled in this synthetic preview.</source>
             <translation>Account changes are disabled in this synthetic preview.</translation>
         </message>
@@ -1664,159 +1670,159 @@ Synthetic demo draft. Sending is disabled.</translation>
         </message>
         <message>
             <location filename="../src/MailController.cpp" line="330" />
-            <location filename="../src/MailController.cpp" line="402" />
+            <location filename="../src/MailController.cpp" line="409" />
             <source>Finish the current operation before switching accounts</source>
             <translation>Finish the current operation before switching accounts</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="409" />
+            <location filename="../src/MailController.cpp" line="416" />
             <source>Could not remove account</source>
             <translation>Could not remove account</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="421" />
+            <location filename="../src/MailController.cpp" line="428" />
             <source>No accounts left</source>
             <translation>No accounts left</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="426" />
-            <location filename="../src/MailController.cpp" line="684" />
+            <location filename="../src/MailController.cpp" line="433" />
+            <location filename="../src/MailController.cpp" line="691" />
             <source>Account needs attention</source>
             <translation>Account needs attention</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="426" />
+            <location filename="../src/MailController.cpp" line="433" />
             <source>Add an account and enter an application password before connecting.</source>
             <translation>Add an account and enter an application password before connecting.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="428" />
+            <location filename="../src/MailController.cpp" line="435" />
             <source>Connecting securely…</source>
             <translation>Connecting securely…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="461" />
-            <location filename="../src/MailController.cpp" line="471" />
+            <location filename="../src/MailController.cpp" line="468" />
+            <location filename="../src/MailController.cpp" line="478" />
             <source>Searching server…</source>
             <translation>Searching server…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="462" />
+            <location filename="../src/MailController.cpp" line="469" />
             <source>Preview · search synthetic cached messages</source>
             <translation>Preview · search synthetic cached messages</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="463" />
+            <location filename="../src/MailController.cpp" line="470" />
             <source>Search · cached messages only</source>
             <translation>Search · cached messages only</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="475" />
+            <location filename="../src/MailController.cpp" line="482" />
             <source>Search · server unavailable</source>
             <translation>Search · server unavailable</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="488" />
+            <location filename="../src/MailController.cpp" line="495" />
             <source>Search · cached + server</source>
             <translation>Search · cached + server</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="496" />
+            <location filename="../src/MailController.cpp" line="503" />
             <source>Preview · synthetic cached messages</source>
             <translation>Preview · synthetic cached messages</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="497" />
+            <location filename="../src/MailController.cpp" line="504" />
             <source>Unread · cached messages only</source>
             <translation>Unread · cached messages only</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="497" />
+            <location filename="../src/MailController.cpp" line="504" />
             <source>Cached messages only</source>
             <translation>Cached messages only</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="544" />
+            <location filename="../src/MailController.cpp" line="551" />
             <source>%1 封新邮件</source>
             <translation>%1 new messages</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="557" />
+            <location filename="../src/MailController.cpp" line="564" />
             <source>Fetching message headers…</source>
             <translation>Fetching message headers…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="568" />
+            <location filename="../src/MailController.cpp" line="575" />
             <source>Could not cache messages</source>
             <translation>Could not cache messages</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="599" />
+            <location filename="../src/MailController.cpp" line="606" />
             <source>Up to date · headers cached</source>
             <translation>Up to date · headers cached</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="620" />
+            <location filename="../src/MailController.cpp" line="627" />
             <source>This message is not cached</source>
             <translation>This message is not cached</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="620" />
+            <location filename="../src/MailController.cpp" line="627" />
             <source>Connect to download its content.</source>
             <translation>Connect to download its content.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="622" />
+            <location filename="../src/MailController.cpp" line="629" />
             <source>Loading message without changing server flags…</source>
             <translation>Loading message without changing server flags…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="625" />
+            <location filename="../src/MailController.cpp" line="632" />
             <source>Could not load message</source>
             <translation>Could not load message</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="626" />
+            <location filename="../src/MailController.cpp" line="633" />
             <source>Could not cache content</source>
             <translation>Could not cache content</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="627" />
+            <location filename="../src/MailController.cpp" line="634" />
             <source>Message cached · remote content blocked</source>
             <translation>Message cached · remote content blocked</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="655" />
+            <location filename="../src/MailController.cpp" line="662" />
             <source>Disconnected · cached mail available</source>
             <translation>Disconnected · cached mail available</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="672" />
+            <location filename="../src/MailController.cpp" line="679" />
             <source>Archive folder unavailable</source>
             <translation>Archive folder unavailable</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="672" />
+            <location filename="../src/MailController.cpp" line="679" />
             <source>This account has no Archive, Archives or All Mail folder.</source>
             <translation>This account has no Archive, Archives or All Mail folder.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="676" />
+            <location filename="../src/MailController.cpp" line="683" />
             <source>Choose a different destination folder</source>
             <translation>Choose a different destination folder</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="682" />
+            <location filename="../src/MailController.cpp" line="689" />
             <source>Another mail operation is in progress</source>
             <translation>Another mail operation is in progress</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="684" />
+            <location filename="../src/MailController.cpp" line="691" />
             <source>Enter an application password before changing messages.</source>
             <translation>Enter an application password before changing messages.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="697" />
+            <location filename="../src/MailController.cpp" line="704" />
             <source>Updating messages…</source>
             <translation>Updating messages…</translation>
         </message>

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Kos.Ui
+import "MailboxNavigation.js" as Navigation
 
 Item {
         id: root
@@ -167,6 +168,12 @@ Item {
                         required property var modelData
                         text: modelData.title
                         iconName: MailLabels.folderIcon(modelData.folderId)
+                        unreadText: {
+                            root.unreadRevision
+                            const counts = mail.folderUnreadFor(modelData.accountId)
+                            return counts[modelData.folderId] > 0 ? String(counts[modelData.folderId]) : ""
+                        }
+                        checked: mail.currentAccountId === modelData.accountId && !root.draftsVisible && mail.currentFolder === modelData.folderId
                         countText: ""
                         onClicked: mail.openFavorite(modelData.accountId, modelData.folderId)
                     }
@@ -224,11 +231,21 @@ Item {
                                 }
                             }
                         }
+                        Text {
+                            objectName: "accountSyncStatus_" + accountSection.accountId
+                            visible: accountSection.current && (mail.busy || !!mail.error)
+                            text: mail.error ? mail.error : mail.status
+                            Layout.fillWidth: true
+                            Layout.leftMargin: 24
+                            font.pixelSize: 10
+                            color: mail.error ? AppTheme.destructive : AppTheme.mutedText
+                            wrapMode: Text.Wrap
+                        }
                         Repeater {
                             // Synchronous cache read; it is not re-evaluated when
                             // the active account changes, only when the section folds.
                             objectName: accountSection.current ? "mailboxFolders" : "mailboxFolders_" + accountSection.accountId
-                            model: accountSection.collapsed ? [] : (root.unreadRevision, accountSection.current ? root.mail.folders : (root.mail.foldersFor(accountSection.accountId) || []))
+                            model: accountSection.collapsed ? [] : (root.unreadRevision, Navigation.ordered(accountSection.current ? root.mail.folders : (root.mail.foldersFor(accountSection.accountId) || [])))
                             delegate: MailboxAction {
                                 id: folderRow
                                 required property var modelData
@@ -238,12 +255,12 @@ Item {
                                     ? "mailboxFolder_" + modelData.id
                                     : "mailboxFolder_" + accountSection.accountId + "_" + modelData.id
                                 text: MailLabels.mailboxTitle(modelData)
-                                iconName: MailLabels.folderIcon(modelData.id)
+                                iconName: MailLabels.mailboxIcon(modelData)
                                 countText: ""
                                 unreadText: {
                                     root.unreadRevision
-                                    const count = accountSection.current
-                                        ? (root.mail.folderUnread()[modelData.id] || 0) : 0
+                                    const counts = accountSection.current ? root.mail.folderUnread() : root.mail.folderUnreadFor(accountSection.accountId)
+                                    const count = counts[modelData.id] || 0
                                     return count > 0 ? String(count) : ""
                                 }
                                 checked: accountSection.current && !root.draftsVisible && root.mail.currentFolder === modelData.id
@@ -285,7 +302,8 @@ Item {
                 }
                 MailboxAction {
                     objectName: "draftFolderButton"
-                    text: qsTr("Drafts")
+                    text: qsTr("Local drafts")
+                    unreadText: mail.drafts.length > 0 ? String(mail.drafts.length) : ""
                     iconName: "editRounded"
                     checked: root.draftsVisible
                     Accessible.name: qsTr("Local drafts")

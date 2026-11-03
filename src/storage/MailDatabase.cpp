@@ -12,7 +12,7 @@
 
 namespace nkmail {
 namespace {
-constexpr int SchemaVersion = 4;
+constexpr int SchemaVersion = 5;
 QString json(const QVariantMap &map)
 {
     return QString::fromUtf8(QJsonDocument::fromVariant(map).toJson(QJsonDocument::Compact));
@@ -273,7 +273,8 @@ bool MailDatabase::migrate()
             if (!exec(m_db, sql, {}, &m_error))
                 return false;
     }
-    if (!exec(m_db, QStringLiteral("PRAGMA user_version=4"), {}, &m_error))
+    if (version < 5 && !exec(m_db, QStringLiteral("ALTER TABLE folders ADD COLUMN role TEXT NOT NULL DEFAULT ''"), {}, &m_error)) return false;
+    if (!exec(m_db, QStringLiteral("PRAGMA user_version=5"), {}, &m_error))
         return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
@@ -378,14 +379,14 @@ QList<Folder> MailDatabase::folders(const QString &accountId) const
     if (!check())
         return result;
     QSqlQuery q(m_db);
-    q.prepare(QStringLiteral("SELECT id,title,total FROM folders WHERE account=? ORDER BY position,id"));
+    q.prepare(QStringLiteral("SELECT id,title,total,role FROM folders WHERE account=? ORDER BY position,id"));
     q.addBindValue(accountId.isEmpty() ? m_accountId : accountId);
     if (!q.exec()) {
         fail(q.lastError().text());
         return result;
     }
     while (q.next())
-        result.append({q.value(0).toString(), q.value(1).toString(), q.value(2).toInt()});
+        result.append({q.value(0).toString(), q.value(1).toString(), q.value(2).toInt(), q.value(3).toString()});
     return result;
 }
 bool MailDatabase::saveFolders(const QList<Folder> &folders)
@@ -401,8 +402,8 @@ bool MailDatabase::saveFolders(const QList<Folder> &folders)
     for (const auto &f : folders) {
         if (f.id.isEmpty())
             return fail(QStringLiteral("A folder ID is required"));
-        if (!exec(m_db, QStringLiteral("INSERT INTO folders(account,id,title,total,position) VALUES(?,?,?,?,?)"),
-                  {m_accountId, f.id, f.title.isNull() ? QStringLiteral("") : f.title, f.total, position++}, &m_error))
+        if (!exec(m_db, QStringLiteral("INSERT INTO folders(account,id,title,total,position,role) VALUES(?,?,?,?,?,?)"),
+                  {m_accountId, f.id, f.title.isNull() ? QStringLiteral("") : f.title, f.total, position++, f.role.isNull() ? QStringLiteral("") : f.role}, &m_error))
             return false;
     }
     return tx.commit() || fail(m_db.lastError().text());

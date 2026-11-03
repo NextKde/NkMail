@@ -403,7 +403,14 @@ QList<Folder> MailioBackend::folders(const Account &a)
                 const auto id = prefix.isEmpty() ? unicode(name) : prefix + delimiter + unicode(name);
                 if (child.selectable) {
                     const auto stat = imap.statistics(utf8(id));
-                    result << Folder{id, folderTitle(id), int(std::min<unsigned long>(stat.messages_no, std::numeric_limits<int>::max()))};
+                    QString role;
+                    if (id.compare("INBOX", Qt::CaseInsensitive) == 0) role = "inbox";
+                    for (const auto &attribute : child.attributes) {
+                        const auto flag = unicode(attribute).toLower();
+                        for (const auto &name : {"sent", "drafts", "archive", "trash", "junk"})
+                            if (flag == QStringLiteral("\\") + QLatin1String(name)) role = QLatin1String(name);
+                    }
+                    result << Folder{id, folderTitle(id), int(std::min<unsigned long>(stat.messages_no, std::numeric_limits<int>::max())), role};
                 }
                 visit(child, id, depth + 1);
             }

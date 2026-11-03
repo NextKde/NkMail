@@ -1,0 +1,30 @@
+diff --git a/third_party/mailio/include/mailio/imap.hpp b/third_party/mailio/include/mailio/imap.hpp
+index 5ae0873..5d45f3d 100644
+--- a/third_party/mailio/include/mailio/imap.hpp
++++ b/third_party/mailio/include/mailio/imap.hpp
+@@ -128,6 +128,7 @@ public:
+     {
+         std::map<std::string, mailbox_folder_t> folders;
+         bool selectable = false;
++        std::vector<std::string> attributes;
+     };
+ 
+ 
+diff --git a/third_party/mailio/src/imap.cpp b/third_party/mailio/src/imap.cpp
+index c076cb3..d9eb0e0 100644
+--- a/third_party/mailio/src/imap.cpp
++++ b/third_party/mailio/src/imap.cpp
+@@ -1125,7 +1125,12 @@ auto imap::list_folders(const string& folder_name) -> mailbox_folder_t
+                         leaf = &mbox->at(f);
+                         mbox = &leaf->folders;
+                     }
+-                    if (leaf) leaf->selectable = selectable;
++                    if (leaf) {
++                        leaf->selectable = selectable;
++                        leaf->attributes.clear();
++                        for (const auto& flag : mandatory_part_.front()->parenthesized_list)
++                            leaf->attributes.push_back(flag->atom);
++                    }
+                 }
+                 else
+                     throw imap_error("Parsing failure.", "Line=`" + line + "`.");
