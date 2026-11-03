@@ -387,7 +387,7 @@ TestCase {
         app.readerVisible = true
         wait(30)
         compare(findChild(app, "detailsButton"), null)   // 窄宽下「详情」已并入「更多」，不再有独立按钮
-        app.showReview("details")
+        mouseClick(findChild(app, "messageDetailsButton"))
         const details = findChild(app, "messageDetailsPanel")
         verify(details !== null)
         tryCompare(details, "visible", true)

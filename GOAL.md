@@ -1,5 +1,11 @@
 # NkMail local delivery goal
 
+## Reader-local details entry · 2026-11-03
+
+- First incremental feature: removed toolbar details cell, added canonical inline action beside message time, and moved the existing details panel below the mail header. No shared UI material or radius changes.
+- User now authorizes host testing/screenshots. Local Wayland synthetic captures are included; application captures omit compositor-drawn traffic lights. Local UI interaction regression activates the new details entry. Full test results are reported in the PR.
+- Foundation PR #7 holds prior reviewed work; this feature is stacked on that branch. Next: compact reader header and unified message action menus.
+
 ## 下一阶段产品目标：邮件操作、账户接入与导航一致性 · 2026-11-02
 
 本轮完成参考图与代码差距评估并制定目标，尚未开始本节功能实现。参考图只作为信息层级与交互参考；不复制截图内真实邮件、地址或密钥片段。

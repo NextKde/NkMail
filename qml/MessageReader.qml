@@ -17,6 +17,7 @@ Rectangle {
     readonly property color muted: AppTheme.mutedText
     readonly property color rule: AppTheme.border
     signal closeDetailsRequested()
+    signal detailsRequested()
     signal saveAttachmentRequested(int index)
     signal addAccountRequested()
 
@@ -41,6 +42,40 @@ Rectangle {
                     Layout.maximumWidth: Math.max(0, Math.min(MailStyle.readerMaximumWidth, readerScroll.availableWidth - (root.compact ? 48 : 72)))
                     Layout.minimumWidth: 0
                     spacing: 14
+                    Text {
+                        text: MailLabels.value(root.message, "subject") || qsTr("(No subject)")
+                        color: root.ink; font.pixelSize: 25; font.weight: Font.Bold
+                        wrapMode: Text.Wrap; Layout.fillWidth: true; textFormat: Text.PlainText
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true; spacing: 12
+                        Rectangle {
+                            width: 36; height: 36; radius: 18; color: MailStyle.avatar
+                            Text { anchors.centerIn: parent; text: (MailLabels.value(root.message, "sender") || "?").slice(0, 1).toUpperCase(); color: AppTheme.accent; font.pixelSize: 16; font.weight: Font.DemiBold }
+                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true; spacing: 4
+                            Text { text: MailLabels.value(root.message, "sender") || MailLabels.value(root.message, "senderAddress"); color: root.ink; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
+                            Text { text: qsTr("To: ") + MailLabels.value(root.message, "to"); color: root.muted; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text { text: MailLabels.dateLabel(root.message.date, root.localeName); color: root.muted; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight }
+                    LiquidActionButton {
+                        objectName: "messageDetailsButton"
+                        Layout.alignment: Qt.AlignRight
+                        text: qsTr("Message details")
+                        implicitHeight: 20
+                        materialForm: true
+                        cornerRadius: 6
+                        flat: true
+                        font.pixelSize: 11
+                        Accessible.name: text
+                        onClicked: root.detailsVisible ? root.closeDetailsRequested() : root.detailsRequested()
+                    }
+                    }
+                    Rectangle { Layout.fillWidth: true; height: 1; color: root.rule; Layout.topMargin: 4; Layout.bottomMargin: 6 }
                     Item {
                         id: detailsPanel
                         objectName: "messageDetailsPanel"
@@ -107,25 +142,7 @@ Rectangle {
                             color: root.rule
                         }
                     }
-                    Text {
-                        text: MailLabels.value(root.message, "subject") || qsTr("(No subject)")
-                        color: root.ink; font.pixelSize: 25; font.weight: Font.Bold
-                        wrapMode: Text.Wrap; Layout.fillWidth: true; textFormat: Text.PlainText
-                    }
-                    RowLayout {
-                        Layout.fillWidth: true; spacing: 12
-                        Rectangle {
-                            width: 36; height: 36; radius: 18; color: MailStyle.avatar
-                            Text { anchors.centerIn: parent; text: (MailLabels.value(root.message, "sender") || "?").slice(0, 1).toUpperCase(); color: AppTheme.accent; font.pixelSize: 16; font.weight: Font.DemiBold }
-                        }
-                        ColumnLayout {
-                            Layout.fillWidth: true; spacing: 4
-                            Text { text: MailLabels.value(root.message, "sender") || MailLabels.value(root.message, "senderAddress"); color: root.ink; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                            Text { text: qsTr("To: ") + MailLabels.value(root.message, "to"); color: root.muted; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                        }
-                    }
-                    Text { text: MailLabels.dateLabel(root.message.date, root.localeName); color: root.muted; font.pixelSize: 11; Layout.fillWidth: true }
-                    Rectangle { Layout.fillWidth: true; height: 1; color: root.rule; Layout.topMargin: 4; Layout.bottomMargin: 6 }
+
                     RowLayout {
                         objectName: "blockedImagesBar"
                         Layout.fillWidth: true

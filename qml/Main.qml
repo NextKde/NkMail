@@ -454,6 +454,7 @@ ApplicationWindow {
                 compact: window.width < 1100
                 visible: !window.narrow || window.readerVisible
                 Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumWidth: 0
+                onDetailsRequested: window.detailsVisible = !window.detailsVisible
                 onCloseDetailsRequested: window.detailsVisible = false
                 onSaveAttachmentRequested: function(index) { saveAttachmentDialog.attachmentIndex = index; saveAttachmentDialog.open() }
                 onAddAccountRequested: accountDialog.editAccount()
