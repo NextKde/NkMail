@@ -17,3 +17,7 @@ Qt (LGPL/GPL/commercial as applicable to the modules and distribution), QtKeycha
 
 ## Visual references
 Apple Mail user-guide screenshots were consulted for design research only. Apple artwork, branding and screenshots are not redistributed as NkMail assets. Progress screenshots depict NkMail with synthetic data.
+
+## Provider marks
+
+Account setup bundles provider identity images for offline display. Brand rights remain with their owners; no endorsement is implied. Sources are recorded in data/providers/README.md.

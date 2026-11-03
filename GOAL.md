@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Provider logo follow-up · 2026-11-03
+
+- User requested each provider's own logo. Added local provider identity assets, using shared LiquidNavigationButton behavior with an app-owned content layout to preserve brand colors and wide NetEase wordmarks. Other keeps its generic envelope; sources and rights are recorded in data/providers/README.md. No runtime provider requests or shared component edits.
+- Host build and UI suite passed (11.14s), including decoded packaged logo checks for every provider. Catalog/i18n checks and canonical dependency gate passed. Chinese/light and English/dark synthetic Wayland screenshots inspected; wide NetEase logos receive a light backing in dark mode for contrast. Follow-up targets PR #16.
+
 ## Provider presets and protocol compatibility · 2026-11-03
 
 - Continued the interrupted provider-presets task. Added independent ProviderPicker/ProviderProfiles for iCloud, Gmail, QQ, Tencent Exmail, 163, 126, Yahoo, AOL and manual IMAP/SMTP. Unknown custom domains remain manual. Microsoft/Exchange is visibly unavailable; OAuth registration and implementation remain deferred by user choice.

@@ -715,7 +715,20 @@ TestCase {
             "163":"imap.163.com","126":"imap.126.com",yahoo:"imap.mail.yahoo.com",aol:"imap.aol.com"}
         const dialog = findChild(app, "accountDialog")
         dialog.addAccount()
+        function visualChild(item, name) {
+            if (item.objectName === name) return item
+            for (const child of item.children || []) {
+                const found = visualChild(child, name)
+                if (found) return found
+            }
+            return null
+        }
+        const picker = findChild(dialog, "providerChoice")
         for (const provider in expected) {
+            const logo = visualChild(picker, "providerLogo_" + provider)
+            verify(logo !== null, provider)
+            tryCompare(logo, "status", Image.Ready)
+            verify(logo.source.toString().indexOf("qrc:/data/providers/") === 0)
             dialog.step = 0
             findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf(provider)
             dialog.nextStep()
@@ -731,6 +744,8 @@ TestCase {
         findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("microsoft")
         dialog.nextStep()
         compare(dialog.step, 0)
+        tryCompare(visualChild(picker, "providerLogo_microsoft"), "status", Image.Ready)
+        compare(Profiles.logo("manual"), "")
         dialog.close()
     }
     function test_account_wizard_preserves_config_on_failure() {

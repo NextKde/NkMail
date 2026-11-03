@@ -21,3 +21,11 @@ function settings(provider) {
         smtpHost:value[1], smtpPort:value[2], smtpStartTls:value[2] === 587,
         serverSavesSent:provider === 'google', available:provider !== 'microsoft'}
 }
+
+// Packaged assets only: opening account setup must not contact providers.
+function logo(provider) {
+    const files = {icloud:'icloud.ico', google:'google.svg', qq:'qq.png',
+        exmail:'exmail.ico', '163':'163.png', '126':'126.png',
+        yahoo:'yahoo.png', aol:'aol.png', microsoft:'microsoft.ico'}
+    return files[provider] ? 'qrc:/data/providers/' + files[provider] : ''
+}
