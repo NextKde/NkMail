@@ -1,5 +1,12 @@
 # NkMail local delivery goal
 
+## Restore composer NextKde ownership contract · 2026-11-03
+
+- Corrected the reference-driven composer implementation: removed application-owned 22px window corners and border, the leading custom decoration layout and disabled platform adapter. The composer now reuses the inbox WindowChrome/MailWindowControls cooperative path over flush rectangular content planes. Window shape and decoration stay with NextKde/compositor ownership.
+- Floating header actions now use canonical liquid material with an explicit eligible same-window LiquidBackdrop. Embedded formatting controls remain ordinary material. Close confirmation again uses canonical LiquidDialog defaults and unmodified 30px LiquidDialogButton role styling; removed forced opaque mode and custom destructive tint.
+- Recorded the top-level window/material contract in AGENTS.md. Scoped inbox-control tests to their own chrome now that both windows share the canonical component. Added assertions for rectangular content, enabled protocol component, and liquid-action backdrop ownership.
+- Host build and UI/i18n/catalog checks passed (3/3, 15.89s; 43 UI cases). Synthetic Wayland composer and close-decision captures inspected; no capture runtime warnings. Client screenshot exports intentionally omit compositor-owned controls/corners. No KWin/reference code was modified or executed.
+
 ## Compact account setup and provider scrolling · 2026-11-03
 
 - Account-dialog height now follows visible content up to the host-window limit, removing fixed-height blank space. Reduced header/content/footer padding and field spacing. Provider selection shows six rows with a persistent interactive scrollbar on the right.

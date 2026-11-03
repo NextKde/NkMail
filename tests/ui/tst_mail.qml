@@ -412,7 +412,7 @@ TestCase {
         }
     }
     function test_window_controls_geometry_and_takeover() {
-        const controls = findChild(app, "windowControls")
+        const controls = findChild(findChild(app, "windowChrome"), "windowControls")
         const client = findChild(controls, "clientWindowControls")
         const original = controls.platformComponent
         controls.platformComponent = platformControlsMock
@@ -450,7 +450,7 @@ TestCase {
 
     function test_search_has_ten_pixel_gap_to_traffic_lights() {
         const toolbar = findChild(app, "readerHeader")
-        const controls = findChild(app, "windowControls")
+        const controls = findChild(findChild(app, "windowChrome"), "windowControls")
         for (const width of [1000, 1180, 1320, 1600]) {
             toolbar.closeSearch()
             app.width = width
@@ -475,7 +475,7 @@ TestCase {
         const contentPlane = findChild(app, "contentPlane")
         const backdrop = findChild(app, "chromeBackdrop")
         const chrome = findChild(app, "windowChrome")
-        const controls = findChild(app, "windowControls")
+        const controls = findChild(findChild(app, "windowChrome"), "windowControls")
         verify(planes !== null)
         verify(sidebarPlane !== null)
         verify(contentPlane !== null)
@@ -548,7 +548,7 @@ TestCase {
         const sidebar = findChild(app, "sidebarBody")
         const list = findChild(app, "messagePane")
         const reader = findChild(app, "messageReader")
-        const controls = findChild(app, "windowControls")
+        const controls = findChild(findChild(app, "windowChrome"), "windowControls")
         const listHeader = findChild(app, "listHeader")
         const readerHeader = findChild(app, "readerHeader")
         compare(findChild(app, "statusStrip"), null)
@@ -760,6 +760,18 @@ TestCase {
         verify(editor.contentItem.Window.window === editor)
         verify(editor.contentItem.Window.window !== app)
         compare(editor.modality, Qt.NonModal)
+        const surface = findChild(editor, "composerSurface")
+        compare(surface.radius, 0)
+        compare(surface.border.width, 0)
+        const chrome = findChild(editor, "composerWindowChrome")
+        verify(chrome !== null)
+        const controls = findChild(chrome, "windowControls")
+        compare(controls.targetWindow, editor)
+        verify(controls.platformComponent !== null)
+        const backdrop = findChild(editor, "composerBackdrop")
+        compare(findChild(editor, "sendDraftButton").shellBackdrop, backdrop)
+        compare(findChild(editor, "sendDraftButton").floatingAction, true)
+        compare(findChild(editor, "composerActionGroupSurface").materialForm, !editor.liquidControls)
         editor.width = 1000; editor.height = 800
         compare(editor.width, 1000)
         compare(editor.height, 800)

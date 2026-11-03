@@ -1,6 +1,6 @@
 # Independent mail composer · 2026-11-03
 
-The composer now opens as a separate nonmodal window with close/minimize/maximize controls and resize handles. Its layout follows the supplied macOS Mail reference: a compact top action strip, full-width address/subject rows, a horizontal format strip, and an expanding unboxed editor. The existing canonical Kos.Ui controls remain pinned and unchanged.
+The composer now opens as a separate nonmodal window with close/minimize/maximize controls and resize handles. Its content layout follows the supplied macOS Mail reference: a compact top action strip, full-width address/subject rows, a horizontal format strip, and an expanding unboxed editor. Window shape/decorations follow the inbox NextKde contract, using a flush rectangular content surface and canonical WindowChrome/MailWindowControls with compositor takeover enabled. Floating header controls use shared liquid actions backed by a same-window LiquidBackdrop; embedded format controls and confirmation interiors use ordinary material. The existing canonical Kos.Ui dependency remains pinned and unchanged.
 
 Closing the composer offers Save / Don’t Save / Cancel. Save failure keeps the content available. Don’t Save deletes the local draft and stops autosave. Active or pending sends block close/discard; accepted sends close only the matching draft. Switching accounts disables editing until the original account is active again. Local drafts also expose a confirmed trash action in the list.
 
@@ -11,3 +11,5 @@ Validation: the user explicitly authorized host testing for this iteration. Host
 - `compose-light.png`: independent composer, light appearance.
 - `compose-dark.png`: independent composer, dark appearance.
 - `compose-close.png`: Save / Don’t Save / Cancel decision.
+
+The original screenshots in this folder record the initial composer iteration. The corrected NextKde-conforming window and close-decision captures are in `../2026-11-03-composer-contract/`. Application screenshot exports capture client pixels; compositor-owned window corners/decorations are not baked into those images.

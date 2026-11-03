@@ -11,7 +11,6 @@ Item {
     property alias buttonWidth: controls.buttonWidth
     property alias buttonHeight: controls.buttonHeight
     property alias spacing: controls.spacing
-    property alias layoutDirection: controls.layoutDirection
     property Component platformComponent: Qt.createComponent("qrc:/nkmail/platform/NativeWindowControls.qml")
     property var platformSlot: null
     readonly property bool compositorActive: platformSlot !== null && platformSlot.active

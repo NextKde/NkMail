@@ -30,22 +30,17 @@ ApplicationWindow {
     flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
     color: "transparent"
     title: subjectField.text.trim() || qsTr("New message")
-    background: Rectangle {
-        radius: root.visibility === Window.Maximized ? 0 : 22
-        color: AppTheme.windowSurface
-        border.width: root.visibility === Window.Maximized ? 0 : 1
-        border.color: AppTheme.border
-    }
+    background: Item {}
+    readonly property bool liquidControls: AppTheme.materialMode !== "solid"
+        && !AppTheme.reduceTransparency && GraphicsInfo.api !== GraphicsInfo.Software
     font.family: "sans-serif"
     font.pixelSize: 13
 
-    component ComposerAction: LiquidActionButton {
-        materialForm: true
-        implicitHeight: 32
+    component ComposerAction: MailAction {
+        toolbarAction: false
+        implicitHeight: 28
         implicitWidth: iconOnly ? 32 : Math.max(44, contentItem.implicitWidth + leftPadding + rightPadding)
-        focusPolicy: Qt.NoFocus
-        Accessible.name: text
-        KosToolTip { target: parent; text: parent.Accessible.name }
+        accessibleText: text
     }
     component AddressField: TextField {
         Layout.fillWidth: true
@@ -71,6 +66,10 @@ ApplicationWindow {
         color: AppTheme.border
     }
 
+    function toggleMaximized() {
+        if (visibility === Window.Maximized) showNormal()
+        else showMaximized()
+    }
     function copy(map) { return JSON.parse(JSON.stringify(map || {})) }
     function editDraft(value) {
         if (visible && !persist()) return false
@@ -186,38 +185,45 @@ ApplicationWindow {
     Item {
         id: composeScene
         anchors.fill: parent
-        anchors.margins: root.visibility === Window.Maximized ? 0 : 1
+        // Same ownership as Main.qml: flush content planes, no client-side
+        // window radius, clipping, outline or decoration shadow.
+        Item {
+            id: composerPlanes
+            objectName: "composerPlanes"
+            anchors.fill: parent
+            Rectangle { objectName: "composerSurface"; anchors.fill: parent; color: AppTheme.contentBackground; border.width: 0 }
+        }
+        LiquidBackdrop {
+            id: composerBackdrop
+            objectName: "composerBackdrop"
+            sourceItem: composerPlanes
+            registerAsDefault: false
+            active: root.liquidControls
+        }
         ColumnLayout {
             anchors.fill: parent
             spacing: 0
             Item {
-                Layout.fillWidth: true; Layout.preferredHeight: 62
-                MouseArea {
+                Layout.fillWidth: true; Layout.preferredHeight: MailStyle.shellHeaderHeight
+                WindowChrome {
+                    id: composerChrome
+                    objectName: "composerWindowChrome"
                     anchors.fill: parent
-                    onPressed: root.startSystemMove()
-                    onDoubleClicked: {
-                        if (root.visibility === Window.Maximized) root.showNormal()
-                        else root.showMaximized()
-                    }
-                }
-                MailWindowControls {
-                    id: windowControls
                     targetWindow: root
-                    maximizeMode: true
-                    // Native protocol adapters assume the inbox's right-side order;
-                    // this window uses the canonical fallback controls on the left.
-                    platformComponent: null
-                    layoutDirection: Qt.RightToLeft
-                    circleSize: 13; buttonWidth: 22; buttonHeight: 28; spacing: 3
-                    anchors.left: parent.left; anchors.leftMargin: 17
-                    anchors.verticalCenter: parent.verticalCenter
                 }
                 RowLayout {
-                    anchors.centerIn: parent
+                    anchors.left: parent.left; anchors.leftMargin: 18
+                    anchors.verticalCenter: parent.verticalCenter
                     spacing: 10
                     Item {
-                        implicitWidth: headerActions.implicitWidth; implicitHeight: 32
-                        LiquidActionButton { anchors.fill: parent; materialForm: true; enabled: false; Accessible.ignored: true }
+                        implicitWidth: headerActions.implicitWidth; implicitHeight: headerActions.implicitHeight
+                        LiquidActionButton {
+                            objectName: "composerActionGroupSurface"
+                            anchors.fill: parent
+                            materialForm: !root.liquidControls
+                            backdrop: composerBackdrop
+                            enabled: false; Accessible.ignored: true
+                        }
                         Row {
                             id: headerActions
                             ComposerAction { flat: true; text: qsTr("Undo"); iconOnly: true; iconName: "undo"; enabled: root.editable && bodyField.canUndo; onClicked: bodyField.undo() }
@@ -227,6 +233,7 @@ ApplicationWindow {
                     }
                     ComposerAction {
                         text: qsTr("Attach file…"); iconOnly: true
+                        floatingAction: true; shellBackdrop: composerBackdrop
                         enabled: root.editable
                         contentItem: Item {
                             Image {
@@ -239,22 +246,23 @@ ApplicationWindow {
                         }
                         onClicked: attachmentDialog.open()
                     }
-                    ComposerAction { text: qsTr("Bcc"); checkable: true; checked: root.showBcc; enabled: root.editable; onClicked: root.showBcc = !root.showBcc }
+                    ComposerAction { floatingAction: true; shellBackdrop: composerBackdrop; text: qsTr("Bcc"); checkable: true; checked: root.showBcc; enabled: root.editable; onClicked: root.showBcc = !root.showBcc }
                 }
                 ComposerAction {
                     objectName: "sendDraftButton"
-                    anchors.right: parent.right; anchors.rightMargin: 18
+                    anchors.right: parent.right
+                    anchors.rightMargin: composerChrome.controlsReservedWidth + 12
                     anchors.verticalCenter: parent.verticalCenter
-                    implicitWidth: 40; implicitHeight: 40
-                    highlighted: true
+                    implicitWidth: 28; implicitHeight: 28
+                    floatingAction: true; shellBackdrop: composerBackdrop
                     text: root.mail.sendPending ? qsTr("撤销发送") : root.mail.sending ? qsTr("Sending…") : qsTr("Send")
                     enabled: root.mail.sendPending ? true : (root.editable && !root.mail.busy && !root.mail.demo && root.mail.configured
                         && (toField.text.trim().length > 0 || ccField.text.trim().length > 0 || bccField.text.trim().length > 0)
                         && ["unknown", "accepted", "sending"].indexOf(root.draft.state) < 0)
                     contentItem: Text {
                         text: root.mail.sendPending ? "↶" : "↑"
-                        font.pixelSize: 27
-                        color: parent.enabled ? "white" : AppTheme.disabledText
+                        font.pixelSize: 21
+                        color: parent.textColor
                         horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
                     }
                     onClicked: { if (root.mail.sendPending) root.mail.cancelSend(); else if (root.persist()) root.mail.sendDraft(root.currentDraft()) }
@@ -431,7 +439,6 @@ ApplicationWindow {
         objectName: "composerCloseDecision"
         parent: Overlay.overlay
         sourceItem: composeScene
-        reduceTransparency: true
         width: Math.min(360, root.width - 48)
         anchors.centerIn: parent
         title: qsTr("Save this message as a draft?")
@@ -453,23 +460,21 @@ ApplicationWindow {
             }
             LiquidDialogButton {
                 objectName: "composerSaveAndClose"
-                Layout.fillWidth: true; implicitHeight: 36
+                Layout.fillWidth: true; implicitHeight: 30
                 text: qsTr("Save"); primaryAction: true
                 enabled: root.accountMatches && !root.mail.sending && !root.mail.sendPending
                 onClicked: root.finishEditing()
             }
             LiquidDialogButton {
                 objectName: "composerDiscardAndClose"
-                Layout.fillWidth: true; implicitHeight: 36
+                Layout.fillWidth: true; implicitHeight: 30
                 text: qsTr("Don't Save"); destructive: true
-                // The reference uses a tinted destructive action in the close decision.
-                surfaceColor: AppTheme.withAlpha(AppTheme.destructive, AppTheme.dark ? 0.22 : 0.16)
                 enabled: root.editable
                 onClicked: root.discardAndClose()
             }
             LiquidDialogButton {
                 objectName: "composerCancelClose"
-                Layout.fillWidth: true; implicitHeight: 36
+                Layout.fillWidth: true; implicitHeight: 30
                 text: qsTr("Cancel")
                 onClicked: { closeDecision.close(); if (root.dirty) autosave.restart() }
             }
