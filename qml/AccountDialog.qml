@@ -121,11 +121,32 @@ LiquidDialog {
                     : qsTr("Connect one account with an application password. TLS certificate verification is always enabled.")
                 color: AppTheme.mutedText; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap
             }
-            SettingsGroup {
+            Text {
                 visible: root.step < 2
-                title: root.step === 0 ? qsTr("Enter your email address") : qsTr("Identity")
+                text: root.step === 0 ? qsTr("Enter your email address") : qsTr("Email")
+                Layout.fillWidth: true
+                color: AppTheme.text
+                font.pixelSize: 13
+                font.weight: Font.DemiBold
+            }
+            KosTextField {
+                id: addressField
+                objectName: "accountAddress"
+                visible: root.step < 2
+                Layout.fillWidth: true
+                implicitHeight: MailStyle.fieldHeight
+                cornerRadius: height / 2
+                specificationForm: true
+                enabled: !root.submitting
+                readOnly: root.mail.demo || root.submitting
+                Accessible.name: qsTr("Email")
+                placeholderText: qsTr("Enter you@example.com")
+                onTextEdited: providerChoice.currentIndex = Profiles.indexForAddress(text)
+            }
+            SettingsGroup {
+                visible: root.step === 1
+                title: qsTr("Identity")
                 SettingsItem { visible: root.step === 1; title: qsTr("Name"); KosTextField { id: nameField; objectName: "accountName"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Name") } }
-                SettingsItem { title: qsTr("Email"); KosTextField { id: addressField; objectName: "accountAddress"; onTextEdited: providerChoice.currentIndex = Profiles.indexForAddress(text); Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Email"); placeholderText: "you@example.invalid" } }
                 SettingsItem { visible: root.step === 1; title: qsTr("Username"); KosTextField { id: usernameField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Username") } }
                 SettingsItem {
                     visible: root.step === 1; title: qsTr("App password"); description: qsTr("Stored passwords are never displayed.")

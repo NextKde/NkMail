@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Account address input layout · 2026-11-03
+
+- Removed the indented SettingsGroup label/row for email. A left-aligned heading now sits over one full-width shared text field, with Chinese placeholder `请输入you@example.com`. The same address field continues to drive provider selection and saved configuration.
+- Host build, UI, i18n and translation checks passed (3/3, 11.07s); synthetic screenshot inspected.
+
 ## iCloud logo clarity · 2026-11-03
 
 - Replaced the low-resolution ICO with Apple’s 180×180 touch icon, resolving its URL against the iCloud page’s HTML base. Display geometry stays unchanged; the bundled asset remains offline. Host build and UI regression passed (11.19s); updated screenshot inspected.

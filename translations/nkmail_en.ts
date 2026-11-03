@@ -3,6 +3,10 @@
     <context>
         <name>AccountDialog</name>
         <message>
+            <source>Enter you@example.com</source>
+            <translation>Enter you@example.com</translation>
+        </message>
+        <message>
             <location filename="../qml/AccountDialog.qml" line="16" />
             <source>Mail account</source>
             <translation>Mail account</translation>
