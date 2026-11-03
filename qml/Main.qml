@@ -105,7 +105,7 @@ ApplicationWindow {
         const folders = mail.folders || []
         for (let i = 0; i < folders.length; ++i)
             if (folders[i].id === mail.currentFolder) return mailboxTitle(folders[i])
-        return mail.currentFolder || qsTr("Inbox")
+        return mailboxTitle({id: mail.currentFolder || "INBOX"})
     }
     function dateLabel(date) { return MailLabels.dateLabel(date) }
     function compose(mode) {
@@ -451,7 +451,6 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 onMessageOpened: window.readerVisible = true
                 onComposeRequested: function(mode) { window.compose(mode) }
-                onAddAccountRequested: accountDialog.editAccount()
                 onEditDraftRequested: function(draftId) { composer.editDraft(mail.loadDraft(draftId)) }
             }
 
@@ -470,7 +469,6 @@ ApplicationWindow {
                 onDetailsRequested: window.detailsVisible = !window.detailsVisible
                 onCloseDetailsRequested: window.detailsVisible = false
                 onSaveAttachmentRequested: function(index) { saveAttachmentDialog.attachmentIndex = index; saveAttachmentDialog.open() }
-                onAddAccountRequested: accountDialog.editAccount()
             }
 
         }

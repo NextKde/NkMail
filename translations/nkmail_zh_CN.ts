@@ -1103,11 +1103,6 @@
             <translation>草稿箱</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="108" />
-            <source>Inbox</source>
-            <translation>收件箱</translation>
-        </message>
-        <message>
             <location filename="../qml/Main.qml" line="129" />
             <source>A few thoughts for Friday</source>
             <translation>关于周五的一些想法</translation>
@@ -1437,11 +1432,6 @@ Alex
             <translation>显示全部缓存邮件</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="252" />
-            <source>Add an account</source>
-            <translation>添加账号</translation>
-        </message>
-        <message>
             <location filename="../qml/MessagePane.qml" line="267" />
             <location filename="../qml/MessagePane.qml" line="272" />
             <source>Untitled draft</source>
@@ -1569,11 +1559,6 @@ Alex
             <location filename="../qml/MessageReader.qml" line="198" />
             <source>Select a message to read it here.</source>
             <translation>选择一封邮件，在这里阅读。</translation>
-        </message>
-        <message>
-            <location filename="../qml/MessageReader.qml" line="199" />
-            <source>Add an account</source>
-            <translation>添加账号</translation>
         </message>
     </context>
     <context>

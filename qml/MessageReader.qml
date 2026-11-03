@@ -20,7 +20,6 @@ Rectangle {
     signal closeDetailsRequested()
     signal detailsRequested()
     signal saveAttachmentRequested(int index)
-    signal addAccountRequested()
 
     objectName: "messageReader"
     color: "transparent"
@@ -196,7 +195,6 @@ Rectangle {
                 anchors.centerIn: parent; spacing: 12; width: Math.min(310, parent.width - 48)
                 Text { width: parent.width; text: root.draftsVisible ? qsTr("Pick up where you left off.") : qsTr("A moment of quiet."); color: root.muted; font.pixelSize: 22; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap }
                 Text { width: parent.width; text: root.draftsVisible ? qsTr("Choose a draft to continue writing.") : qsTr("Select a message to read it here."); color: root.muted; font.pixelSize: 12; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap }
-                MailAction { anchors.horizontalCenter: parent.horizontalCenter; visible: !mail.configured && !mail.demo; text: qsTr("Add an account"); onClicked: root.addAccountRequested() }
             }
         }
     }

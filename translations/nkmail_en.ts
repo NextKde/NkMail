@@ -1103,11 +1103,6 @@
             <translation>Drafts</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="108" />
-            <source>Inbox</source>
-            <translation>Inbox</translation>
-        </message>
-        <message>
             <location filename="../qml/Main.qml" line="129" />
             <source>A few thoughts for Friday</source>
             <translation>A few thoughts for Friday</translation>
@@ -1437,11 +1432,6 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation>Show all cached messages</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="252" />
-            <source>Add an account</source>
-            <translation>Add an account</translation>
-        </message>
-        <message>
             <location filename="../qml/MessagePane.qml" line="267" />
             <location filename="../qml/MessagePane.qml" line="272" />
             <source>Untitled draft</source>
@@ -1569,11 +1559,6 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../qml/MessageReader.qml" line="198" />
             <source>Select a message to read it here.</source>
             <translation>Select a message to read it here.</translation>
-        </message>
-        <message>
-            <location filename="../qml/MessageReader.qml" line="199" />
-            <source>Add an account</source>
-            <translation>Add an account</translation>
         </message>
     </context>
     <context>

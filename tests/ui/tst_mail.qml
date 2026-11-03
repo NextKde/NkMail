@@ -129,7 +129,7 @@ TestCase {
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
         mock.refreshCount = 0; mock.search = ""
         mock.drafts = []; mock.sendPending = false
-        mock.smartMailbox = ""; mock.sending = false; mock.busy = false; mock.demo = true; mock.error = ""
+        mock.configured = true; mock.smartMailbox = ""; mock.sending = false; mock.busy = false; mock.demo = true; mock.error = ""
         app = createTemporaryObject(appComponent, testCase, {mail: mock})
         verify(app !== null)
         wait(80)
@@ -142,6 +142,34 @@ TestCase {
     function activateApp() {
         app.requestActivate()
         wait(40)
+    }
+    function test_empty_profile_uses_localized_title_and_sidebar_account_entry() {
+        const folders = mock.folders
+        const accounts = mock.accounts
+        const selectedUid = mock.selectedUid
+        try {
+            mock.configured = false
+            mock.demo = false
+            mock.folders = []
+            mock.accounts = []
+            mock.selectedUid = ""
+            compare(app.folderTitle(), App.MailLabels.mailboxTitle({id: "INBOX"}))
+            verify(app.folderTitle() !== "INBOX")
+            compare(findChild(app, "messageEmptyState").actionText, "")
+            const addAccount = findChild(app, "addAccountButton")
+            verify(addAccount.visible)
+            mouseClick(addAccount)
+            tryCompare(findChild(app, "accountDialog"), "visible", true)
+            mock.currentFolder = "Projects"
+            compare(app.folderTitle(), "Projects")
+        } finally {
+            mock.configured = true
+            mock.demo = true
+            mock.folders = folders
+            mock.accounts = accounts
+            mock.selectedUid = selectedUid
+            mock.currentFolder = "INBOX"
+        }
     }
     function test_local_draft_delete_cancel_and_confirm() {
         activateApp()

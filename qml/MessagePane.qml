@@ -20,7 +20,6 @@ Rectangle {
     readonly property color hoverSurface: AppTheme.cardHover
     signal messageOpened()
     signal composeRequested(string mode)
-    signal addAccountRequested()
     signal editDraftRequested(string draftId)
 
     function showReviewMenu() {
@@ -264,11 +263,8 @@ Rectangle {
                 objectName: "messageEmptyState"
                 title: mail.busy ? qsTr("Getting your mail…") : mail.search ? qsTr("No cached matches") : mail.unreadOnly ? qsTr("No unread messages in cached mail") : mail.configured || mail.demo ? qsTr("No messages here") : qsTr("Welcome to your new inbox")
                 description: mail.busy ? "" : mail.unreadOnly ? qsTr("Only cached unread messages are shown. Clear the filter to browse all messages.") : mail.search ? qsTr("Try a different search term.") : mail.configured || mail.demo ? qsTr("There is nothing to show in this mailbox yet.") : qsTr("Add an account to start reading mail locally.")
-                actionText: mail.unreadOnly ? qsTr("Show all cached messages") : !mail.configured && !mail.demo ? qsTr("Add an account") : ""
-                onActionTriggered: {
-                    if (mail.unreadOnly) mail.unreadOnly = false
-                    else root.addAccountRequested()
-                }
+                actionText: mail.unreadOnly ? qsTr("Show all cached messages") : ""
+                onActionTriggered: mail.unreadOnly = false
             }
         }
         ListView {

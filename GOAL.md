@@ -432,3 +432,9 @@ The scoped local implementation is substantially complete, but real-provider rea
 - Reduced the sidebar Mail heading from 24px Bold to 15px DemiBold; aligned it with the existing top-row controls and reserved space for the shared sidebar toggle. No dependency or mail behavior changes.
 - Fresh default pinned-source VM build succeeded. VM CTest `nkmail_ui`, `nkmail_i18n`, and `nkmail_translations`: 3/3 passed. Actual synthetic X11/GPU screenshots inspected at 1240px light/Chinese and dark/English, plus 900px Chinese. No heading/control overlap observed. Nested Wayland screenshot attempts returned “Preview window is not exposed”; Wayland visual acceptance is not claimed. No real mailbox was accessed.
 - Rebuilt the existing host `build-clean/nkmail` entry without launching it or running tests. Its existing sibling Kos.Ui development override was preserved; default-source validation refers to the separate VM build. No commit, publication or dependency upgrade performed.
+
+## Empty inbox review · 2026-11-03
+
+- Fixed the header fallback to resolve `INBOX` through the existing localized mailbox labels when the folder list is empty. Custom folder names remain unchanged.
+- Kept account creation in the sidebar and removed duplicate account buttons and unused signals from the message list and reader. The list's cached-unread reset action remains available. Removed obsolete translation entries from both catalogs.
+- Added a UI regression for the empty-account folder fallback, sidebar add-account dialog opening, absence of the list add-account action, and custom folder naming. VM default pinned-source build succeeded; UI/i18n/catalog checks passed 3/3 in 38.55 seconds (48 UI cases including init/cleanup). No host build, tests or GUI execution performed.
