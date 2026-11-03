@@ -37,6 +37,8 @@ TestCase {
         property bool hasMore: false
         property string search: ""
         property bool failSave: false
+        property var lastContextRows: []
+        function deleteMessages(rows) { lastContextRows = rows }
         property int deletedRow: -1
         function deleteMessage(row) { deletedRow = row }
         property int refreshCount: 0
@@ -124,6 +126,52 @@ TestCase {
         app.requestActivate()
         wait(40)
     }
+    function test_context_delete_preserves_selected_rows() {
+        const pane = findChild(app, "messagePane")
+        const list = findChild(app, "messageList")
+        const second = Object.assign({}, messageModel.get(0), {uid: "2"})
+        messageModel.append(second)
+        wait(30)
+        try {
+            pane.selection.toggleRow(0)
+            pane.selection.toggleRow(1)
+            const row = list.itemAtIndex(0)
+            row.openContextMenu()
+            verify(row.bulkMenu)
+            verify(!row.canCompose)
+            row.contextCommand("delete")
+            compare(mock.lastContextRows.join(","), "0,1")
+            pane.selection.clearSelection()
+            pane.selection.toggleRow(1)
+            row.openContextMenu()
+            compare(pane.selection.selectionSize, 0)
+            row.contextCommand("delete")
+            compare(mock.lastContextRows.join(","), "0")
+        } finally {
+            messageModel.remove(1)
+        }
+    }
+
+    function test_context_reply_waits_for_matching_content() {
+        activateApp()
+        const pane = findChild(app, "messagePane")
+        pane.showReviewMenu()
+        wait(30)
+        const reply = findChild(app, "messageList").itemAtIndex(0)
+        verify(reply !== null)
+        verify(reply.canCompose)
+        const previous = mock.selectedMessage
+        mock.selectedMessage = ({uid: "different", uidValidity: "1"})
+        verify(!reply.canCompose)
+        mock.selectedMessage = ({uid: "1", uidValidity: "other"})
+        verify(!reply.canCompose)
+        mock.selectedMessage = previous
+        mock.sending = true
+        verify(!reply.canCompose)
+        mock.sending = false
+        verify(reply.canCompose)
+    }
+
     function test_tray_close_keeps_window_and_sending_alive() {
         app.desktop = desktopMock; desktopMock.hides = 0
         mock.sending = true

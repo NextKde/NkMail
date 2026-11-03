@@ -116,6 +116,7 @@ ApplicationWindow {
         moreMenu.close(); listOptions.close(); window.detailsVisible = false; accountDialog.close()
         if (composer.visible && !composer.finishEditing()) return
         draftsVisible = false
+        if (scenario === "message-menu") { messagePane.showReviewMenu(); return }
         if (scenario === "compose") {
             const sample = mail.newDraft("new")
             if (!sample || !sample.id) return
@@ -438,6 +439,7 @@ ApplicationWindow {
                 Layout.fillWidth: window.narrow
                 Layout.fillHeight: true
                 onMessageOpened: window.readerVisible = true
+                onComposeRequested: function(mode) { window.compose(mode) }
                 onAddAccountRequested: accountDialog.editAccount()
                 onEditDraftRequested: function(draftId) { composer.editDraft(mail.loadDraft(draftId)) }
             }

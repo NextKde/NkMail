@@ -18,9 +18,15 @@ Rectangle {
     readonly property color selectedSurface: AppTheme.withAlpha(AppTheme.accent, AppTheme.dark ? 0.18 : 0.10)
     readonly property color hoverSurface: AppTheme.cardHover
     signal messageOpened()
+    signal composeRequested(string mode)
     signal addAccountRequested()
     signal editDraftRequested(string draftId)
 
+    function showReviewMenu() {
+        if (!mail.demo) return
+        const row = messageList.itemAtIndex(0)
+        if (row) row.openContextMenu()
+    }
     objectName: "messagePane"
     color: "transparent"
     ColumnLayout {
@@ -62,6 +68,28 @@ Rectangle {
                 readonly property bool multiSelected: root.selection.isRowSelected(index)
                 readonly property int messageIndex: (mail.messages && typeof mail.messages.indexOf === "function")
                     ? mail.messages.indexOf(mail.currentFolder, uidValidity, uid) : -1
+                readonly property bool bulkMenu: root.selection.isRowSelected(index) && root.selection.selectionSize > 1
+                readonly property bool canCompose: !bulkMenu && !mail.sending
+                    && mail.selectedMessage.uid === uid && mail.selectedMessage.uidValidity === uidValidity
+                function composeMessage(mode) {
+                    if (!canCompose) return
+                    rowMenu.close()
+                    root.composeRequested(mode)
+                }
+                function contextCommand(action, value) {
+                    if (messageIndex < 0) return
+                    const rows = bulkMenu ? root.selection.selectedIndexList() : [messageIndex]
+                    if (action === "read") mail.setMessagesRead(rows, value)
+                    else if (action === "flag") mail.setMessagesFlagged(rows, value)
+                    else if (action === "archive") mail.archiveMessages(rows)
+                    else if (action === "delete") mail.deleteMessages(rows)
+                    else if (action === "move") mail.moveMessages(rows, value)
+                }
+                function openContextMenu() {
+                    if (!root.selection.isRowSelected(index)) root.selection.clearSelection()
+                    selectRow()
+                    rowMenu.openAtAnchor()
+                }
                 function selectRow() { mail.openMessage(uid, uidValidity); root.messageOpened() }
                 function openRow() {
                     selectRow()
@@ -82,7 +110,7 @@ Rectangle {
                 }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    onTapped: { messageRow.selectRow(); rowMenu.openAtAnchor() }
+                    onTapped: messageRow.openContextMenu()
                 }
                 LiquidPopover {
                     id: rowMenu
@@ -90,16 +118,20 @@ Rectangle {
                     sourceItem: root.surface
                     anchorItem: messageRow
                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
-                    LiquidPopoverItem { text: qsTr("打开"); iconName: "reminder"; onTriggered: messageRow.openRow() }
+                    LiquidPopoverItem { text: qsTr("打开"); iconName: "reminder"; enabled: !messageRow.bulkMenu; onTriggered: messageRow.openRow() }
+                    LiquidPopoverItem { objectName: "rowReply"; text: qsTr("Reply"); iconName: "undo"; enabled: messageRow.canCompose; onTriggered: messageRow.composeMessage("reply") }
+                    LiquidPopoverItem { objectName: "rowReplyAll"; text: qsTr("Reply to all"); iconName: "arrows"; enabled: messageRow.canCompose; onTriggered: messageRow.composeMessage("replyAll") }
+                    LiquidPopoverItem { objectName: "rowForward"; text: qsTr("Forward"); iconName: "forward"; enabled: messageRow.canCompose; onTriggered: messageRow.composeMessage("forward") }
+                    Rectangle { implicitHeight: 1; Layout.fillWidth: true; color: root.rule }
                     LiquidPopoverItem {
                         text: messageRow.unread ? qsTr("标为已读") : qsTr("标为未读")
                         iconName: messageRow.unread ? "envelopeOpen" : "envelope"
-                        onTriggered: mail.setMessageRead(messageRow.messageIndex, messageRow.unread)
+                        onTriggered: messageRow.contextCommand("read", messageRow.unread)
                     }
                     LiquidPopoverItem {
                         text: messageRow.flagged ? qsTr("移除旗标") : qsTr("添加旗标")
                         iconName: "flag"
-                        onTriggered: mail.toggleFlagged(messageRow.messageIndex)
+                        onTriggered: messageRow.contextCommand("flag", !messageRow.flagged)
                     }
                     LiquidPopoverItem {
                         objectName: "moveToMenuItem"
@@ -108,8 +140,8 @@ Rectangle {
                         enabled: mail.folders.filter(f => f.id !== mail.currentFolder).length > 0
                         onTriggered: { rowMenu.close(); messageMoveMenu.openAtAnchor() }
                     }
-                    LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; onTriggered: mail.archiveMessage(messageRow.messageIndex) }
-                    LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; onTriggered: mail.deleteMessage(messageRow.messageIndex) }
+                    LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; onTriggered: messageRow.contextCommand("archive") }
+                    LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; onTriggered: messageRow.contextCommand("delete") }
                 }
                 LiquidPopover {
                     id: messageMoveMenu
@@ -124,7 +156,7 @@ Rectangle {
                             iconName: "folder"
                             onTriggered: {
                                 messageMoveMenu.close()
-                                mail.moveMessage(messageRow.messageIndex, modelData.id)
+                                messageRow.contextCommand("move", modelData.id)
                             }
                         }
                     }

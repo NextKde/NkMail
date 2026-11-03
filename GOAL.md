@@ -1,5 +1,11 @@
 # NkMail local delivery goal
 
+## Message context actions · 2026-11-03
+
+- Added reply/reply-all/forward group to the existing liquid context menu. Compose actions require matching loaded UID and UIDVALIDITY and are unavailable during sending or multi-selection. Existing command service handles single/batch read, flag, move, archive and delete through the same bulk entry points. Right-click outside the selection clears stale batch targets.
+- Local UI and catalog regression passed 2/2 in 8.66s, including multi-selection targeting and stale/missing content gating. Synthetic Wayland menu screenshot inspected; no shared style changes.
+- Remaining planned work: optional list avatars, account setup wizard, navigation counts/roles and on-demand sync status.
+
 ## Reader-local details entry · 2026-11-03
 
 - First incremental feature: removed toolbar details cell, added canonical inline action beside message time, and moved the existing details panel below the mail header. No shared UI material or radius changes.
