@@ -50,8 +50,10 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     connect(m_send, &SendService::status, this, &MailController::setStatus);
     m_images = new RemoteImageLoader(this);
     connect(m_images, &RemoteImageLoader::loaded, this, [this](const QString &key, const QString &html) {
-        if (key != RemoteImageLoader::key(m_account.id, m_content.summary)) return;
-        m_content.html = html; m_selected = contentMap(m_content); emit selectionChanged();
+        if (key != RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion)) return;
+        if (!m_content.displayHtml.isEmpty()) m_content.displayHtml = html;
+        else m_content.html = html;
+        m_selected = contentMap(m_content); emit selectionChanged();
     });
     m_commands = new MailboxCommands(*m_database, m_transport, this);
     connect(m_commands, &MailboxCommands::completed, this, [this](const QList<Summary> &messages, bool removed, const QString &error) {
@@ -626,23 +628,31 @@ void MailController::fetchPage(bool append, bool quiet) {
 
 void MailController::present(const Content &content) {
     m_content = content;
-    m_content.html = m_images->cached(RemoteImageLoader::key(m_account.id, content.summary), content.html);
+    const auto key = RemoteImageLoader::key(m_account.id, content.summary, content.bodyFormatVersion);
+    if (!content.displayHtml.isEmpty()) m_content.displayHtml = m_images->cached(key, content.displayHtml);
+    else m_content.html = m_images->cached(key, content.html);
     m_selectedUid = content.summary.uid; m_selected = contentMap(m_content);
     emit selectionChanged();
 }
 int MailController::blockedImageCount() const {
-    return int(m_content.html.count(QStringLiteral("data-nkmail-src=\"")));
+    const auto &html = m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml;
+    return int(html.count(QStringLiteral("data-nkmail-src=\"")));
 }
 void MailController::loadRemoteImages() {
-    m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary), m_content.html);
+    m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion), m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml);
 }
 void MailController::openMessage(const QString &uid, const QString &validity, const QString &sourceFolder) {
     const auto folder = sourceFolder.isEmpty() ? m_folder : sourceFolder;
     if (!m_smartMailbox.isEmpty() && m_messages->indexOf(folder, validity, uid) < 0) return;
     if (m_commands->busy()) return;
     const auto selectionGeneration = ++m_selectionGeneration;
-    if (auto cached = m_database->content(folder, validity, uid)) { present(*cached); return; }
-    m_selectedUid = uid; m_selected.clear(); m_content = {}; emit selectionChanged();
+    bool upgrading = false;
+    if (auto cached = m_database->content(folder, validity, uid)) {
+        present(*cached);
+        if (cached->bodyFormatVersion >= 1 || m_demo || m_account.password.isEmpty()) return;
+        upgrading = true; // Re-read only this selected message with PEEK; keep cache visible.
+    }
+    if (!upgrading) { m_selectedUid = uid; m_selected.clear(); m_content = {}; emit selectionChanged(); }
     if (m_demo || m_account.password.isEmpty()) { setStatus(tr("This message is not cached"), tr("Connect to download its content.")); return; }
     const auto generation = m_generation; const auto account = m_account;
     setStatus(tr("Loading message without changing server flags…"));

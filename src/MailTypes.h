@@ -26,6 +26,8 @@ struct Attachment { QString name, mimeType, path; qint64 size = 0; QByteArray by
 struct Content {
     Summary summary;
     QString text, html, messageId, replyTo, to, cc;
+    QString displayHtml; // Layout-preserving, browser-only sanitized HTML.
+    int bodyFormatVersion = 0;
     QList<Attachment> attachments;
 };
 struct Page {

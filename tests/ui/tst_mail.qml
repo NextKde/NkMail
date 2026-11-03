@@ -392,6 +392,16 @@ TestCase {
         const blocked = '<img data-nkmail-src="https://example.invalid/image">'
         compare(ReaderLayout.fitImages(blocked, 300), blocked)
     }
+    function test_legacy_html_offers_account_reconnection_for_formatting() {
+        const original = mock.selectedMessage
+        try {
+            mock.demo = false
+            mock.selectedMessage = Object.assign({}, original, {html: "<p>Cached fallback</p>", bodyFormatVersion: 0})
+            tryCompare(findChild(app, "restoreFormattingBar"), "visible", true)
+            findChild(app, "restoreFormattingButton").clicked()
+            tryCompare(findChild(app, "accountDialog"), "visible", true)
+        } finally { mock.selectedMessage = original; mock.demo = true }
+    }
     function test_reader_notification_layout_and_blocked_images() {
         const html = '<div>Account activity</div>\n    <br><div> </div><div><span>&nbsp;</span></div>'
             + '<img data-nkmail-src="https://example.invalid/logo" alt=""> | | <br><br><br><br>'
@@ -405,7 +415,7 @@ TestCase {
         const original = mock.selectedMessage
         try {
             mock.selectedMessage = Object.assign({}, original, {html: html})
-            const body = findChild(app, "messageBody")
+            const body = findChild(app, "legacyMessageBody")
             tryVerify(() => body.getText(0, body.length).includes("Account activity"))
             const plain = body.getText(0, body.length)
             verify(!plain.includes("\uFFFC"), "Blocked images must not produce broken image objects")

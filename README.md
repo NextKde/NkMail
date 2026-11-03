@@ -58,6 +58,22 @@ closing exits normally with the same protections. If the tray host disappears wh
 NkMail is hidden, the window is restored. Screenshot mode does not create a tray icon.
 This does not install login autostart or a separate background daemon.
 
+## HTML mail rendering
+
+HTML mail uses Qt WebEngine Quick with its own off-the-record profile. A browser-only
+sanitized representation retains tables, inline styles and embedded CSS; the existing
+simplified HTML remains separate for replies and the plain/rich-text fallback. The
+reader disables mail scripts, storage, downloads and navigation; CSP and a request
+interceptor reject external resources and local files. Remote images still require the
+existing explicit download action. Chromium's process sandbox stays enabled.
+
+Old cached messages stay readable while the selected body is re-read once using IMAP
+PEEK to recover layout that the old sanitizer discarded. Offline messages retain their
+fallback until connected. The cache stores a format version to avoid repeated upgrades.
+
+Build dependencies include Qt WebEngine Quick (`qt6-webengine` on Arch). Browser tests
+also require Xvfb/xauth/Mesa and run as an ordinary user, with the sandbox enabled.
+
 ## Module boundaries
 
 | Module | Owns | Must not own |
@@ -92,7 +108,7 @@ one shared mutable controller across multiple implementation files.
 ## Dependencies
 
 - CMake 3.30+, C++20 compiler, Ninja (optional)
-- Qt 6.8+: Core, Gui, Widgets, Qml, Quick, QuickControls2, QuickDialogs2, Network, Concurrent, Sql, LinguistTools; QtTest/QuickTest for testing
+- Qt 6.8+: Core, Gui, Widgets, Qml, Quick, QuickControls2, QuickDialogs2, Network, Concurrent, Sql, LinguistTools, WebEngineQuick; QtTest/QuickTest for testing
 - Qt translation catalogs (for standard dialogs, e.g. `qt6-translations` on Arch)
 - Qt graphical-effects compatibility module and SVG support as required by Kos.Ui
 - QtKeychain for Qt 6; system Secret Service or equivalent
@@ -212,7 +228,7 @@ Screenshot export is intentionally blocked outside synthetic preview mode. Publi
 
 ## Regression tests (virtual machine only)
 
-Tests additionally require Qt Test / QuickTest, Python 3, `dbus-daemon`, `dbus-send` and the `openssl` executable (for short-lived loopback certificates). They do not need a real account. Core/controller tests use temporary data directories; protocol services bind only `127.0.0.1`; UI tests run offscreen with synthetic state.
+Tests additionally require Qt Test / QuickTest, Xvfb/xauth/Mesa, Python 3, `dbus-daemon`, `dbus-send` and the `openssl` executable (for short-lived loopback certificates). They do not need a real account. Core/controller tests use temporary data directories; protocol services bind only `127.0.0.1`; UI tests run offscreen with synthetic state; browser tests use an Xvfb OpenGL surface as an ordinary user with the Chromium sandbox enabled.
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DNKMAIL_BUILD_TESTS=ON

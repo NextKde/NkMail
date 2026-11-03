@@ -1475,6 +1475,14 @@ Synthetic demo draft. Sending is disabled.</translation>
     <context>
         <name>MessageReader</name>
         <message>
+            <source>Connect to load the original message formatting.</source>
+            <translation>Connect to load the original message formatting.</translation>
+        </message>
+        <message>
+            <source>Connect account</source>
+            <translation>Connect account</translation>
+        </message>
+        <message>
             <location filename="../qml/MessageReader.qml" line="77" />
             <source>Message details</source>
             <translation>Message details</translation>

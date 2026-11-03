@@ -3,6 +3,8 @@
 #include "platform/SingleInstance.h"
 #include "platform/LanguageService.h"
 #include <QApplication>
+#include <QtWebEngineQuick>
+#include "reader/MailWebProfile.h"
 #include <QIcon>
 #include <QCommandLineParser>
 #include <QDir>
@@ -24,6 +26,8 @@
 #include <memory>
 
 int main(int argc, char **argv) {
+    registerMailDocumentScheme();
+    QtWebEngineQuick::initialize();
     QApplication app(argc, argv);
     app.setWindowIcon(QIcon(QStringLiteral(":/data/nkmail.svg")));
     app.setApplicationName(QStringLiteral("nkmail"));

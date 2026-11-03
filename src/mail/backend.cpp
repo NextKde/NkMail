@@ -508,6 +508,8 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
         Decoded decoded; decodePart(m, decoded);
         c.text = (decoded.plain.isEmpty() ? decoded.html : decoded.plain).join(QStringLiteral("\n\n"));
         c.html = sanitizeMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
+        c.displayHtml = sanitizeBrowserMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
+        c.bodyFormatVersion = 1;
         c.attachments = std::move(decoded.attachments);
         c.summary.hasAttachments = !c.attachments.isEmpty();
         c.summary.preview = c.text.simplified().left(160);

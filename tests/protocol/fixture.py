@@ -22,7 +22,7 @@ MESSAGE = (b"From: =?UTF-8?B?5rWL6K+V?= <author@fixture.invalid>\r\n"
            b"MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=fixture\r\n\r\n"
            b"--fixture\r\nContent-Type: text/html; charset=UTF-8\r\n"
            b"Content-Transfer-Encoding: base64\r\n\r\n" +
-           base64.b64encode('<html><head><style>bad-style</style></head><body><p>你好 HTML</p><script>bad-script</script><img src="file:///fixture-must-not-read"><img src="https://fixture.invalid/pixel"></body></html>'.encode()) +
+           base64.b64encode('<html><head><style>bad-style</style></head><body><table style="width:480px"><tr><td style="padding:24px">你好 HTML</td></tr></table><script>bad-script</script><img src="file:///fixture-must-not-read"><img src="https://fixture.invalid/pixel"></body></html>'.encode()) +
            b"\r\n--fixture\r\nContent-Type: application/octet-stream\r\n"
            b"Content-Disposition: attachment; filename=\"../../evil.txt\"\r\n"
            b"Content-Transfer-Encoding: base64\r\n\r\n" + base64.b64encode(b"fixture\x00attachment") +
@@ -265,6 +265,9 @@ def main():
             content, server = invoke("imap", good, ca, "content", starttls)
             assert content["ok"] and "你好 HTML" in content["text"], content
             assert "bad-script" not in content["text"] and "bad-style" not in content["text"], content
+            assert content["bodyFormatVersion"] == 1 and "<table " in content["displayHtml"], content
+            assert "padding:24px" in content["displayHtml"] and "bad-script" not in content["displayHtml"], content
+            assert "file:///" not in content["displayHtml"] and "data-nkmail-src=" in content["displayHtml"], content
             assert content["attachments"] == [{"name": "evil.txt", "bytes": base64.b64encode(b"fixture\x00attachment").decode(), "path": ""}], content
             assert any("BODY.PEEK[]" in cmd for cmd in server.commands)
             passed += 1

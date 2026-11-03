@@ -30,8 +30,8 @@ QString htmlAttributeText(const QString &value) {
     return out;
 }
 }
-QString RemoteImageLoader::key(const QString &accountId, const Summary &s) {
-    return QString::fromUtf8(QJsonDocument(QJsonArray{accountId, s.folder, s.uidValidity, s.uid}).toJson(QJsonDocument::Compact));
+QString RemoteImageLoader::key(const QString &accountId, const Summary &s, int formatVersion) {
+    return QString::fromUtf8(QJsonDocument(QJsonArray{accountId, s.folder, s.uidValidity, s.uid, formatVersion}).toJson(QJsonDocument::Compact));
 }
 QString RemoteImageLoader::cached(const QString &key, const QString &fallback) const {
     if (const auto *html = m_cache.object(key)) return *html;
@@ -145,7 +145,16 @@ void RemoteImageLoader::load(const QString &key, const QString &input) {
                 const auto it = replacements.constFind(match.captured(1));
                 if (it == replacements.constEnd()) continue;
                 out += current.mid(last, match.capturedStart() - last);
-                out += it.value();
+                if (match.captured().contains(QStringLiteral("data-nkmail-layout=\"1\""))
+                    && it.value().startsWith(QStringLiteral("<img "))) {
+                    // Preserve the sender's display dimensions/styles, rather
+                    // than substituting the image's intrinsic pixel dimensions.
+                    static const QRegularExpression dataSource(QStringLiteral("src=\"(data:[^\"]*)\""));
+                    const auto data = dataSource.match(it.value());
+                    QString image = match.captured();
+                    image.replace(srcPattern, QStringLiteral("src=\"%1\"").arg(data.captured(1)));
+                    out += image;
+                } else out += it.value();
                 last = match.capturedEnd();
             }
             out += current.mid(last);

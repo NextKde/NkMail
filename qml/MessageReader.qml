@@ -17,6 +17,7 @@ Rectangle {
     readonly property color ink: AppTheme.text
     readonly property color muted: AppTheme.mutedText
     readonly property color rule: AppTheme.border
+    signal reconnectRequested()
     signal closeDetailsRequested()
     signal detailsRequested()
     signal saveAttachmentRequested(int index)
@@ -122,6 +123,25 @@ Rectangle {
                     }
 
                     RowLayout {
+                        objectName: "restoreFormattingBar"
+                        Layout.fillWidth: true
+                        spacing: 12
+                        visible: root.showRichText && !root.mail.demo
+                            && Number(MailLabels.value(root.message, "bodyFormatVersion") || 0) < 1
+                            && MailLabels.value(root.message, "html").length > 0
+                        Text {
+                            Layout.fillWidth: true
+                            text: qsTr("Connect to load the original message formatting.")
+                            color: root.muted; font.pixelSize: 12; wrapMode: Text.Wrap
+                        }
+                        KosButton {
+                            objectName: "restoreFormattingButton"
+                            text: qsTr("Connect account")
+                            secondary: true; implicitHeight: 30
+                            onClicked: root.reconnectRequested()
+                        }
+                    }
+                    RowLayout {
                         objectName: "blockedImagesBar"
                         Layout.fillWidth: true
                         spacing: 8
@@ -138,15 +158,72 @@ Rectangle {
                         }
                     }
                     // Render only the backend-sanitized html field; fall back to plain text.
+                    Loader {
+                        id: browserBody
+                        objectName: "browserBodyLoader"
+                        readonly property string displayHtml: MailLabels.value(root.message, "displayHtml")
+                        active: root.showRichText && displayHtml.length > 0
+                        visible: active
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: item ? item.implicitHeight : 0
+                        sourceComponent: Component {
+                            MailHtmlBody {
+                                html: browserBody.displayHtml
+                                onLinkActivated: function(link) {
+                                    linkClip.text = link
+                                    linkClip.selectAll(); linkClip.copy()
+                                    root.mail.clearError()
+                                    statusHint.show(qsTr("Link copied to clipboard"))
+                                }
+                            }
+                        }
+                    }
+                    // Keep formats fixed: switching a single TextEdit between
+                    // plain and rich modes can briefly parse plain mail as HTML.
                     TextEdit {
                         id: messageBody
                         objectName: "messageBody"
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
+                        visible: !browserBody.active && !asRich
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.max(200, contentHeight)
                         readonly property string richHtml: MailLabels.value(root.message, "html") || ""
                         readonly property bool asRich: root.showRichText && String(richHtml).length > 0
-                        text: asRich ? ReaderLayout.readableHtml(richHtml, width) : MailLabels.value(root.message, "text")
-                        textFormat: asRich ? TextEdit.RichText : TextEdit.PlainText
+                        text: MailLabels.value(root.message, "text")
+                        textFormat: TextEdit.PlainText
+                        readOnly: true; selectByMouse: true
+                        wrapMode: TextEdit.Wrap
+                        color: root.ink
+                        selectionColor: AppTheme.accent; selectedTextColor: "white"
+                        font.pixelSize: 14
+                        onLinkActivated: function(link) {
+                            if (!/^(https?:|mailto:)/i.test(String(link))) return
+                            linkClip.text = String(link)
+                            linkClip.selectAll(); linkClip.copy()
+                            mail.clearError()
+                            statusHint.show(qsTr("Link copied to clipboard"))
+                        }
+                    }
+                    TextEdit {
+                        id: legacyMessageBody
+                        objectName: "legacyMessageBody"
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
+                        visible: !browserBody.active && asRich
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.max(200, contentHeight)
+                        readonly property string richHtml: MailLabels.value(root.message, "html") || ""
+                        readonly property bool asRich: root.showRichText && String(richHtml).length > 0
+                        // Defer width-dependent image fitting until the layout settles.
+                        // A synchronous text/implicit-width/layout binding forms a loop.
+                        function renderLegacy() { text = asRich ? ReaderLayout.readableHtml(richHtml, width) : "" }
+                        onRichHtmlChanged: legacyRenderTimer.restart()
+                        onAsRichChanged: legacyRenderTimer.restart()
+                        onWidthChanged: legacyRenderTimer.restart()
+                        Component.onCompleted: legacyRenderTimer.restart()
+                        Timer { id: legacyRenderTimer; interval: 0; onTriggered: legacyMessageBody.renderLegacy() }
+                        textFormat: TextEdit.RichText
                         readOnly: true; selectByMouse: true
                         wrapMode: TextEdit.Wrap
                         color: root.ink

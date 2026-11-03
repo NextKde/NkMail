@@ -1475,6 +1475,14 @@ Alex
     <context>
         <name>MessageReader</name>
         <message>
+            <source>Connect to load the original message formatting.</source>
+            <translation>连接邮箱以加载这封邮件的原始排版。</translation>
+        </message>
+        <message>
+            <source>Connect account</source>
+            <translation>连接邮箱</translation>
+        </message>
+        <message>
             <location filename="../qml/MessageReader.qml" line="77" />
             <source>Message details</source>
             <translation>邮件详情</translation>

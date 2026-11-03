@@ -63,6 +63,7 @@ void reset()
         Content c;
         c.summary.folder = folder; c.summary.uidValidity = validity; c.summary.uid = uid;
         c.text = QStringLiteral("Synthetic body ") + uid;
+        c.bodyFormatVersion = 1;
         c.attachments.append({"fixture.txt", "text/plain", {}, 9, QByteArray("synthetic")});
         return c;
     };
@@ -272,6 +273,33 @@ private slots:
         QCOMPARE(setup.stage(), QString("failed"));
     }
 
+    void selectedLegacyCacheUpgradesOnceWithoutDiscardingFallback() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
+        {
+            MailDatabase db; QVERIFY(db.open(root.path()));
+            Content c; c.summary = synthetic::page(account(), "INBOX", 0, 1).messages.first();
+            c.text = "Legacy cached text"; c.html = "<p>Legacy cached text</p>";
+            QVERIFY(db.saveContent(c));
+        }
+        const auto normal = synthetic::content;
+        synthetic::content = [normal](const Account &a, const QString &f, const QString &v, const QString &u) {
+            auto c = normal(a, f, v, u);
+            c.displayHtml = "<table><tr><td style=\"padding:24px\">Restored layout</td></tr></table>";
+            return c;
+        };
+        MailController controller(false, root.path());
+        QTRY_VERIFY(controller.status().contains("restored"));
+        controller.openMessage("120", "100");
+        QCOMPARE(controller.selectedMessage().value("text").toString(), QString("Legacy cached text"));
+        QTRY_VERIFY(!controller.selectedMessage().value("displayHtml").toString().isEmpty());
+        QCOMPARE(synthetic::contentCalls.load(), 1);
+        controller.openMessage("120", "100");
+        QCOMPARE(synthetic::contentCalls.load(), 1);
+        MailDatabase db; QVERIFY(db.open(root.path()));
+        const auto cached = db.content("INBOX", "100", "120");
+        QVERIFY(cached); QCOMPARE(cached->bodyFormatVersion, 1);
+        QVERIFY(!cached->displayHtml.isEmpty());
+    }
     void initTestCase() { QVERIFY(QDir().mkpath(QStringLiteral(NKMAIL_CONTROLLER_TMP_ROOT))); }
     void init() { synthetic::reset(); }
     void demoNeverUsesExternalBoundaries();
@@ -451,6 +479,15 @@ void ControllerTests::imagesCacheRenderedContentPerAccount()
     QCOMPARE(loader.cached(second, html), html);
     loader.load(second, html);
     QTRY_COMPARE(loaded.count(), 3); QCOMPARE(requests, 2);
+    const auto layoutKey = RemoteImageLoader::key("first", message, 1);
+    const QString layout = QString("<img data-nkmail-src=\"http://127.0.0.1:%1/image\" data-nkmail-layout=\"1\" width=\"80\" style=\"width:80px\">").arg(server.serverPort());
+    loader.load(layoutKey, layout);
+    QTRY_COMPARE(loaded.count(), 4); QCOMPARE(requests, 3);
+    const auto rendered = loader.cached(layoutKey, layout);
+    QVERIFY(rendered.contains(QStringLiteral("src=\"data:image/png;base64,")));
+    QVERIFY(rendered.contains(QStringLiteral("width=\"80\"")));
+    QVERIFY(rendered.contains(QStringLiteral("style=\"width:80px\"")));
+    QVERIFY(!rendered.contains(QStringLiteral("data-nkmail-src=")));
 }
 void ControllerTests::closingImageLoaderCancelsStalledRequest()
 {

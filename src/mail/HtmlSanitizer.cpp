@@ -46,7 +46,7 @@ const QSet<QString> &dropContainerTags()
         QStringLiteral("script"), QStringLiteral("style"), QStringLiteral("iframe"),
         QStringLiteral("object"), QStringLiteral("form"), QStringLiteral("button"),
         QStringLiteral("svg"), QStringLiteral("math"), QStringLiteral("video"),
-        QStringLiteral("audio")};
+        QStringLiteral("audio"), QStringLiteral("title")};
     return set;
 }
 // Void elements in the removal list: no content to skip, just drop the tag.
@@ -247,6 +247,7 @@ struct TagParse {
     QString href;
     QString src;
     QString alt;
+    QHash<QString, QString> layout;
     qsizetype end = 0;
 };
 
@@ -344,6 +345,12 @@ TagParse parseTag(QStringView s, qsizetype start)
             }
         }
         if (!tag.closing) {
+            static const QSet<QString> layoutAttributes = {
+                "style", "class", "id", "align", "valign", "bgcolor", "color", "face", "size",
+                "width", "height", "border", "cellpadding", "cellspacing", "colspan", "rowspan", "dir", "lang"};
+            const auto attribute = attrName.toString().toLower();
+            if (layoutAttributes.contains(attribute))
+                tag.layout.insert(attribute, decodeEntities(QStringView(value)));
             if (attrName.compare(QStringLiteral("href"), Qt::CaseInsensitive) == 0) {
                 tag.hasHref = true;
                 tag.href = value;
@@ -362,7 +369,7 @@ TagParse parseTag(QStringView s, qsizetype start)
 }
 }
 
-QString sanitizeMailHtml(const QString &input)
+static QString sanitize(const QString &input, bool browser)
 {
     if (input.isEmpty())
         return QString();
@@ -397,14 +404,31 @@ QString sanitizeMailHtml(const QString &input)
         }
         const QChar c = s.at(i);
         if (c == u'<') {
-            const TagParse tag = parseTag(s, i);
+            TagParse tag = parseTag(s, i);
+            if (browser && tag.name == QStringLiteral("body")) tag.name = QStringLiteral("div");
             if (!tag.ok) {
                 appendEscaped(out, u'<');
                 ++i;
                 continue;
             }
             if (!tag.name.isEmpty()) {
-                if (isTableLayoutTag(tag.name)) {
+                if (browser && tag.name == QStringLiteral("style") && !tag.closing) {
+                    // CSS remains passive: CSP and the request interceptor block
+                    // imports/URLs/fonts; script execution and navigation are disabled.
+                    qsizetype close = tag.end;
+                    while ((close = s.indexOf(QStringLiteral("</style"), close, Qt::CaseInsensitive)) >= 0) {
+                        const auto end = parseTag(s, close);
+                        if (end.ok && end.closing && end.name == QStringLiteral("style")) {
+                            out += QStringLiteral("<style>") + s.mid(tag.end, close - tag.end).toString() + QStringLiteral("</style>");
+                            i = end.end;
+                            break;
+                        }
+                        ++close;
+                    }
+                    if (close < 0) i = n; // Discard unterminated raw CSS.
+                    continue;
+                }
+                if (!browser && isTableLayoutTag(tag.name)) {
                     // Keep rows separate without fixed widths, spacer geometry
                     // or synthetic pipe characters in the message text.
                     if (tag.name == QStringLiteral("tr")) {
@@ -444,10 +468,22 @@ QString sanitizeMailHtml(const QString &input)
                             appendEscapedString(out, src);
                             out += QLatin1String("\" alt=\"");
                             appendEscapedString(out, alt);
-                            out += QLatin1String("\">");
+                            out += u'"';
+                            if (browser) {
+                                out += QStringLiteral(" data-nkmail-layout=\"1\"");
+                                for (auto it = tag.layout.cbegin(); it != tag.layout.cend(); ++it) {
+                                    out += u' ' + it.key() + QStringLiteral("=\"");
+                                    appendEscapedString(out, it.value());
+                                    out += u'"';
+                                }
+                            }
+                            out += u'>';
                         }
                     }
-                } else if (allowedTags().contains(tag.name)) {
+                } else if (allowedTags().contains(tag.name)
+                           || (browser && (isTableLayoutTag(tag.name) || tag.name == "tfoot"
+                               || tag.name == "colgroup" || tag.name == "col" || tag.name == "center"
+                               || tag.name == "font"))) {
                     if (openTags.size() < MaxDepth) {
                         if (tag.name == QStringLiteral("a")) {
                             const QString href =
@@ -456,7 +492,15 @@ QString sanitizeMailHtml(const QString &input)
                             if (safeHref(href)) {
                                 out += QLatin1String("<a href=\"");
                                 appendEscapedString(out, href);
-                                out += QLatin1String("\">");
+                                out += u'"';
+                                if (browser) {
+                                    for (auto it = tag.layout.cbegin(); it != tag.layout.cend(); ++it) {
+                                        out += u' ' + it.key() + QStringLiteral("=\"");
+                                        appendEscapedString(out, it.value());
+                                        out += u'"';
+                                    }
+                                }
+                                out += u'>';
                                 if (!tag.selfClosing)
                                     openTags.append(tag.name);
                             }
@@ -464,8 +508,15 @@ QString sanitizeMailHtml(const QString &input)
                         } else {
                             out += u'<';
                             out += tag.name;
+                            if (browser) {
+                                for (auto it = tag.layout.cbegin(); it != tag.layout.cend(); ++it) {
+                                    out += u' ' + it.key() + QStringLiteral("=\"");
+                                    appendEscapedString(out, it.value());
+                                    out += u'"';
+                                }
+                            }
                             out += u'>';
-                            if (!isVoidAllowed(tag.name) && !tag.selfClosing)
+                            if (!isVoidAllowed(tag.name) && tag.name != "col" && !tag.selfClosing)
                                 openTags.append(tag.name);
                         }
                     }
@@ -492,4 +543,7 @@ QString sanitizeMailHtml(const QString &input)
     }
     return out;
 }
+
+QString sanitizeMailHtml(const QString &input) { return sanitize(input, false); }
+QString sanitizeBrowserMailHtml(const QString &input) { return sanitize(input, true); }
 }
