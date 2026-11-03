@@ -12,6 +12,7 @@ struct Account {
     QString imapHost, smtpHost;
     int imapPort = 993, smtpPort = 465;
     bool imapStartTls = false, smtpStartTls = false;
+    bool serverSavesSent = false;
     QString caFile; // Explicit custom trust anchor; never disables verification.
 };
 struct Folder { QString id, title; int total = 0; QString role; };

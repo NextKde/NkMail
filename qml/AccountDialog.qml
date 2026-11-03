@@ -11,7 +11,7 @@ LiquidDialog {
     objectName: "accountDialog"
     parent: Overlay.overlay
     width: Math.min(580, hostWindow.width - 32)
-    height: Math.min(step === 0 ? 380 : step === 2 ? 300 : 730, hostWindow.height - 32)
+    height: Math.min(step === 0 ? 700 : step === 2 ? 300 : 730, hostWindow.height - 32)
     anchors.centerIn: parent
     title: qsTr("Mail account")
     padding: 24
@@ -24,11 +24,14 @@ LiquidDialog {
     property string setupError: ""
     readonly property var setup: mail.accountSetup || null
     function nextStep() {
+        if (!providerChoice.available) return
         usernameField.text = addressField.text.trim()
-        const preset = Profiles.settings(providerChoice.currentIndex === 1 ? "icloud" : "manual")
+        const preset = Profiles.settings(providerChoice.provider)
         imapField.text = preset.imapHost; smtpField.text = preset.smtpHost
         imapPortField.text = String(preset.imapPort); smtpPortField.text = String(preset.smtpPort)
+        imapTls.checked = preset.imapStartTls
         smtpTls.checked = preset.smtpStartTls
+        serverSavesSent.checked = preset.serverSavesSent
         step = 1
     }
     function validateConnection() {
@@ -57,6 +60,8 @@ LiquidDialog {
         smtpTls.checked = !!original.smtpStartTls
         caField.text = field(original, "caFile")
         passwordField.text = ""
+        providerChoice.currentIndex = Profiles.indexForAddress(addressField.text)
+        serverSavesSent.checked = !!original.serverSavesSent
         rememberPassword.checked = false
         submitting = false
         setupError = ""; advanced = false; step = 1
@@ -79,7 +84,7 @@ LiquidDialog {
             id: original.id || "", name: nameField.text.trim(), address: addressField.text.trim(),
             username: usernameField.text.trim(), imapHost: imapField.text.trim(), smtpHost: smtpField.text.trim(),
             imapPort: Number(imapPortField.text), smtpPort: Number(smtpPortField.text),
-            imapStartTls: imapTls.checked, smtpStartTls: smtpTls.checked, caFile: caField.text.trim()
+            imapStartTls: imapTls.checked, smtpStartTls: smtpTls.checked, serverSavesSent: serverSavesSent.checked, caFile: caField.text.trim()
         }
     }
     function save() {
@@ -120,7 +125,7 @@ LiquidDialog {
                 visible: root.step < 2
                 title: root.step === 0 ? qsTr("Enter your email address") : qsTr("Identity")
                 SettingsItem { visible: root.step === 1; title: qsTr("Name"); KosTextField { id: nameField; objectName: "accountName"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Name") } }
-                SettingsItem { title: qsTr("Email"); KosTextField { id: addressField; objectName: "accountAddress"; onTextEdited: providerChoice.currentIndex = Profiles.forAddress(text) === "icloud" ? 1 : 0; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Email"); placeholderText: "you@example.invalid" } }
+                SettingsItem { title: qsTr("Email"); KosTextField { id: addressField; objectName: "accountAddress"; onTextEdited: providerChoice.currentIndex = Profiles.indexForAddress(text); Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Email"); placeholderText: "you@example.invalid" } }
                 SettingsItem { visible: root.step === 1; title: qsTr("Username"); KosTextField { id: usernameField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Username") } }
                 SettingsItem {
                     visible: root.step === 1; title: qsTr("App password"); description: qsTr("Stored passwords are never displayed.")
@@ -131,13 +136,22 @@ LiquidDialog {
                     KosCheckBox { id: rememberPassword; enabled: !root.mail.demo && !root.submitting }
                 }
             }
-            LiquidSelect {
-                materialForm: true
+            ProviderPicker {
                 id: providerChoice
                 objectName: "providerChoice"
                 visible: root.step === 0
                 Layout.fillWidth: true
-                model: [qsTr("Other · manual IMAP/SMTP"), "iCloud"]
+                enabled: !root.submitting
+            }
+            Text {
+                visible: root.step === 1
+                text: providerChoice.guidance
+                Layout.fillWidth: true; wrapMode: Text.Wrap; font.pixelSize: 11; color: AppTheme.mutedText
+            }
+            LiquidCheckBox {
+                id: serverSavesSent
+                visible: root.step === 1 && root.advanced
+                text: qsTr("Server automatically saves sent mail")
                 enabled: !root.submitting
             }
             LiquidCheckBox {
@@ -209,7 +223,7 @@ LiquidDialog {
             LiquidDialogButton {
                 text: qsTr("Continue")
                 visible: root.step === 0
-                enabled: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addressField.text.trim())
+                enabled: providerChoice.available && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addressField.text.trim())
                 onClicked: root.nextStep()
             }
             LiquidDialogButton {

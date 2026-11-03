@@ -3,6 +3,7 @@ import QtTest
 import Kos.Ui
 import "../../qml/MailboxNavigation.js" as Navigation
 import "../../qml/ReaderLayout.js" as ReaderLayout
+import "../../qml/ProviderProfiles.js" as Profiles
 import NextKde.Mail.TestViews 1.0 as App
 
 TestCase {
@@ -709,6 +710,29 @@ TestCase {
         compare(App.MailLabels.mailboxIcon(sorted[2]), "folder")
     }
 
+    function test_provider_presets_and_no_false_oauth_support() {
+        const expected = {icloud:"imap.mail.me.com",google:"imap.gmail.com",qq:"imap.qq.com",exmail:"imap.exmail.qq.com",
+            "163":"imap.163.com","126":"imap.126.com",yahoo:"imap.mail.yahoo.com",aol:"imap.aol.com"}
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        for (const provider in expected) {
+            dialog.step = 0
+            findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf(provider)
+            dialog.nextStep()
+            compare(dialog.configuration().imapHost, expected[provider])
+            compare(dialog.configuration().imapPort, 993)
+            compare(dialog.configuration().imapStartTls, false)
+            compare(dialog.configuration().serverSavesSent, provider === "google")
+        }
+        compare(Profiles.forAddress(" USER@GMAIL.COM "), "google")
+        compare(Profiles.forAddress("person@company.invalid"), "manual")
+        compare(Profiles.forAddress("person@gmail.com.attacker.invalid"), "manual")
+        dialog.step = 0
+        findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("microsoft")
+        dialog.nextStep()
+        compare(dialog.step, 0)
+        dialog.close()
+    }
     function test_account_wizard_preserves_config_on_failure() {
         const dialog = findChild(app, "accountDialog")
         dialog.addAccount()

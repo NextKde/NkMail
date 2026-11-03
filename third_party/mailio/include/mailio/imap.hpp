@@ -598,6 +598,10 @@ public:
     **/
     std::set<std::string> capabilities();
 
+    // RFC 2971: disclose only a static client name, after ID is advertised.
+    // False means the server rejected this optional extension.
+    bool client_id(const std::string& name);
+
     /**
     Searching a mailbox.
 

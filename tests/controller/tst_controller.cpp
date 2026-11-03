@@ -35,12 +35,14 @@ std::function<void(CredentialStore *, const QString &)> readCredential;
 QMutex callsMutex;
 QList<int> offsets;
 QStringList contentUids;
+std::atomic_int sentFolderCalls{0};
 std::atomic_int folderCalls{0}, pageCalls{0}, contentCalls{0}, sendCalls{0};
 std::atomic_int credentialReads{0}, credentialWrites{0}, credentialDeletes{0};
 QString lastPassword;
 QStringList credentialReadKeys, credentialWriteKeys, credentialDeleteKeys;
 void reset()
 {
+    sentFolderCalls = 0;
     folders = [](const Account &) { return QList<Folder>{{"INBOX", "Inbox", 120}, {"Archive", "Archive", 0}}; };
     page = [](const Account &, const QString &folder, int offset, int limit) {
         Page p;
@@ -101,6 +103,7 @@ SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *)
 }
 QString MailioBackend::sentFolder(const Account &)
 {
+    ++synthetic::sentFolderCalls;
     return QStringLiteral("Sent");
 }
 void MailioBackend::appendSent(const Account &, const QString &, const QByteArray &)
@@ -228,6 +231,20 @@ private slots:
         controller.selectFolder("INBOX");
         QVERIFY(controller.smartMailbox().isEmpty());
         QCOMPARE(messages(controller)->count(), 1);
+    }
+    void serverManagedSentCopyDoesNotAppendOrResend() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path()));
+        { MailDatabase db; QVERIFY(db.open(root.path())); auto a = db.account(); a.serverSavesSent = true; QVERIFY(db.saveAccount(a)); }
+        MailController controller(false, root.path());
+        QTRY_VERIFY(controller.status().contains("restored"));
+        auto draft = controller.newDraft(); draft.insert("to", "nobody@example.invalid");
+        controller.sendDraft(draft);
+        QTRY_COMPARE(synthetic::sendCalls.load(), 1);
+        QTRY_VERIFY(!controller.sending());
+        QCOMPARE(synthetic::sentFolderCalls.load(), 0);
+        QCOMPARE(controller.loadDraft(draft.value("id").toString()).value("state").toString(), QString("accepted"));
+        controller.sendDraft(draft);
+        QCOMPARE(synthetic::sendCalls.load(), 1);
     }
     void setupChecksBothServersWithoutSending() {
         class Probe final : public MailTransport {

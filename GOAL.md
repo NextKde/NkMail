@@ -1,5 +1,12 @@
 # NkMail local delivery goal
 
+## Provider presets and protocol compatibility · 2026-11-03
+
+- Continued the interrupted provider-presets task. Added independent ProviderPicker/ProviderProfiles for iCloud, Gmail, QQ, Tencent Exmail, 163, 126, Yahoo, AOL and manual IMAP/SMTP. Unknown custom domains remain manual. Microsoft/Exchange is visibly unavailable; OAuth registration and implementation remain deferred by user choice.
+- Existing AccountSetup, MailTransport and SendService remain responsible for connection verification and mail operations. Added capability-gated static IMAP ID, server special-use Sent/All roles and a persisted server-managed Sent-copy option (enabled by the Gmail preset). No real mailbox writes or SMTP submissions were performed.
+- Full host CTest passed 8/8 in 44.98s on takeover. Synthetic Chinese Wayland screenshot inspected; protocol fixtures cover 44 loopback/TLS scenarios. Provider behavior, optional-ID refusal, special Sent selection and no duplicate Sent copy have regressions. Dependency gate and 32 guard tests passed. Remote PR/release-gate is still required; do not imply live-provider verification or completed OAuth.
+- Delivery details and limitations: docs/PROVIDERS.md and docs/progress/2026-11-03-provider-presets/README.md.
+
 ## Sidebar reference hierarchy correction · 2026-11-03
 
 - The earlier completion statement overstated the visual scope: account folder sections alone did not match the reference navigation. Added always-visible Favorites (Inbox, Flagged, Local drafts, Sent), custom pins, Smart mailboxes (Unread, With attachments) and expandable account folders identified by address. Only the actual navigation origin is highlighted.

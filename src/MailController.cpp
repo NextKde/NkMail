@@ -27,6 +27,8 @@ bool isArchiveFolder(const QVariantList &folders, const QString &destination) {
         const auto folder = value.toMap();
         const auto id = folder.value("id").toString();
         if (id != destination) continue;
+        const auto role = folder.value("role").toString();
+        if (role == "archive" || role == "all") return true;
         const auto title = folder.value("title").toString();
         for (const auto &name : names)
             if (title.compare(name, Qt::CaseInsensitive) == 0 || id.compare(name, Qt::CaseInsensitive) == 0) return true;

@@ -1044,6 +1044,24 @@ set<string> imap::capabilities()
 }
 
 
+bool imap::client_id(const string& name)
+{
+    if (name.empty() || name.size() > 1024)
+        throw imap_error("Invalid client name.", "");
+    for (const unsigned char ch : name)
+        if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+            || (ch >= '0' && ch <= '9') || ch == ' ' || ch == '.' || ch == '-' || ch == '_'))
+            throw imap_error("Invalid client name.", "");
+    dlg_->send(format("ID (\"name\" \"" + name + "\")"));
+    while (true)
+    {
+        const auto response = parse_tag_result(dlg_->receive());
+        if (response.tag == UNTAGGED_RESPONSE) continue;
+        if (response.tag != to_string(tag_)) throw imap_error("Incorrect tag.", "");
+        return response.result.has_value() && response.result.value() == tag_result_response_t::OK;
+    }
+}
+
 void imap::search(const list<imap::search_condition_t>& conditions, list<unsigned long>& results, bool want_uids)
 {
     string cond_str;

@@ -8,215 +8,215 @@
             <translation>邮件账号</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="93" />
+            <location filename="../qml/AccountDialog.qml" line="98" />
             <source>Account could not be saved. Please retry.</source>
             <translation>无法保存账户，请重试。</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="115" />
+            <location filename="../qml/AccountDialog.qml" line="120" />
             <source>Example account · synthetic data only. Account changes and sending are disabled in demo mode.</source>
             <translation>示例账号 · 仅使用模拟数据。演示模式下无法修改账号或发送邮件。</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="116" />
+            <location filename="../qml/AccountDialog.qml" line="121" />
             <source>Connect one account with an application password. TLS certificate verification is always enabled.</source>
             <translation>使用应用专用密码连接账号。始终启用 TLS 证书验证。</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="121" />
+            <location filename="../qml/AccountDialog.qml" line="126" />
             <source>Identity</source>
             <translation>身份信息</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="121" />
+            <location filename="../qml/AccountDialog.qml" line="126" />
             <source>Enter your email address</source>
             <translation>输入电子邮件地址</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="122" />
-            <location filename="../qml/AccountDialog.qml" line="122" />
+            <location filename="../qml/AccountDialog.qml" line="127" />
+            <location filename="../qml/AccountDialog.qml" line="127" />
             <source>Name</source>
             <translation>名称</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="123" />
-            <location filename="../qml/AccountDialog.qml" line="123" />
+            <location filename="../qml/AccountDialog.qml" line="128" />
+            <location filename="../qml/AccountDialog.qml" line="128" />
             <source>Email</source>
             <translation>邮箱地址</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="124" />
-            <location filename="../qml/AccountDialog.qml" line="124" />
+            <location filename="../qml/AccountDialog.qml" line="129" />
+            <location filename="../qml/AccountDialog.qml" line="129" />
             <source>Username</source>
             <translation>用户名</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="126" />
+            <location filename="../qml/AccountDialog.qml" line="131" />
             <source>App password</source>
             <translation>应用专用密码</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="126" />
+            <location filename="../qml/AccountDialog.qml" line="131" />
             <source>Stored passwords are never displayed.</source>
             <translation>不会显示已保存的密码。</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="127" />
+            <location filename="../qml/AccountDialog.qml" line="132" />
             <source>Application password</source>
             <translation>应用专用密码</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="127" />
+            <location filename="../qml/AccountDialog.qml" line="132" />
             <source>Enter application password</source>
             <translation>输入应用专用密码</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="130" />
+            <location filename="../qml/AccountDialog.qml" line="135" />
             <source>Remember password</source>
             <translation>记住密码</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="130" />
+            <location filename="../qml/AccountDialog.qml" line="135" />
             <source>Use the system keychain; no plaintext fallback.</source>
             <translation>使用系统钥匙串，不会以明文保存。</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="140" />
-            <source>Other · manual IMAP/SMTP</source>
-            <translation>其他 · 手动设置 IMAP/SMTP</translation>
+            <location filename="../qml/AccountDialog.qml" line="154" />
+            <source>Server automatically saves sent mail</source>
+            <translation>服务器自动保存已发送邮件</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="145" />
+            <location filename="../qml/AccountDialog.qml" line="159" />
             <source>Advanced server settings</source>
             <translation>高级服务器设置</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="152" />
+            <location filename="../qml/AccountDialog.qml" line="166" />
             <source>Account verified and saved</source>
             <translation>账户已验证并保存</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="158" />
+            <location filename="../qml/AccountDialog.qml" line="172" />
             <source>Checking outgoing server…</source>
             <translation>正在验证发信服务器…</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="158" />
+            <location filename="../qml/AccountDialog.qml" line="172" />
             <source>Checking incoming server…</source>
             <translation>正在验证收信服务器…</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="164" />
+            <location filename="../qml/AccountDialog.qml" line="178" />
             <source>Incoming · IMAP</source>
             <translation>收件 · IMAP</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="165" />
-            <location filename="../qml/AccountDialog.qml" line="175" />
+            <location filename="../qml/AccountDialog.qml" line="179" />
+            <location filename="../qml/AccountDialog.qml" line="189" />
             <source>Server</source>
             <translation>服务器</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="165" />
+            <location filename="../qml/AccountDialog.qml" line="179" />
             <source>IMAP server</source>
             <translation>IMAP 服务器</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="166" />
-            <location filename="../qml/AccountDialog.qml" line="176" />
+            <location filename="../qml/AccountDialog.qml" line="180" />
+            <location filename="../qml/AccountDialog.qml" line="190" />
             <source>Port</source>
             <translation>端口</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="166" />
+            <location filename="../qml/AccountDialog.qml" line="180" />
             <source>IMAP port</source>
             <translation>IMAP 端口</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="168" />
-            <location filename="../qml/AccountDialog.qml" line="178" />
+            <location filename="../qml/AccountDialog.qml" line="182" />
+            <location filename="../qml/AccountDialog.qml" line="192" />
             <source>STARTTLS</source>
             <translation>STARTTLS</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="168" />
-            <location filename="../qml/AccountDialog.qml" line="178" />
+            <location filename="../qml/AccountDialog.qml" line="182" />
+            <location filename="../qml/AccountDialog.qml" line="192" />
             <source>Off uses implicit TLS, not plaintext.</source>
             <translation>关闭后使用隐式 TLS，而非明文连接。</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="174" />
+            <location filename="../qml/AccountDialog.qml" line="188" />
             <source>Outgoing · SMTP</source>
             <translation>发件 · SMTP</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="175" />
+            <location filename="../qml/AccountDialog.qml" line="189" />
             <source>SMTP server</source>
             <translation>SMTP 服务器</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="176" />
+            <location filename="../qml/AccountDialog.qml" line="190" />
             <source>SMTP port</source>
             <translation>SMTP 端口</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="184" />
+            <location filename="../qml/AccountDialog.qml" line="198" />
             <source>Trust</source>
             <translation>证书信任</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="186" />
-            <location filename="../qml/AccountDialog.qml" line="187" />
+            <location filename="../qml/AccountDialog.qml" line="200" />
+            <location filename="../qml/AccountDialog.qml" line="201" />
             <source>CA file</source>
             <translation>CA 文件</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="186" />
+            <location filename="../qml/AccountDialog.qml" line="200" />
             <source>Optional PEM path; blank uses system trust.</source>
             <translation>可选的 PEM 文件路径；留空则使用系统信任库。</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="187" />
+            <location filename="../qml/AccountDialog.qml" line="201" />
             <source>System certificates</source>
             <translation>系统证书</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="191" />
+            <location filename="../qml/AccountDialog.qml" line="205" />
             <source>Reading does not change server flags. Explicit mail actions can update or delete messages.</source>
             <translation>阅读不会更改服务器标记。主动执行邮件操作可修改或删除邮件。</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="200" />
+            <location filename="../qml/AccountDialog.qml" line="214" />
             <source>Disconnect</source>
             <translation>断开连接</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="202" />
+            <location filename="../qml/AccountDialog.qml" line="216" />
             <source>Done</source>
             <translation>完成</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="202" />
+            <location filename="../qml/AccountDialog.qml" line="216" />
             <source>Cancel</source>
             <translation>取消</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="204" />
+            <location filename="../qml/AccountDialog.qml" line="218" />
             <source>Back</source>
             <translation>返回</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="210" />
+            <location filename="../qml/AccountDialog.qml" line="224" />
             <source>Continue</source>
             <translation>继续</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="218" />
+            <location filename="../qml/AccountDialog.qml" line="232" />
             <source>Checking…</source>
             <translation>正在验证…</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="218" />
+            <location filename="../qml/AccountDialog.qml" line="232" />
             <source>Verify and save</source>
             <translation>验证并保存</translation>
         </message>
@@ -431,232 +431,232 @@
             <translation>选择的邮件过多。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="215" />
+            <location filename="../src/mail/backend.cpp" line="216" />
             <source>Message MIME structure exceeds safety limits.</source>
             <translation>邮件 MIME 结构超过安全限制。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="219" />
+            <location filename="../src/mail/backend.cpp" line="220" />
             <source>Message exceeds safety limits.</source>
             <translation>邮件超过安全限制。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="223" />
-            <location filename="../src/mail/backend.cpp" line="353" />
+            <location filename="../src/mail/backend.cpp" line="224" />
+            <location filename="../src/mail/backend.cpp" line="354" />
             <source>Attachments exceed safety limits.</source>
             <translation>附件超过安全限制。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="245" />
+            <location filename="../src/mail/backend.cpp" line="246" />
             <source>Recipient list exceeds safety limits.</source>
             <translation>收件人列表超过安全限制。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="252" />
+            <location filename="../src/mail/backend.cpp" line="253" />
             <source>Invalid recipient list.</source>
             <translation>收件人列表无效。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="255" />
+            <location filename="../src/mail/backend.cpp" line="256" />
             <source>Invalid recipient address.</source>
             <translation>收件地址无效。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="280" />
+            <location filename="../src/mail/backend.cpp" line="281" />
             <source>Reply references exceed safety limits.</source>
             <translation>回复引用超过安全限制。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="283" />
+            <location filename="../src/mail/backend.cpp" line="284" />
             <source>Invalid reply reference.</source>
             <translation>回复引用无效。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="289" />
+            <location filename="../src/mail/backend.cpp" line="290" />
             <source>Draft exceeds safety limits.</source>
             <translation>草稿超过安全限制。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="293" />
+            <location filename="../src/mail/backend.cpp" line="294" />
             <source>Invalid sender address.</source>
             <translation>发件地址无效。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="297" />
+            <location filename="../src/mail/backend.cpp" line="298" />
             <source>At least one recipient is required (maximum 100).</source>
             <translation>至少需要一位收件人（最多 100 位）。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="348" />
+            <location filename="../src/mail/backend.cpp" line="349" />
             <source>Cannot read attachment or attachment is too large.</source>
             <translation>无法读取附件，或附件过大。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="350" />
+            <location filename="../src/mail/backend.cpp" line="351" />
             <source>Cannot read attachment.</source>
             <translation>无法读取附件。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="365" />
+            <location filename="../src/mail/backend.cpp" line="366" />
             <source>Encoded message exceeds safety limits.</source>
             <translation>编码后的邮件超过安全限制。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="387" />
+            <location filename="../src/mail/backend.cpp" line="388" />
             <source>Unable to read inbox statistics. Check account, connection and trusted TLS certificate.</source>
             <translation>无法读取收件箱统计信息。请检查账号、连接和受信任的 TLS 证书。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="400" />
+            <location filename="../src/mail/backend.cpp" line="401" />
             <source>Folder hierarchy exceeds safety limits.</source>
             <translation>文件夹层级超过安全限制。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="402" />
+            <location filename="../src/mail/backend.cpp" line="403" />
             <source>Folder list exceeds safety limits.</source>
             <translation>文件夹列表超过安全限制。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="421" />
+            <location filename="../src/mail/backend.cpp" line="422" />
             <source>Unable to list folders. Check account, connection and trusted TLS certificate.</source>
             <translation>无法列出文件夹。请检查账号、连接和受信任的 TLS 证书。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="427" />
+            <location filename="../src/mail/backend.cpp" line="428" />
             <source>Invalid page bounds.</source>
             <translation>分页范围无效。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="430" />
+            <location filename="../src/mail/backend.cpp" line="431" />
             <source>Server did not provide UIDVALIDITY.</source>
             <translation>服务器未提供 UIDVALIDITY。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="439" />
+            <location filename="../src/mail/backend.cpp" line="440" />
             <source>Server returned an invalid page.</source>
             <translation>服务器返回了无效的分页结果。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="449" />
+            <location filename="../src/mail/backend.cpp" line="450" />
             <source>Unable to read message headers. Check account, connection and trusted TLS certificate.</source>
             <translation>无法读取邮件列表。请检查账号、连接和受信任的 TLS 证书。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="456" />
+            <location filename="../src/mail/backend.cpp" line="457" />
             <source>Invalid search query.</source>
             <translation>搜索条件无效。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="457" />
+            <location filename="../src/mail/backend.cpp" line="458" />
             <source>Invalid search bounds.</source>
             <translation>搜索范围无效。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="461" />
-            <location filename="../src/mail/backend.cpp" line="497" />
-            <location filename="../src/mail/backend.cpp" line="618" />
-            <location filename="../src/mail/backend.cpp" line="640" />
-            <location filename="../src/mail/backend.cpp" line="653" />
-            <location filename="../src/mail/backend.cpp" line="667" />
-            <location filename="../src/mail/backend.cpp" line="691" />
-            <location filename="../src/mail/backend.cpp" line="706" />
-            <location filename="../src/mail/backend.cpp" line="722" />
+            <location filename="../src/mail/backend.cpp" line="462" />
+            <location filename="../src/mail/backend.cpp" line="498" />
+            <location filename="../src/mail/backend.cpp" line="626" />
+            <location filename="../src/mail/backend.cpp" line="648" />
+            <location filename="../src/mail/backend.cpp" line="661" />
+            <location filename="../src/mail/backend.cpp" line="675" />
+            <location filename="../src/mail/backend.cpp" line="699" />
+            <location filename="../src/mail/backend.cpp" line="714" />
+            <location filename="../src/mail/backend.cpp" line="730" />
             <source>Folder identity changed. Refresh the message list.</source>
             <translation>文件夹标识已变化。请刷新邮件列表。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="475" />
+            <location filename="../src/mail/backend.cpp" line="476" />
             <source>Unable to search messages on the mail server.</source>
             <translation>无法在邮件服务器上搜索邮件。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="488" />
+            <location filename="../src/mail/backend.cpp" line="489" />
             <source>Unable to search messages. Check account, connection and trusted TLS certificate.</source>
             <translation>无法搜索邮件。请检查账号、连接和受信任的 TLS 证书。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="501" />
+            <location filename="../src/mail/backend.cpp" line="502" />
             <source>Message no longer exists.</source>
             <translation>邮件已不存在。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="515" />
+            <location filename="../src/mail/backend.cpp" line="516" />
             <source>Unable to read message. Check account, connection and trusted TLS certificate.</source>
             <translation>无法读取邮件。请检查账号、连接和受信任的 TLS 证书。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="542" />
+            <location filename="../src/mail/backend.cpp" line="543" />
             <source>SMTP server accepted the message; delivery is not confirmed.</source>
             <translation>SMTP 服务器已接受邮件，但尚未确认送达。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="549" />
-            <location filename="../src/mail/backend.cpp" line="553" />
+            <location filename="../src/mail/backend.cpp" line="550" />
+            <location filename="../src/mail/backend.cpp" line="554" />
             <source>Submission outcome is unknown. Check Sent mail before retrying manually.</source>
             <translation>提交结果未知。手动重试前请检查已发送邮件。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="550" />
+            <location filename="../src/mail/backend.cpp" line="551" />
             <source>SMTP server rejected the operation. The draft has been preserved.</source>
             <translation>SMTP 服务器拒绝了操作。草稿已保留。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="554" />
+            <location filename="../src/mail/backend.cpp" line="555" />
             <source>Message was not submitted. Check account, connection and trusted TLS certificate.</source>
             <translation>邮件未提交。请检查账号、连接和受信任的 TLS 证书。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="600" />
+            <location filename="../src/mail/backend.cpp" line="608" />
             <source>Unable to save a copy to the Sent folder. Check account, connection and trusted TLS certificate.</source>
             <translation>无法将副本保存到已发送文件夹。请检查账号、连接和受信任的 TLS 证书。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="612" />
+            <location filename="../src/mail/backend.cpp" line="620" />
             <source>Choose a different destination folder.</source>
             <translation>请选择其他目标文件夹。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="620" />
+            <location filename="../src/mail/backend.cpp" line="628" />
             <source>Safe deletion/move requires UIDPLUS. No messages were changed.</source>
             <translation>安全删除或移动需要 UIDPLUS 支持。未修改任何邮件。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="627" />
+            <location filename="../src/mail/backend.cpp" line="635" />
             <source>Operation may be partially complete. Refresh both folders before retrying; no automatic retry was made.</source>
             <translation>操作可能已部分完成。重试前请刷新两个文件夹；未进行自动重试。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="628" />
+            <location filename="../src/mail/backend.cpp" line="636" />
             <source>Unable to prepare mailbox operation. No messages were changed.</source>
             <translation>无法准备邮箱操作。未修改任何邮件。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="643" />
-            <location filename="../src/mail/backend.cpp" line="694" />
+            <location filename="../src/mail/backend.cpp" line="651" />
+            <location filename="../src/mail/backend.cpp" line="702" />
             <source>Unable to update message flags. Check account, connection and trusted TLS certificate.</source>
             <translation>无法更新邮件标记。请检查账号、连接和受信任的 TLS 证书。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="656" />
-            <location filename="../src/mail/backend.cpp" line="709" />
+            <location filename="../src/mail/backend.cpp" line="664" />
+            <location filename="../src/mail/backend.cpp" line="717" />
             <source>Unable to copy message. Check account, connection and trusted TLS certificate.</source>
             <translation>无法复制邮件。请检查账号、连接和受信任的 TLS 证书。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="674" />
-            <location filename="../src/mail/backend.cpp" line="727" />
+            <location filename="../src/mail/backend.cpp" line="682" />
+            <location filename="../src/mail/backend.cpp" line="735" />
             <source>Safe deletion requires UIDPLUS; no mailbox-wide expunge was performed.</source>
             <translation>安全删除需要 UIDPLUS 支持；未执行整个邮箱的清除操作。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="676" />
-            <location filename="../src/mail/backend.cpp" line="728" />
+            <location filename="../src/mail/backend.cpp" line="684" />
+            <location filename="../src/mail/backend.cpp" line="736" />
             <source>Safe deletion requires explicit UIDs and UIDPLUS.</source>
             <translation>安全删除需要明确的 UID 和 UIDPLUS 支持。</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="678" />
-            <location filename="../src/mail/backend.cpp" line="730" />
+            <location filename="../src/mail/backend.cpp" line="686" />
+            <location filename="../src/mail/backend.cpp" line="738" />
             <source>Unable to expunge deleted messages. Check account, connection and trusted TLS certificate.</source>
             <translation>无法清除已删除邮件。请检查账号、连接和受信任的 TLS 证书。</translation>
         </message>
@@ -789,6 +789,11 @@
             <translation>服务器草稿</translation>
         </message>
         <message>
+            <location filename="../qml/MailLabels.qml" line="15" />
+            <source>All mail</source>
+            <translation>所有邮件</translation>
+        </message>
+        <message>
             <location filename="../qml/MailLabels.qml" line="42" />
             <source>Draft</source>
             <translation>草稿</translation>
@@ -845,58 +850,58 @@
     <context>
         <name>MailSidebar</name>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="270" />
+            <location filename="../qml/MailSidebar.qml" line="273" />
             <source>编辑账号</source>
             <translation>编辑账号</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="277" />
+            <location filename="../qml/MailSidebar.qml" line="280" />
             <source>删除账号</source>
             <translation>删除账号</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="342" />
+            <location filename="../qml/MailSidebar.qml" line="346" />
             <source>从收藏移除</source>
             <translation>从收藏移除</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="342" />
+            <location filename="../qml/MailSidebar.qml" line="346" />
             <source>添加到收藏</source>
             <translation>添加到收藏</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="170" />
+            <location filename="../qml/MailSidebar.qml" line="171" />
             <source>Local drafts</source>
             <translation>本地草稿</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="159" />
+            <location filename="../qml/MailSidebar.qml" line="160" />
             <source>Favorites</source>
             <translation>个人收藏</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="171" />
+            <location filename="../qml/MailSidebar.qml" line="172" />
             <source>Inbox</source>
             <translation>收件箱</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="171" />
+            <location filename="../qml/MailSidebar.qml" line="172" />
             <source>Sent</source>
             <translation>已发送</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="210" />
+            <location filename="../qml/MailSidebar.qml" line="212" />
             <source>Smart mailboxes</source>
             <translation>智能邮箱</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="215" />
+            <location filename="../qml/MailSidebar.qml" line="217" />
             <source>Current account · cached mail</source>
             <translation>当前账户 · 已缓存邮件</translation>
         </message>
         <message>
-            <location filename="../qml/MailSidebar.qml" line="357" />
-            <location filename="../qml/MailSidebar.qml" line="385" />
+            <location filename="../qml/MailSidebar.qml" line="361" />
+            <location filename="../qml/MailSidebar.qml" line="389" />
             <source>添加账号</source>
             <translation>添加账号</translation>
         </message>
@@ -1009,12 +1014,12 @@
             <translation>收件箱</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="128" />
+            <location filename="../qml/Main.qml" line="129" />
             <source>A few thoughts for Friday</source>
             <translation>关于周五的一些想法</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="129" />
+            <location filename="../qml/Main.qml" line="130" />
             <source>Hi Maya,
 
 I like the quieter direction. A little more space to read, and fewer things competing for attention.
@@ -1039,173 +1044,173 @@ Alex
 模拟演示草稿，无法发送。</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="152" />
+            <location filename="../qml/Main.qml" line="153" />
             <source>邮件正在发送或等待发送，请等待完成或撤销发送后再退出。</source>
             <translation>邮件正在发送或等待发送，请等待完成或撤销发送后再退出。</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="277" />
+            <location filename="../qml/Main.qml" line="278" />
             <source>Mail</source>
             <translation>邮件</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="298" />
+            <location filename="../qml/Main.qml" line="299" />
             <source>%1 · Unread (cached)</source>
             <translation>%1 · 未读（缓存）</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="316" />
+            <location filename="../qml/Main.qml" line="317" />
             <source>Show all cached messages</source>
             <translation>显示全部缓存邮件</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="316" />
+            <location filename="../qml/Main.qml" line="317" />
             <source>Show unread cached messages</source>
             <translation>显示未读缓存邮件</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="386" />
+            <location filename="../qml/Main.qml" line="387" />
             <source>Hide sidebar</source>
             <translation>隐藏侧边栏</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="386" />
+            <location filename="../qml/Main.qml" line="387" />
             <source>Show sidebar</source>
             <translation>显示侧边栏</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="498" />
+            <location filename="../qml/Main.qml" line="499" />
             <source>Mailbox column width</source>
             <translation>导航栏宽度</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="498" />
+            <location filename="../qml/Main.qml" line="499" />
             <source>Message column width</source>
             <translation>邮件列表宽度</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="499" />
+            <location filename="../qml/Main.qml" line="500" />
             <source>Drag or use Left and Right to resize. Double-click to reset.</source>
             <translation>拖动或使用左右方向键调整宽度。双击恢复默认值。</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="567" />
+            <location filename="../qml/Main.qml" line="568" />
             <source>Dismiss</source>
             <translation>关闭提示</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="608" />
+            <location filename="../qml/Main.qml" line="609" />
             <source>Unread messages only (cached)</source>
             <translation>仅显示未读邮件（缓存）</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="615" />
+            <location filename="../qml/Main.qml" line="616" />
             <source>Sender initials</source>
             <translation>发件人首字头像</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="622" />
+            <location filename="../qml/Main.qml" line="623" />
             <source>按会话聚合</source>
             <translation>按会话聚合</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="629" />
+            <location filename="../qml/Main.qml" line="630" />
             <source>新邮件通知</source>
             <translation>新邮件通知</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="636" />
+            <location filename="../qml/Main.qml" line="637" />
             <source>Show message summaries</source>
             <translation>显示邮件摘要</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="643" />
+            <location filename="../qml/Main.qml" line="644" />
             <source>富文本显示</source>
             <translation>富文本显示</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="651" />
+            <location filename="../qml/Main.qml" line="652" />
             <source>Check for mail</source>
             <translation>收取邮件</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="659" />
+            <location filename="../qml/Main.qml" line="660" />
             <source>New message</source>
             <translation>新邮件</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="670" />
+            <location filename="../qml/Main.qml" line="671" />
             <source>显示</source>
             <translation>显示</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="675" />
+            <location filename="../qml/Main.qml" line="676" />
             <source>Language: follow system</source>
             <translation>语言：跟随系统</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="689" />
+            <location filename="../qml/Main.qml" line="690" />
             <source>Switch light / dark appearance</source>
             <translation>切换浅色／深色外观</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="694" />
+            <location filename="../qml/Main.qml" line="695" />
             <source>Reply</source>
             <translation>回复</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="695" />
+            <location filename="../qml/Main.qml" line="696" />
             <source>Reply to all</source>
             <translation>全部回复</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="696" />
+            <location filename="../qml/Main.qml" line="697" />
             <source>Forward</source>
             <translation>转发</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="697" />
+            <location filename="../qml/Main.qml" line="698" />
             <source>Message details</source>
             <translation>邮件详情</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="699" />
-            <location filename="../qml/Main.qml" line="741" />
+            <location filename="../qml/Main.qml" line="700" />
+            <location filename="../qml/Main.qml" line="742" />
             <source>删除</source>
             <translation>删除</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="704" />
+            <location filename="../qml/Main.qml" line="705" />
             <source>归档</source>
             <translation>归档</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="709" />
+            <location filename="../qml/Main.qml" line="710" />
             <source>取消旗标</source>
             <translation>取消旗标</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="709" />
+            <location filename="../qml/Main.qml" line="710" />
             <source>标为旗标</source>
             <translation>标为旗标</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="724" />
+            <location filename="../qml/Main.qml" line="725" />
             <source>删除账号？</source>
             <translation>删除账号？</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="726" />
+            <location filename="../qml/Main.qml" line="727" />
             <source>%1 的本地缓存和记住的口令会被删除，服务器上的邮件不受影响。</source>
             <translation>%1 的本地缓存和记住的口令会被删除，服务器上的邮件不受影响。</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="738" />
+            <location filename="../qml/Main.qml" line="739" />
             <source>取消</source>
             <translation>取消</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="755" />
+            <location filename="../qml/Main.qml" line="756" />
             <source>Save attachment</source>
             <translation>保存附件</translation>
         </message>
@@ -1458,6 +1463,54 @@ Alex
         </message>
     </context>
     <context>
+        <name>ProviderPicker</name>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="11" />
+            <source>Other mail account</source>
+            <translation>其他邮箱账户</translation>
+        </message>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="11" />
+            <source>Tencent Exmail</source>
+            <translation>腾讯企业邮箱</translation>
+        </message>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="13" />
+            <source>Microsoft OAuth and native Exchange are not available yet. Browser sign-in requires an application registration.</source>
+            <translation>暂未提供 Microsoft OAuth 和原生 Exchange 接入，浏览器登录需要先注册应用。</translation>
+        </message>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="14" />
+            <source>Use a Google app password with two-step verification. Some managed accounts require OAuth, which is not available yet.</source>
+            <translation>使用开启两步验证后生成的 Google 应用密码。部分受管理账户必须使用 OAuth，目前暂不支持。</translation>
+        </message>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="16" />
+            <source>Enable IMAP/SMTP in your webmail settings and use the client authorization code when required.</source>
+            <translation>请在网页版邮箱设置中开启 IMAP/SMTP，按服务商要求使用客户端授权码。</translation>
+        </message>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="17" />
+            <source>Enter the IMAP and SMTP settings supplied by your mail administrator.</source>
+            <translation>填写邮箱管理员提供的 IMAP 和 SMTP 配置。</translation>
+        </message>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="18" />
+            <source>Use an app-specific password generated in your provider account settings.</source>
+            <translation>使用在邮箱服务商账户设置中生成的应用专用密码。</translation>
+        </message>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="20" />
+            <source>Choose your provider</source>
+            <translation>选择邮箱提供商</translation>
+        </message>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="40" />
+            <source> · Not available yet</source>
+            <translation> · 暂未支持</translation>
+        </message>
+    </context>
+    <context>
         <name>SystemTray</name>
         <message>
             <location filename="../src/platform/SystemTray.cpp" line="16" />
@@ -1589,286 +1642,287 @@ Alex
     <context>
         <name>nkmail::MailController</name>
         <message>
-            <location filename="../src/MailController.cpp" line="71" />
+            <location filename="../src/MailController.cpp" line="73" />
             <source>Messages updated</source>
             <translation>邮件已更新</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="71" />
+            <location filename="../src/MailController.cpp" line="73" />
             <source>Mailbox operation needs attention</source>
             <translation>邮箱操作需要处理</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="98" />
+            <location filename="../src/MailController.cpp" line="100" />
             <source>New mail available</source>
             <translation>收到新邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="108" />
+            <location filename="../src/MailController.cpp" line="110" />
             <source>Saved credentials restored. Refresh to connect.</source>
             <translation>已恢复保存的凭据。收取邮件以连接服务器。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="113" />
+            <location filename="../src/MailController.cpp" line="115" />
             <source>Credentials saved in the system keychain.</source>
             <translation>凭据已保存到系统钥匙串。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="123" />
+            <location filename="../src/MailController.cpp" line="125" />
             <source>Account needs a password</source>
             <translation>账号需要密码</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="123" />
+            <location filename="../src/MailController.cpp" line="125" />
             <source>Enter an application password for this account.</source>
             <translation>请输入此账号的应用专用密码。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="126" />
+            <location filename="../src/MailController.cpp" line="128" />
             <source>System keychain needs attention</source>
             <translation>系统钥匙串需要处理</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="126" />
+            <location filename="../src/MailController.cpp" line="128" />
             <source>Credential storage or removal could not be completed. The local restore permission is authoritative; no plaintext fallback is used.</source>
             <translation>无法完成凭据的保存或移除。以本地恢复权限为准，不会改用明文保存。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="220" />
-            <location filename="../src/MailController.cpp" line="221" />
-            <location filename="../src/MailController.cpp" line="226" />
-            <location filename="../src/MailController.cpp" line="345" />
-            <location filename="../src/MailController.cpp" line="425" />
+            <location filename="../src/MailController.cpp" line="222" />
+            <location filename="../src/MailController.cpp" line="223" />
+            <location filename="../src/MailController.cpp" line="228" />
+            <location filename="../src/MailController.cpp" line="347" />
+            <location filename="../src/MailController.cpp" line="427" />
             <source>Storage unavailable</source>
             <translation>存储不可用</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="232" />
-            <location filename="../src/MailController.cpp" line="377" />
-            <location filename="../src/MailController.cpp" line="440" />
-            <location filename="../src/MailController.cpp" line="584" />
+            <location filename="../src/MailController.cpp" line="234" />
+            <location filename="../src/MailController.cpp" line="379" />
+            <location filename="../src/MailController.cpp" line="443" />
+            <location filename="../src/MailController.cpp" line="587" />
             <source>Offline · cached mail</source>
             <translation>离线 · 缓存邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="232" />
-            <location filename="../src/MailController.cpp" line="377" />
+            <location filename="../src/MailController.cpp" line="234" />
+            <location filename="../src/MailController.cpp" line="379" />
             <source>Add your email account to get started</source>
             <translation>添加邮箱账号以开始使用</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="268" />
-            <location filename="../src/MailController.cpp" line="432" />
+            <location filename="../src/MailController.cpp" line="270" />
+            <location filename="../src/MailController.cpp" line="435" />
             <source>Preview · synthetic mail · not connected</source>
             <translation>预览 · 模拟邮件 · 未连接</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="272" />
-            <location filename="../src/MailController.cpp" line="409" />
+            <location filename="../src/MailController.cpp" line="274" />
+            <location filename="../src/MailController.cpp" line="411" />
             <source>Preview mode</source>
             <translation>预览模式</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="272" />
-            <location filename="../src/MailController.cpp" line="409" />
+            <location filename="../src/MailController.cpp" line="274" />
+            <location filename="../src/MailController.cpp" line="411" />
             <source>Account changes are disabled in this synthetic preview.</source>
             <translation>此模拟预览不允许修改账号。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="278" />
+            <location filename="../src/MailController.cpp" line="280" />
             <source>Check account settings</source>
             <translation>检查账号设置</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="278" />
+            <location filename="../src/MailController.cpp" line="280" />
             <source>Enter an email address, username, valid server names and ports.</source>
             <translation>请输入邮箱地址、用户名以及有效的服务器名称和端口。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="293" />
+            <location filename="../src/MailController.cpp" line="295" />
             <source>Account change requires a separate data directory</source>
             <translation>修改账号身份需要独立的数据目录</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="293" />
+            <location filename="../src/MailController.cpp" line="295" />
             <source>Remove and re-add the account to change its email address, username or IMAP host.</source>
             <translation>若要更改邮箱地址、用户名或 IMAP 主机，请移除账号后重新添加。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="297" />
+            <location filename="../src/MailController.cpp" line="299" />
             <source>Could not save account</source>
             <translation>无法保存账号</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="305" />
+            <location filename="../src/MailController.cpp" line="307" />
             <source>Account saved.</source>
             <translation>账号已保存。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="326" />
+            <location filename="../src/MailController.cpp" line="328" />
             <source>Account saved. Refresh to connect.</source>
             <translation>账号已保存。收取邮件以连接服务器。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="331" />
-            <location filename="../src/MailController.cpp" line="410" />
+            <location filename="../src/MailController.cpp" line="333" />
+            <location filename="../src/MailController.cpp" line="412" />
             <source>Finish the current operation before switching accounts</source>
             <translation>切换账号前请先完成当前操作</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="417" />
+            <location filename="../src/MailController.cpp" line="419" />
             <source>Could not remove account</source>
             <translation>无法移除账号</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="429" />
+            <location filename="../src/MailController.cpp" line="431" />
             <source>No accounts left</source>
             <translation>没有剩余账号</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="434" />
-            <location filename="../src/MailController.cpp" line="707" />
+            <location filename="../src/MailController.cpp" line="437" />
+            <location filename="../src/MailController.cpp" line="710" />
             <source>Account needs attention</source>
             <translation>账号需要处理</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="434" />
+            <location filename="../src/MailController.cpp" line="437" />
             <source>Add an account and enter an application password before connecting.</source>
             <translation>连接前请先添加账号并输入应用专用密码。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="436" />
+            <location filename="../src/MailController.cpp" line="439" />
             <source>Connecting securely…</source>
             <translation>正在安全连接…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="466" />
+            <location filename="../src/MailController.cpp" line="434" />
+            <location filename="../src/MailController.cpp" line="469" />
             <source>Smart mailbox · current account cached messages</source>
             <translation>智能邮箱 · 当前账户的已缓存邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="482" />
-            <location filename="../src/MailController.cpp" line="492" />
+            <location filename="../src/MailController.cpp" line="485" />
+            <location filename="../src/MailController.cpp" line="495" />
             <source>Searching server…</source>
             <translation>正在搜索服务器…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="483" />
+            <location filename="../src/MailController.cpp" line="486" />
             <source>Preview · search synthetic cached messages</source>
             <translation>预览 · 搜索模拟缓存邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="484" />
+            <location filename="../src/MailController.cpp" line="487" />
             <source>Search · cached messages only</source>
             <translation>搜索 · 仅缓存邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="496" />
+            <location filename="../src/MailController.cpp" line="499" />
             <source>Search · server unavailable</source>
             <translation>搜索 · 服务器不可用</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="509" />
+            <location filename="../src/MailController.cpp" line="512" />
             <source>Search · cached + server</source>
             <translation>搜索 · 缓存与服务器</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="517" />
+            <location filename="../src/MailController.cpp" line="520" />
             <source>Preview · synthetic cached messages</source>
             <translation>预览 · 模拟缓存邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="518" />
+            <location filename="../src/MailController.cpp" line="521" />
             <source>Unread · cached messages only</source>
             <translation>未读 · 仅缓存邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="518" />
+            <location filename="../src/MailController.cpp" line="521" />
             <source>Cached messages only</source>
             <translation>仅缓存邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="565" />
+            <location filename="../src/MailController.cpp" line="568" />
             <source>%1 封新邮件</source>
             <translation>%1 封新邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="578" />
+            <location filename="../src/MailController.cpp" line="581" />
             <source>Fetching message headers…</source>
             <translation>正在获取邮件列表…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="589" />
+            <location filename="../src/MailController.cpp" line="592" />
             <source>Could not cache messages</source>
             <translation>无法缓存邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="620" />
+            <location filename="../src/MailController.cpp" line="623" />
             <source>Up to date · headers cached</source>
             <translation>已是最新 · 邮件列表已缓存</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="643" />
+            <location filename="../src/MailController.cpp" line="646" />
             <source>This message is not cached</source>
             <translation>此邮件尚未缓存</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="643" />
+            <location filename="../src/MailController.cpp" line="646" />
             <source>Connect to download its content.</source>
             <translation>请连接服务器以下载邮件内容。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="645" />
+            <location filename="../src/MailController.cpp" line="648" />
             <source>Loading message without changing server flags…</source>
             <translation>正在加载邮件，不更改服务器标记…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="648" />
+            <location filename="../src/MailController.cpp" line="651" />
             <source>Could not load message</source>
             <translation>无法加载邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="649" />
+            <location filename="../src/MailController.cpp" line="652" />
             <source>Could not cache content</source>
             <translation>无法缓存内容</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="650" />
+            <location filename="../src/MailController.cpp" line="653" />
             <source>Message cached · remote content blocked</source>
             <translation>邮件已缓存 · 远程内容已屏蔽</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="678" />
+            <location filename="../src/MailController.cpp" line="681" />
             <source>Disconnected · cached mail available</source>
             <translation>已断开连接 · 可阅读缓存邮件</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="695" />
+            <location filename="../src/MailController.cpp" line="698" />
             <source>Archive folder unavailable</source>
             <translation>归档文件夹不可用</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="695" />
+            <location filename="../src/MailController.cpp" line="698" />
             <source>This account has no Archive, Archives or All Mail folder.</source>
             <translation>此账号没有归档或全部邮件文件夹。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="699" />
+            <location filename="../src/MailController.cpp" line="702" />
             <source>Choose a different destination folder</source>
             <translation>请选择其他目标文件夹</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="705" />
+            <location filename="../src/MailController.cpp" line="708" />
             <source>Another mail operation is in progress</source>
             <translation>另一项邮件操作正在进行</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="707" />
+            <location filename="../src/MailController.cpp" line="710" />
             <source>Enter an application password before changing messages.</source>
             <translation>修改邮件前请输入应用专用密码。</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="722" />
+            <location filename="../src/MailController.cpp" line="725" />
             <source>Updating messages…</source>
             <translation>正在更新邮件…</translation>
         </message>
@@ -1986,32 +2040,37 @@ Alex
             <translation>SMTP 服务器已接受邮件 · 尚未确认送达</translation>
         </message>
         <message>
-            <location filename="../src/services/SendService.cpp" line="64" />
+            <location filename="../src/services/SendService.cpp" line="62" />
+            <source>SMTP server accepted this message · server manages the Sent copy</source>
+            <translation>SMTP 服务器已接受邮件 · 已发送副本由服务器管理</translation>
+        </message>
+        <message>
+            <location filename="../src/services/SendService.cpp" line="69" />
             <source>SMTP server accepted this message · no Sent folder found, no copy saved</source>
             <translation>SMTP 服务器已接受邮件 · 未找到已发送文件夹，未保存副本</translation>
         </message>
         <message>
-            <location filename="../src/services/SendService.cpp" line="76" />
+            <location filename="../src/services/SendService.cpp" line="81" />
             <source>SMTP server accepted this message · copy saved to %1</source>
             <translation>SMTP 服务器已接受邮件 · 副本已保存到 %1</translation>
         </message>
         <message>
-            <location filename="../src/services/SendService.cpp" line="77" />
+            <location filename="../src/services/SendService.cpp" line="82" />
             <source>SMTP server accepted this message · copy could not be saved to %1</source>
             <translation>SMTP 服务器已接受邮件 · 无法将副本保存到 %1</translation>
         </message>
         <message>
-            <location filename="../src/services/SendService.cpp" line="80" />
+            <location filename="../src/services/SendService.cpp" line="85" />
             <source>Send result unknown · not retried</source>
             <translation>发送结果未知 · 未重试</translation>
         </message>
         <message>
-            <location filename="../src/services/SendService.cpp" line="80" />
+            <location filename="../src/services/SendService.cpp" line="85" />
             <source>Message not accepted · draft preserved</source>
             <translation>邮件未被接受 · 草稿已保留</translation>
         </message>
         <message>
-            <location filename="../src/services/SendService.cpp" line="88" />
+            <location filename="../src/services/SendService.cpp" line="93" />
             <source>Send cancelled</source>
             <translation>已撤销发送</translation>
         </message>

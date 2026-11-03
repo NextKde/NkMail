@@ -161,7 +161,7 @@ void CoreTests::mapRoundTrips()
     a.address = QStringLiteral("test@example.invalid");
     a.password = QStringLiteral("NEVER-SERIALIZE-THIS-SYNTHETIC-SECRET");
     a.caFile = QStringLiteral("/isolated/test-ca.pem");
-    a.imapStartTls = true;
+    a.imapStartTls = true; a.serverSavesSent = true;
     const auto accountValues = accountMap(a);
     QVERIFY(!accountValues.contains("password"));
     QVERIFY(!QJsonDocument::fromVariant(accountValues).toJson().contains(a.password.toUtf8()));
@@ -171,6 +171,8 @@ void CoreTests::mapRoundTrips()
     QCOMPARE(restored.smtpPort, 465);
     QCOMPARE(restored.caFile, a.caFile);
     QVERIFY(restored.imapStartTls);
+    QVERIFY(restored.serverSavesSent);
+    QVERIFY(!accountFromMap({}).serverSavesSent);
     QVERIFY(restored.password.isEmpty());
     QCOMPARE(accountFromMap({{"password", a.password}}).password, a.password);
     Draft d;
