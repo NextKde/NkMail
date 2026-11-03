@@ -155,6 +155,29 @@ TestCase {
         }
     }
 
+    function test_context_menu_uses_click_position_and_stays_in_window() {
+        activateApp()
+        const row = findChild(app, "messageList").itemAtIndex(0)
+        const menu = findChild(row, "messageRowMenu")
+        for (const point of [Qt.point(28, 12), Qt.point(120, 24)]) {
+            mouseClick(row, point.x, point.y, Qt.RightButton)
+            tryCompare(menu, "opened", true)
+            const expected = row.mapToItem(menu.parent, point.x, point.y)
+            tryCompare(menu, "x", expected.x)
+            tryCompare(menu, "y", expected.y)
+            verify(!menu.arrowVisible)
+            menu.close()
+            wait(30)
+        }
+        const corner = row.mapFromItem(menu.parent, menu.parent.width - 2, menu.parent.height - 2)
+        row.openContextMenu(corner)
+        tryCompare(menu, "opened", true)
+        verify(menu.x >= menu.margins && menu.y >= menu.margins)
+        verify(menu.x + menu.width <= menu.parent.width - menu.margins + 1)
+        verify(menu.y + menu.height <= menu.parent.height - menu.margins + 1)
+        menu.close()
+    }
+
     function test_context_delete_preserves_selected_rows() {
         const pane = findChild(app, "messagePane")
         const list = findChild(app, "messageList")

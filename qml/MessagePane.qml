@@ -87,10 +87,25 @@ Rectangle {
                     else if (action === "delete") mail.deleteMessages(rows)
                     else if (action === "move") mail.moveMessages(rows, value)
                 }
-                function openContextMenu() {
+                property point contextPosition: Qt.point(0, 0)
+                function openMenuAtContext(menu) {
+                    function place() {
+                        const edge = menu.margins
+                        menu.x = Math.max(edge, Math.min(contextPosition.x, menu.parent.width - menu.width - edge))
+                        menu.y = Math.max(edge, Math.min(contextPosition.y, menu.parent.height - menu.height - edge))
+                    }
+                    place()
+                    menu.open()
+                    Qt.callLater(place)
+                }
+                function openContextMenu(position) {
+                    // Pointer invocation uses the actual click; keyboard/review
+                    // invocation falls back to the middle of the selected row.
+                    const point = position || Qt.point(width / 2, height / 2)
+                    contextPosition = mapToItem(rowMenu.parent, point.x, point.y)
                     if (!root.selection.isRowSelected(index)) root.selection.clearSelection()
                     selectRow()
-                    rowMenu.openAtAnchor()
+                    openMenuAtContext(rowMenu)
                 }
                 function selectRow() { mail.openMessage(uid, uidValidity, folder); root.messageOpened() }
                 function openRow() {
@@ -112,13 +127,13 @@ Rectangle {
                 }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    onTapped: messageRow.openContextMenu()
+                    onTapped: (eventPoint) => messageRow.openContextMenu(eventPoint.position)
                 }
                 LiquidPopover {
                     id: rowMenu
                     objectName: "messageRowMenu"
                     sourceItem: root.surface
-                    anchorItem: messageRow
+                    arrowEnabled: false
                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
                     LiquidPopoverItem { text: qsTr("打开"); iconName: "reminder"; enabled: !messageRow.bulkMenu; onTriggered: messageRow.openRow() }
                     LiquidPopoverItem { objectName: "rowReply"; text: qsTr("Reply"); iconName: "undo"; enabled: messageRow.canCompose; onTriggered: messageRow.composeMessage("reply") }
@@ -140,7 +155,7 @@ Rectangle {
                         text: qsTr("移动到…")
                         iconName: "folder"
                         enabled: mail.folders.filter(f => f.id !== messageRow.folder).length > 0
-                        onTriggered: { rowMenu.close(); messageMoveMenu.openAtAnchor() }
+                        onTriggered: { rowMenu.close(); messageRow.openMenuAtContext(messageMoveMenu) }
                     }
                     LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; onTriggered: messageRow.contextCommand("archive") }
                     LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; onTriggered: messageRow.contextCommand("delete") }
@@ -149,7 +164,7 @@ Rectangle {
                     id: messageMoveMenu
                     objectName: "messageMoveMenu"
                     sourceItem: root.surface
-                    anchorItem: messageRow
+                    arrowEnabled: false
                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
                     Repeater {
                         model: mail.folders.filter(f => f.id !== messageRow.folder)

@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Pointer-positioned message context menu · 2026-11-03
+
+- Message right-click menus now use TapHandler pointer coordinates instead of anchoring below the whole row. Context menus omit the anchor arrow and clamp inside the overlay; Move-to uses the saved context point. Non-pointer review invocation falls back to row center.
+- UI regression passed (12.44s), including real right-clicks at distinct positions and bottom/right boundary placement. Synthetic Wayland capture inspected.
+
 ## More menu empty first row · 2026-11-03
 
 - The compact-only Display item was invisible on wide windows but retained its 30px MenuItem height. Explicitly collapse its height with the compact-options condition. Shared Kos.Ui stays unchanged.
