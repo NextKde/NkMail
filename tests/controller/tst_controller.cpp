@@ -396,6 +396,7 @@ void ControllerTests::imagesCacheRenderedContentPerAccount()
     loader.load(key, html);
     QTRY_COMPARE(loaded.count(), 1);
     QVERIFY(loader.cached(key, html).contains("data:image/png;base64,"));
+    QVERIFY(loader.cached(key, html).contains("width=\"1\" height=\"1\""));
     loader.load(key, html);
     QCOMPARE(loaded.count(), 2); QCOMPARE(requests, 1);
     QVERIFY(second != key);

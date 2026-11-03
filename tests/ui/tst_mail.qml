@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import Kos.Ui
 import "../../qml/MailboxNavigation.js" as Navigation
+import "../../qml/ReaderLayout.js" as ReaderLayout
 import NextKde.Mail.TestViews 1.0 as App
 
 TestCase {
@@ -221,6 +222,36 @@ TestCase {
         compare(mock.deletedRow, 0)
         messageModel.clear(); messageModel.append(original)
         mock.selectedMessage = selected; mock.selectedUid = "1"
+    }
+    function test_reader_header_long_content_and_resize() {
+        const message = Object.assign({}, mock.selectedMessage, {
+            subject: "A long subject that must wrap without covering the details action. ".repeat(4),
+            to: "recipient@example.invalid, ".repeat(12)
+        })
+        const reader = createTemporaryObject(readerComponent, testCase, {
+            mail: mock, message: message, hasMessage: true, width: 600, height: 600
+        })
+        wait(50)
+        const header = findChild(reader, "mailMessageHeader")
+        const subject = findChild(reader, "readerSubject")
+        const details = findChild(reader, "messageDetailsButton")
+        verify(subject.height > 20)
+        verify(details.mapToItem(header, 0, 0).x >= 0)
+        reader.width = 330
+        wait(50)
+        verify(header.compact)
+        const pos = details.mapToItem(header, 0, 0)
+        verify(pos.x >= 0 && pos.x + details.width <= header.width + 1)
+        verify(pos.y >= subject.mapToItem(header, 0, subject.height).y)
+        header.expanded = true
+        verify(details.text.length > 0)
+    }
+    function test_reader_images_fit_without_changing_remote_placeholders() {
+        const image = '<img width="1200" height="600" src="data:image/png;base64,AAAA">'
+        verify(ReaderLayout.fitImages(image, 300).includes('width="300" height="150"'))
+        compare(ReaderLayout.fitImages(image, 1600), image)
+        const blocked = '<img data-nkmail-src="https://example.invalid/image">'
+        compare(ReaderLayout.fitImages(blocked, 300), blocked)
     }
     function test_views_load_without_shell_context() {
         const reader = createTemporaryObject(readerComponent, testCase, {

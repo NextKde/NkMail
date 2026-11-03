@@ -805,6 +805,29 @@
         </message>
     </context>
     <context>
+        <name>MailMessageHeader</name>
+        <message>
+            <location filename="../qml/MailMessageHeader.qml" line="45" />
+            <source>(No subject)</source>
+            <translation>（无主题）</translation>
+        </message>
+        <message>
+            <location filename="../qml/MailMessageHeader.qml" line="51" />
+            <source>To: </source>
+            <translation>收件人：</translation>
+        </message>
+        <message>
+            <location filename="../qml/MailMessageHeader.qml" line="82" />
+            <source>Hide details</source>
+            <translation>收起详情</translation>
+        </message>
+        <message>
+            <location filename="../qml/MailMessageHeader.qml" line="82" />
+            <source>Details</source>
+            <translation>详情</translation>
+        </message>
+    </context>
+    <context>
         <name>MailSidebar</name>
         <message>
             <location filename="../qml/MailSidebar.qml" line="160" />
@@ -1305,113 +1328,97 @@ Alex
     <context>
         <name>MessageReader</name>
         <message>
-            <location filename="../qml/MessageReader.qml" line="68" />
-            <location filename="../qml/MessageReader.qml" line="98" />
+            <location filename="../qml/MessageReader.qml" line="76" />
             <source>Message details</source>
             <translation>邮件详情</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="99" />
-            <source>关闭</source>
-            <translation>关闭</translation>
-        </message>
-        <message>
-            <location filename="../qml/MessageReader.qml" line="99" />
+            <location filename="../qml/MessageReader.qml" line="77" />
             <source>Close message details</source>
             <translation>关闭邮件详情</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="120" />
+            <location filename="../qml/MessageReader.qml" line="98" />
             <source>From</source>
             <translation>发件人</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="121" />
+            <location filename="../qml/MessageReader.qml" line="99" />
             <source>To</source>
             <translation>收件人</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="122" />
+            <location filename="../qml/MessageReader.qml" line="100" />
             <source>Cc</source>
             <translation>抄送</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="123" />
+            <location filename="../qml/MessageReader.qml" line="101" />
             <source>Date</source>
             <translation>日期</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="124" />
+            <location filename="../qml/MessageReader.qml" line="102" />
             <source>Message ID</source>
             <translation>邮件 ID</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="134" />
+            <location filename="../qml/MessageReader.qml" line="112" />
             <source>Reading does not change server flags.</source>
             <translation>阅读不会更改服务器标记。</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="46" />
-            <source>(No subject)</source>
-            <translation>（无主题）</translation>
-        </message>
-        <message>
-            <location filename="../qml/MessageReader.qml" line="59" />
-            <source>To: </source>
-            <translation>收件人：</translation>
-        </message>
-        <message>
-            <location filename="../qml/MessageReader.qml" line="152" />
+            <location filename="../qml/MessageReader.qml" line="130" />
             <source>%1 张远程图片已隐藏</source>
             <translation>%1 张远程图片已隐藏</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="157" />
+            <location filename="../qml/MessageReader.qml" line="135" />
             <source>显示图片</source>
             <translation>显示图片</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="158" />
+            <location filename="../qml/MessageReader.qml" line="136" />
             <source>Load remote images</source>
             <translation>加载远程图片</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="182" />
+            <location filename="../qml/MessageReader.qml" line="160" />
             <source>Link copied to clipboard</source>
             <translation>链接已复制到剪贴板</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="206" />
+            <location filename="../qml/MessageReader.qml" line="184" />
             <source>保存</source>
             <translation>保存</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="206" />
+            <location filename="../qml/MessageReader.qml" line="184" />
             <source>Save attachment</source>
             <translation>保存附件</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="218" />
+            <location filename="../qml/MessageReader.qml" line="196" />
             <source>Pick up where you left off.</source>
             <translation>继续上次的写作。</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="218" />
+            <location filename="../qml/MessageReader.qml" line="196" />
             <source>A moment of quiet.</source>
             <translation>享受片刻安静。</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="219" />
+            <location filename="../qml/MessageReader.qml" line="197" />
             <source>Choose a draft to continue writing.</source>
             <translation>选择一封草稿继续撰写。</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="219" />
+            <location filename="../qml/MessageReader.qml" line="197" />
             <source>Select a message to read it here.</source>
             <translation>选择一封邮件，在这里阅读。</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="220" />
+            <location filename="../qml/MessageReader.qml" line="198" />
             <source>Add an account</source>
             <translation>添加账号</translation>
         </message>

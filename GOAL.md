@@ -1,5 +1,11 @@
 # NkMail local delivery goal
 
+## Compact reader · 2026-11-03
+
+- Independent MailMessageHeader presents sender, subject, recipient, source, time and inline details. Narrow layouts stack safely; long subjects wrap. ReaderLayout scales explicitly loaded data images using dimensions provided by RemoteImageLoader, preserving aspect ratio and blocked remote placeholders. Existing sanitizer and attachment behavior remain.
+- Host full CTest passed 8/8 in 43.20s, including long-header and image sizing regressions. UI dependency gate and 32 guard tests passed. Chinese/light and English/dark synthetic Wayland screenshots inspected; compositor traffic lights are outside these captures.
+- Final audit found a wizard save rejection could leave submitting true when mailbox work is busy; follow-up fix is next.
+
 ## Account-scoped mailbox navigation · 2026-11-03
 
 - Background/favorite unread badges read account-scoped cached counts. Added independent navigation ordering, server special-use role preservation/storage (schema v5), explicit local/server drafts and transient account sync/error text. Same-named folder identities remain distinct.
