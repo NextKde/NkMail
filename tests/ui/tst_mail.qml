@@ -392,6 +392,28 @@ TestCase {
         const blocked = '<img data-nkmail-src="https://example.invalid/image">'
         compare(ReaderLayout.fitImages(blocked, 300), blocked)
     }
+    function test_reader_notification_layout_and_blocked_images() {
+        const html = '<div>Account activity</div>\n    <br><div> </div><div><span>&nbsp;</span></div>'
+            + '<img data-nkmail-src="https://example.invalid/logo" alt=""> | | <br><br><br><br>'
+            + '<p>Device: Example browser | Example OS</p><pre>  code | \n  line</pre>'
+        const rendered = ReaderLayout.readableHtml(html, 320)
+        verify(!rendered.includes('<img'))
+        verify(!rendered.includes(' | | '))
+        verify(!rendered.includes('<br><br><br>'))
+        verify(rendered.includes('Example browser | Example OS'))
+        verify(rendered.includes('<pre>  code | \n  line</pre>'))
+        const original = mock.selectedMessage
+        try {
+            mock.selectedMessage = Object.assign({}, original, {html: html})
+            const body = findChild(app, "messageBody")
+            tryVerify(() => body.getText(0, body.length).includes("Account activity"))
+            const plain = body.getText(0, body.length)
+            verify(!plain.includes("\uFFFC"), "Blocked images must not produce broken image objects")
+            verify(!plain.includes(" | | "))
+            verify(plain.includes("Example browser | Example OS"))
+            verify(body.contentHeight < 280, "Notification must not grow into pages of empty space")
+        } finally { mock.selectedMessage = original }
+    }
     function test_smart_loading_does_not_select_same_uid_in_other_folder() {
         const original = mock.selectedMessage
         mock.smartMailbox = "flagged"

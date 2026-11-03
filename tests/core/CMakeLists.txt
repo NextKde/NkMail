@@ -8,6 +8,7 @@ find_package(Qt6Keychain REQUIRED)
 enable_testing()
 add_executable(nkmail_core_tests
     tst_core.cpp
+    ../../src/mail/HtmlSanitizer.cpp
     ../../src/MailTypes.cpp
     ../../src/MessageListModel.cpp ../../src/MessageListModel.h
     ../../src/FolderListModel.cpp ../../src/FolderListModel.h

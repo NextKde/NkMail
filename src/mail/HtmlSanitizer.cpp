@@ -61,7 +61,7 @@ bool isVoidAllowed(const QString &name)
 {
     return name == QStringLiteral("br") || name == QStringLiteral("hr");
 }
-// Table structure that Qt rich text cannot wrap; degraded to row text instead.
+// Flatten table layout into readable blocks; never invent cell text.
 bool isTableLayoutTag(const QString &name)
 {
     return name == QStringLiteral("table") || name == QStringLiteral("thead")
@@ -405,16 +405,14 @@ QString sanitizeMailHtml(const QString &input)
             }
             if (!tag.name.isEmpty()) {
                 if (isTableLayoutTag(tag.name)) {
-                    // Qt rich text does not wrap inside tables, so wide tables
-                    // overflow the reading pane. Degrade the structure to plain
-                    // row text: rows become lines, cells are pipe-separated.
+                    // Keep rows separate without fixed widths, spacer geometry
+                    // or synthetic pipe characters in the message text.
                     if (tag.name == QStringLiteral("tr")) {
-                        if (!tag.closing)
-                            out += QLatin1String("<br>");
+                        out += tag.closing ? QLatin1String("</div>") : QLatin1String("<div>");
                     } else if (tag.name == QStringLiteral("td")
                                || tag.name == QStringLiteral("th")) {
                         if (tag.closing)
-                            out += QLatin1String(" | ");
+                            out += QLatin1String(" ");
                     }
                     // table, thead, tbody: drop the tag, keep the content.
                 } else if (tag.closing) {

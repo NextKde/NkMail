@@ -444,3 +444,9 @@ The scoped local implementation is substantially complete, but real-provider rea
 - User requested an additional account entry in the inbox empty state. Added a canonical KosButton with the neutral secondary solid style (30px, no liquid rendering or raised surface). Sidebar entry remains; reader duplicate remains removed. Both entries open addAccount().
 - VM build passed. Final UI regression passed 48 cases including init/cleanup in 37.65s; i18n and catalog checks passed (0.04s / 0.10s). The first UI attempt checked visibility before the empty list updated; now the regression waits for the list count and button visibility before clicking.
 - At the user's explicit request, rebuilt and replaced the host's normal Chinese-mode NkMail process without modifying account/mail data. Automated tests ran only in the VM.
+
+## Reader layout correction · 2026-11-03
+
+- Corrected table fallback separators, blocked-image broken icons, empty layout blocks and source whitespace in the rich-text reader; old cached presentation is normalized without rewriting mail data. Inline pipes/preformatted text are preserved. Header mailbox labels are translated. Full browser/CSS fidelity remains out of scope for this Qt rich-text correction.
+- VM final UI/core checks passed 2/2 in 39.05s (49 UI / 22 core cases including init/cleanup). i18n/catalog and loopback protocol passed. Synthetic software capture inspected; see docs/progress/2026-11-03-reader-layout/. The initial UI assertion compared serialized rich HTML and was replaced with rendered-text/geometry assertions.
+- Host rebuilt and normal Chinese-mode process replaced for requested manual inspection. No host automated tests. No real email or screenshot published.

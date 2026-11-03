@@ -49,7 +49,7 @@ Rectangle {
                         Layout.topMargin: 12
                         message: root.message
                         localeName: root.localeName
-                        sourceLabel: (root.mail.account.name || root.mail.account.address || "") + " · " + (root.message.folder || root.mail.currentFolder)
+                        sourceLabel: (root.mail.account.name || root.mail.account.address || "") + " · " + MailLabels.mailboxTitle({id: root.message.folder || root.mail.currentFolder})
                         expanded: root.detailsVisible
                         onToggleDetails: root.detailsVisible ? root.closeDetailsRequested() : root.detailsRequested()
                     }
@@ -145,7 +145,7 @@ Rectangle {
                         Layout.preferredHeight: Math.max(200, contentHeight)
                         readonly property string richHtml: MailLabels.value(root.message, "html") || ""
                         readonly property bool asRich: root.showRichText && String(richHtml).length > 0
-                        text: asRich ? ReaderLayout.fitImages(richHtml, width) : MailLabels.value(root.message, "text")
+                        text: asRich ? ReaderLayout.readableHtml(richHtml, width) : MailLabels.value(root.message, "text")
                         textFormat: asRich ? TextEdit.RichText : TextEdit.PlainText
                         readOnly: true; selectByMouse: true
                         wrapMode: TextEdit.Wrap

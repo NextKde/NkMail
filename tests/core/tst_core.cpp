@@ -1,4 +1,5 @@
 #include "MailTypes.h"
+#include "mail/HtmlSanitizer.h"
 #include "MessageListModel.h"
 #include "FolderListModel.h"
 #include "storage/MailDatabase.h"
@@ -47,6 +48,20 @@ Page page(QList<Summary> messages, QString generation = QStringLiteral("100"))
 class CoreTests : public QObject {
     Q_OBJECT
 private slots:
+    void notificationTablesDoNotInventTextOrExposeRemoteImages() {
+        const auto html = sanitizeMailHtml(QStringLiteral(
+            "<table width='900'><tr><td><p>Activity</p></td></tr>"
+            "<tr><td height='200'>&nbsp;</td></tr>"
+            "<tr><td>Device</td><td>Example browser</td></tr></table>"
+            "<img src='https://example.invalid/logo' onerror='bad()'>"
+            "<script>bad()</script><pre>A | B</pre>"));
+        QCOMPARE(html.count(QStringLiteral(" | ")), 1);
+        QVERIFY(html.contains(QStringLiteral("<div>Device Example browser </div>")));
+        QVERIFY(html.contains(QStringLiteral("data-nkmail-src=\"https://example.invalid/logo\"")));
+        QVERIFY(!html.contains(QStringLiteral("<img src=")));
+        QVERIFY(!html.contains(QStringLiteral("bad()")));
+        QVERIFY(html.contains(QStringLiteral("<pre>A | B</pre>")));
+    }
     void smartMailboxesPreserveScopeIdentityAndPagination() {
         QTemporaryDir dir(temporaryTemplate());
         MailDatabase db;
