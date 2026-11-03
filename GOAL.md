@@ -1,5 +1,11 @@
 # NkMail local delivery goal
 
+## Provider icon sizing correction · 2026-11-03
+
+- Unified the icon column to 28px and enlarged Other's envelope to 28px. NetEase wordmarks now show only the numeric brand portion within a 24px square tile, removing long taglines and domain names.
+- Host build and UI regression passed (10.93s); updated synthetic light screenshot inspected.
+- iCloud is an IMAP/SMTP app-specific-password preset, not an Apple Account browser sign-in integration. No real iCloud account has been validated; official setup requirements were rechecked against Apple support.
+
 ## Provider logo follow-up · 2026-11-03
 
 - User requested each provider's own logo. Added local provider identity assets, using shared LiquidNavigationButton behavior with an app-owned content layout to preserve brand colors and wide NetEase wordmarks. Other keeps its generic envelope; sources and rights are recorded in data/providers/README.md. No runtime provider requests or shared component edits.

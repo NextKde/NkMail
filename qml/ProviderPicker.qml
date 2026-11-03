@@ -44,19 +44,23 @@ ColumnLayout {
                     contentItem: RowLayout {
                         spacing: 10
                         Item {
-                            Layout.preferredWidth: 52
+                            Layout.preferredWidth: 28
                             Layout.fillHeight: true
                             Rectangle {
                                 anchors.centerIn: parent
-                                width: 56; height: 20; radius: 3
+                                width: 24; height: 24; radius: 4
                                 color: "white"
-                                visible: AppTheme.dark && (providerRow.modelData === 5 || providerRow.modelData === 6)
+                                visible: providerRow.modelData === 5 || providerRow.modelData === 6
                             }
                             Image {
                                 objectName: "providerLogo_" + Profiles.ids[providerRow.modelData]
                                 anchors.centerIn: parent
-                                width: providerRow.modelData === 5 || providerRow.modelData === 6 ? 52 : 24
+                                width: providerRow.modelData === 5 || providerRow.modelData === 6 ? 22 : 24
                                 height: 24
+                                // Show only the compact numeric brand mark, not the
+                                // adjacent website/tagline from the original asset.
+                                sourceClipRect: providerRow.modelData === 5 ? Qt.rect(0, 0, 122, 60)
+                                    : providerRow.modelData === 6 ? Qt.rect(0, 0, 123, 62) : Qt.rect(0, 0, 0, 0)
                                 source: Profiles.logo(Profiles.ids[providerRow.modelData])
                                 fillMode: Image.PreserveAspectFit
                                 visible: source.toString().length > 0
@@ -65,7 +69,7 @@ ColumnLayout {
                             VectorIcon {
                                 anchors.centerIn: parent
                                 visible: providerRow.modelData === 0
-                                name: "envelope"; size: 20; color: AppTheme.accent
+                                name: "envelope"; size: 28; color: AppTheme.accent
                             }
                         }
                         Text {

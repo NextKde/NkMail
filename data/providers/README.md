@@ -13,4 +13,4 @@ Bundled for offline provider identification in account setup, retrieved 2026-11-
 | aol.png | https://assets.aolcdn.com/uploader/aolfp/images/favicon/v4/72.png (linked by https://www.aol.com) |
 | microsoft.ico | https://www.microsoft.com/favicon.ico |
 
-Images retain their original bytes. The UI preserves aspect ratios and does not fetch these URLs at runtime. The generic Other provider uses the existing Kos.Ui envelope glyph.
+Images retain their original bytes. For 163/126, the UI clips to the numeric mark and places it on a compact square tile; the source PNGs remain intact. The UI preserves aspect ratios and does not fetch these URLs at runtime. The generic Other provider uses the existing Kos.Ui envelope glyph.

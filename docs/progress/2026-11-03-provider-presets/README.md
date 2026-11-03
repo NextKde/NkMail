@@ -15,3 +15,5 @@ Validation: full CTest suite, including UI, translations, controller and 44 synt
 Logo follow-up validation: host build, UI suite (11.14s), catalog/i18n checks and canonical dependency gate passed. Every branded resource is decoded in the UI regression.
 
 ![Synthetic English dark provider picker](providers-dark.png)
+
+Sizing correction: a shared 28px icon column, a larger generic envelope, and compact numeric 163/126 brand marks on square tiles replace the long wordmarks. UI regression passed (10.93s). iCloud remains an app-password IMAP/SMTP preset with no live-account acceptance claim.
