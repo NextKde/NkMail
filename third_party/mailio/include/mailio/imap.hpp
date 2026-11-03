@@ -128,6 +128,7 @@ public:
     {
         std::map<std::string, mailbox_folder_t> folders;
         bool selectable = false;
+        std::vector<std::string> attributes;
     };
 
 
@@ -596,6 +597,10 @@ public:
     @throw *          `parse_tag_result(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
     **/
     std::set<std::string> capabilities();
+
+    // RFC 2971: disclose only a static client name, after ID is advertised.
+    // False means the server rejected this optional extension.
+    bool client_id(const std::string& name);
 
     /**
     Searching a mailbox.

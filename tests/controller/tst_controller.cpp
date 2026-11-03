@@ -3,6 +3,7 @@
 #include "mail/backend.h"
 #include "mail/MailTransport.h"
 #include "services/AccountSession.h"
+#include "services/AccountSetup.h"
 #include "services/RemoteImageLoader.h"
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -34,12 +35,14 @@ std::function<void(CredentialStore *, const QString &)> readCredential;
 QMutex callsMutex;
 QList<int> offsets;
 QStringList contentUids;
+std::atomic_int sentFolderCalls{0};
 std::atomic_int folderCalls{0}, pageCalls{0}, contentCalls{0}, sendCalls{0};
 std::atomic_int credentialReads{0}, credentialWrites{0}, credentialDeletes{0};
 QString lastPassword;
 QStringList credentialReadKeys, credentialWriteKeys, credentialDeleteKeys;
 void reset()
 {
+    sentFolderCalls = 0;
     folders = [](const Account &) { return QList<Folder>{{"INBOX", "Inbox", 120}, {"Archive", "Archive", 0}}; };
     page = [](const Account &, const QString &folder, int offset, int limit) {
         Page p;
@@ -100,6 +103,7 @@ SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *)
 }
 QString MailioBackend::sentFolder(const Account &)
 {
+    ++synthetic::sentFolderCalls;
     return QStringLiteral("Sent");
 }
 void MailioBackend::appendSent(const Account &, const QString &, const QByteArray &)
@@ -128,6 +132,7 @@ void MailioBackend::copyMany(const Account &, const QString &, const QString &, 
 void MailioBackend::expungeMany(const Account &, const QString &, const QString &, const QStringList &, bool *)
 {
 }
+void MailioBackend::verifySmtp(const Account &) {}
 InboxStats MailioBackend::inboxStats(const Account &)
 {
     return {};
@@ -199,6 +204,74 @@ struct ReleaseOnExit {
 class ControllerTests : public QObject {
     Q_OBJECT
 private slots:
+    void smartMailboxOpensDuplicateUidFromSourceFolder() {
+        QTemporaryDir root(temporaryTemplate());
+        QVERIFY(seed(root.path(), 0, false));
+        {
+            MailDatabase db; QVERIFY(db.open(root.path()));
+            for (const auto &folder : {QString("INBOX"), QString("Archive")}) {
+                Summary summary; summary.folder = folder; summary.uid = "1";
+                summary.uidValidity = folder == "INBOX" ? "100" : "200";
+                summary.flagged = true;
+                Page page; page.folder = folder; page.uidValidity = summary.uidValidity; page.messages = {summary};
+                QVERIFY(db.savePage(page));
+                Content content; content.summary = summary; content.text = folder;
+                QVERIFY(db.saveContent(content));
+            }
+        }
+        MailController controller(false, root.path());
+        QTRY_VERIFY(controller.configured());
+        controller.selectSmartMailbox("flagged");
+        QCOMPARE(messages(controller)->count(), 2);
+        controller.openMessage("1", "200", "Archive");
+        QCOMPARE(controller.selectedMessage().value("text").toString(), QString("Archive"));
+        controller.openMessage("1", "100", "INBOX");
+        QCOMPARE(controller.selectedMessage().value("text").toString(), QString("INBOX"));
+        QCOMPARE(synthetic::contentCalls.load(), 0);
+        controller.selectFolder("INBOX");
+        QVERIFY(controller.smartMailbox().isEmpty());
+        QCOMPARE(messages(controller)->count(), 1);
+    }
+    void serverManagedSentCopyDoesNotAppendOrResend() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path()));
+        { MailDatabase db; QVERIFY(db.open(root.path())); auto a = db.account(); a.serverSavesSent = true; QVERIFY(db.saveAccount(a)); }
+        MailController controller(false, root.path());
+        QTRY_VERIFY(controller.status().contains("restored"));
+        auto draft = controller.newDraft(); draft.insert("to", "nobody@example.invalid");
+        controller.sendDraft(draft);
+        QTRY_COMPARE(synthetic::sendCalls.load(), 1);
+        QTRY_VERIFY(!controller.sending());
+        QCOMPARE(synthetic::sentFolderCalls.load(), 0);
+        QCOMPARE(controller.loadDraft(draft.value("id").toString()).value("state").toString(), QString("accepted"));
+        controller.sendDraft(draft);
+        QCOMPARE(synthetic::sendCalls.load(), 1);
+    }
+    void setupChecksBothServersWithoutSending() {
+        class Probe final : public MailTransport {
+        public:
+            std::atomic_int imap{0}, smtp{0};
+            bool fail = false;
+            QList<Folder> folders(const Account &) override { ++imap; return {}; }
+            void verifySmtp(const Account &) override { ++smtp; if (fail) throw std::runtime_error("private-server-error"); }
+        };
+        auto transport = std::make_shared<Probe>();
+        AccountSetup setup(transport, true);
+        QSignalSpy finished(&setup, &AccountSetup::finished);
+        setup.verify({}, "synthetic-password");
+        setup.verify({}, "duplicate");
+        QTRY_COMPARE(finished.count(), 1);
+        QVERIFY(finished.at(0).at(0).toBool());
+        QCOMPARE(transport->imap.load(), 1); QCOMPARE(transport->smtp.load(), 1);
+        QCOMPARE(synthetic::sendCalls.load(), 0);
+        QCOMPARE(synthetic::credentialWrites.load(), 0);
+        transport->fail = true;
+        setup.verify({}, "retry");
+        QTRY_COMPARE(finished.count(), 2);
+        QVERIFY(!finished.at(1).at(0).toBool());
+        QVERIFY(!finished.at(1).at(1).toString().contains("private-server-error"));
+        QCOMPARE(setup.stage(), QString("failed"));
+    }
+
     void initTestCase() { QVERIFY(QDir().mkpath(QStringLiteral(NKMAIL_CONTROLLER_TMP_ROOT))); }
     void init() { synthetic::reset(); }
     void demoNeverUsesExternalBoundaries();
@@ -280,6 +353,9 @@ void ControllerTests::commandServiceRejectsInvalidMove()
     auto other = account(); other.id = "other";
     commands.execute(other, {message}, MailboxCommands::Action::Remove);
     QCOMPARE(done.count(), 2); QVERIFY(!done.last().at(2).toString().isEmpty());
+    auto archived = message; archived.folder = "Archive";
+    commands.execute(account(), {message, archived}, MailboxCommands::Action::Remove);
+    QCOMPARE(done.count(), 3); QVERIFY(!done.last().at(2).toString().isEmpty());
     QCOMPARE(backend->removeCalls.load(), 0);
 }
 void ControllerTests::batchCommandsUseFreshValidityAndPersist()
@@ -368,6 +444,7 @@ void ControllerTests::imagesCacheRenderedContentPerAccount()
     loader.load(key, html);
     QTRY_COMPARE(loaded.count(), 1);
     QVERIFY(loader.cached(key, html).contains("data:image/png;base64,"));
+    QVERIFY(loader.cached(key, html).contains("width=\"1\" height=\"1\""));
     loader.load(key, html);
     QCOMPARE(loaded.count(), 2); QCOMPARE(requests, 1);
     QVERIFY(second != key);

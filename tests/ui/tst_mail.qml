@@ -1,6 +1,10 @@
 import QtQuick
+import QtQuick.Window
 import QtTest
 import Kos.Ui
+import "../../qml/MailboxNavigation.js" as Navigation
+import "../../qml/ReaderLayout.js" as ReaderLayout
+import "../../qml/ProviderProfiles.js" as Profiles
 import NextKde.Mail.TestViews 1.0 as App
 
 TestCase {
@@ -24,6 +28,8 @@ TestCase {
         property int blockedImageCount: 0
         function loadRemoteImages() {}
         property string currentFolder: "INBOX"
+        property string smartMailbox: ""
+        function selectSmartMailbox(kind) { smartMailbox = kind }
         property string status: "Demo"
         property string error: ""
         property bool busy: false
@@ -37,6 +43,8 @@ TestCase {
         property bool hasMore: false
         property string search: ""
         property bool failSave: false
+        property var lastContextRows: []
+        function deleteMessages(rows) { lastContextRows = rows }
         property int deletedRow: -1
         function deleteMessage(row) { deletedRow = row }
         property int refreshCount: 0
@@ -57,12 +65,14 @@ TestCase {
             }
             ListElement { uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false; threadKey: ""; threadCount: 1; threadFirst: true }
         }
-        function configureAccount(config, password, remember) {}
+        property var accountSetup: setupMock
+        function configureAccount(config, password, remember) { return !busy }
         function refresh() { refreshCount++ }
-        function selectFolder(folder) { currentFolder = folder }
+        function selectFolder(folder) { smartMailbox = ""; currentFolder = folder }
         function foldersFor(accountId) { return folders }
         property var folderUnreadMap: ({})
         function folderUnread() { return folderUnreadMap }
+        function folderUnreadFor(accountId) { return folderUnreadMap }
         property int accountUnreadRevision: 0
         function accountUnread(accountId) { return 0 }
         property var favorites: ([])
@@ -80,20 +90,28 @@ TestCase {
         function loadMore() {}
         function openMessage(uid, validity) { selectedUid = uid }
         function newDraft(mode) { return {id: "test-draft", to: "", cc: "", bcc: "", subject: "", body: "", inReplyTo: "", references: "", state: "draft", attachments: []} }
-        function loadDraft(id) { return newDraft("new") }
+        function loadDraft(id) { return drafts.find(d => d.id === id) || ({}) }
         function saveDraft(draft) {
             saveCount++
             if (failSave) return ({})
             lastSaved = JSON.parse(JSON.stringify(draft))
+            drafts = drafts.filter(d => d.id !== draft.id).concat([lastSaved])
             return lastSaved
         }
-        function discardDraft(id) {}
+        function discardDraft(id) { drafts = drafts.filter(d => d.id !== id) }
         function addAttachment(url) { return ({}) }
         function saveAttachment(index, url) {}
         function sendDraft(draft) { sending = true }
         function cancelSend() { sendPending = false }
         function clearError() { error = "" }
         function disconnectAccount() { configured = false }
+    }
+    QtObject {
+        id: setupMock
+        property bool busy: false
+        property string stage: ""
+        signal finished(bool success, string error)
+        function verify(config, password) { stage = "imap"; busy = true }
     }
     QtObject {
         id: desktopMock
@@ -110,7 +128,8 @@ TestCase {
         failOnWarning(/.*/)
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
         mock.refreshCount = 0; mock.search = ""
-        mock.sending = false; mock.demo = true; mock.error = ""
+        mock.drafts = []; mock.sendPending = false
+        mock.smartMailbox = ""; mock.sending = false; mock.busy = false; mock.demo = true; mock.error = ""
         app = createTemporaryObject(appComponent, testCase, {mail: mock})
         verify(app !== null)
         wait(80)
@@ -124,6 +143,143 @@ TestCase {
         app.requestActivate()
         wait(40)
     }
+    function test_local_draft_delete_cancel_and_confirm() {
+        activateApp()
+        mock.drafts = [{id: "delete-me", subject: "First draft", state: "draft"},
+                       {id: "keep-me", subject: "Second draft", state: "draft"}]
+        app.draftsVisible = true
+        const list = findChild(app, "draftList")
+        tryCompare(list, "count", 2)
+        wait(50)
+        const button = findChild(list.itemAtIndex(0), "deleteLocalDraft")
+        mouseClick(button)
+        const dialog = findChild(app, "deleteDraftDialog")
+        tryCompare(dialog, "opened", true)
+        verify(!findChild(app, "composerDialog").visible)
+        mouseClick(findChild(dialog, "cancelDeleteDraft"))
+        tryCompare(dialog, "visible", false)
+        compare(mock.drafts.length, 2)
+        mouseClick(button)
+        tryCompare(dialog, "opened", true)
+        mouseClick(findChild(dialog, "confirmDeleteDraft"))
+        tryCompare(dialog, "visible", false)
+        compare(mock.drafts.length, 1)
+        compare(mock.drafts[0].id, "keep-me")
+    }
+    function test_local_draft_delete_blocks_send_and_stale_account() {
+        activateApp()
+        mock.drafts = [{id: "protected-draft", subject: "Draft", state: "draft"}]
+        app.draftsVisible = true
+        const list = findChild(app, "draftList")
+        tryCompare(list, "count", 1)
+        wait(50)
+        const button = findChild(list.itemAtIndex(0), "deleteLocalDraft")
+        mock.sending = true
+        verify(!button.enabled)
+        mock.sending = false; mock.sendPending = true
+        verify(!button.enabled)
+        mock.sendPending = false
+        mouseClick(button)
+        const dialog = findChild(app, "deleteDraftDialog")
+        tryCompare(dialog, "opened", true)
+        const confirm = findChild(dialog, "confirmDeleteDraft")
+        const previousAccount = mock.currentAccountId
+        try {
+            mock.sendPending = true
+            verify(!confirm.enabled)
+            mock.sendPending = false
+            mock.currentAccountId = "another-account"
+            verify(!confirm.enabled)
+            compare(mock.drafts.length, 1)
+        } finally {
+            mock.currentAccountId = previousAccount
+            dialog.close()
+        }
+    }
+    function test_more_menu_hidden_row_does_not_leave_gap() {
+        const menu = findChild(app, "moreMessageMenu")
+        const overflow = findChild(app, "moreDisplayOptions")
+        const language = findChild(app, "languageSystem")
+        for (const width of [1480, 580, 1480]) {
+            app.width = width
+            wait(100)
+            menu.openAtAnchor()
+            tryCompare(menu, "opened", true)
+            compare(overflow.height, overflow.visible ? 30 : 0)
+            tryCompare(language, "y", overflow.visible ? 30 : 0)
+            menu.close()
+        }
+    }
+
+    function test_context_menu_uses_click_position_and_stays_in_window() {
+        activateApp()
+        const row = findChild(app, "messageList").itemAtIndex(0)
+        const menu = findChild(row, "messageRowMenu")
+        for (const point of [Qt.point(28, 12), Qt.point(120, 24)]) {
+            mouseClick(row, point.x, point.y, Qt.RightButton)
+            tryCompare(menu, "opened", true)
+            const expected = row.mapToItem(menu.parent, point.x, point.y)
+            tryCompare(menu, "x", expected.x)
+            tryCompare(menu, "y", expected.y)
+            verify(!menu.arrowVisible)
+            menu.close()
+            wait(30)
+        }
+        const corner = row.mapFromItem(menu.parent, menu.parent.width - 2, menu.parent.height - 2)
+        row.openContextMenu(corner)
+        tryCompare(menu, "opened", true)
+        verify(menu.x >= menu.margins && menu.y >= menu.margins)
+        verify(menu.x + menu.width <= menu.parent.width - menu.margins + 1)
+        verify(menu.y + menu.height <= menu.parent.height - menu.margins + 1)
+        menu.close()
+    }
+
+    function test_context_delete_preserves_selected_rows() {
+        const pane = findChild(app, "messagePane")
+        const list = findChild(app, "messageList")
+        const second = Object.assign({}, messageModel.get(0), {uid: "2"})
+        messageModel.append(second)
+        wait(30)
+        try {
+            pane.selection.toggleRow(0)
+            pane.selection.toggleRow(1)
+            const row = list.itemAtIndex(0)
+            row.openContextMenu()
+            verify(row.bulkMenu)
+            verify(!row.canCompose)
+            row.contextCommand("delete")
+            compare(mock.lastContextRows.join(","), "0,1")
+            pane.selection.clearSelection()
+            pane.selection.toggleRow(1)
+            row.openContextMenu()
+            compare(pane.selection.selectionSize, 0)
+            row.contextCommand("delete")
+            compare(mock.lastContextRows.join(","), "0")
+        } finally {
+            messageModel.remove(1)
+        }
+    }
+
+    function test_context_reply_waits_for_matching_content() {
+        activateApp()
+        const pane = findChild(app, "messagePane")
+        pane.showReviewMenu()
+        wait(30)
+        const reply = findChild(app, "messageList").itemAtIndex(0)
+        verify(reply !== null)
+        verify(reply.canCompose)
+        const previous = mock.selectedMessage
+        mock.selectedMessage = ({uid: "different", uidValidity: "1"})
+        verify(!reply.canCompose)
+        mock.selectedMessage = ({uid: "1", uidValidity: "other"})
+        verify(!reply.canCompose)
+        mock.selectedMessage = previous
+        mock.sending = true
+        verify(!reply.canCompose)
+        mock.sending = false
+        verify(reply.canCompose)
+    }
+
     function test_tray_close_keeps_window_and_sending_alive() {
         app.desktop = desktopMock; desktopMock.hides = 0
         mock.sending = true
@@ -164,6 +320,68 @@ TestCase {
         messageModel.clear(); messageModel.append(original)
         mock.selectedMessage = selected; mock.selectedUid = "1"
     }
+    function test_reader_header_long_content_and_resize() {
+        const message = Object.assign({}, mock.selectedMessage, {
+            subject: "A long subject that must wrap without covering the details action. ".repeat(4),
+            to: "recipient@example.invalid, ".repeat(12)
+        })
+        const reader = createTemporaryObject(readerComponent, testCase, {
+            mail: mock, message: message, hasMessage: true, width: 600, height: 600
+        })
+        wait(50)
+        const header = findChild(reader, "mailMessageHeader")
+        const subject = findChild(reader, "readerSubject")
+        const details = findChild(reader, "messageDetailsButton")
+        verify(subject.height > 20)
+        verify(details.mapToItem(header, 0, 0).x >= 0)
+        reader.width = 330
+        wait(50)
+        verify(header.compact)
+        const pos = details.mapToItem(header, 0, 0)
+        verify(pos.x >= 0 && pos.x + details.width <= header.width + 1)
+        verify(pos.y >= subject.mapToItem(header, 0, subject.height).y)
+        header.expanded = true
+        verify(details.text.length > 0)
+    }
+    function test_reader_images_fit_without_changing_remote_placeholders() {
+        const image = '<img width="1200" height="600" src="data:image/png;base64,AAAA">'
+        verify(ReaderLayout.fitImages(image, 300).includes('width="300" height="150"'))
+        compare(ReaderLayout.fitImages(image, 1600), image)
+        const blocked = '<img data-nkmail-src="https://example.invalid/image">'
+        compare(ReaderLayout.fitImages(blocked, 300), blocked)
+    }
+    function test_smart_loading_does_not_select_same_uid_in_other_folder() {
+        const original = mock.selectedMessage
+        mock.smartMailbox = "flagged"
+        mock.selectedMessage = ({})
+        wait(30)
+        const pane = findChild(app, "messagePane")
+        const row = findChild(pane, "messageList").itemAtIndex(0)
+        verify(row !== null)
+        verify(!row.selected)
+        verify(!row.canCompose)
+        mock.selectedMessage = Object.assign({}, original, {folder: "INBOX"})
+        wait(30)
+        verify(row.selected)
+        mock.selectedMessage = original
+    }
+    function test_sidebar_sections_and_smart_navigation() {
+        const sidebar = findChild(app, "sidebarBody")
+        verify(findChild(sidebar, "favoritesTitle").visible)
+        verify(findChild(sidebar, "smartMailboxesTitle").visible)
+        const flagged = findChild(sidebar, "favoriteShortcut_flagged")
+        const unread = findChild(sidebar, "smartMailbox_unread")
+        flagged.clicked()
+        compare(mock.smartMailbox, "flagged")
+        verify(flagged.checked)
+        unread.clicked()
+        compare(mock.smartMailbox, "unread")
+        verify(!flagged.checked && unread.checked)
+        findChild(sidebar, "favoriteShortcut_inbox").clicked()
+        compare(mock.smartMailbox, "")
+        findChild(sidebar, "draftFolderButton").clicked()
+        verify(app.draftsVisible)
+    }
     function test_views_load_without_shell_context() {
         const reader = createTemporaryObject(readerComponent, testCase, {
             mail: mock, message: mock.selectedMessage, hasMessage: true, width: 600, height: 500
@@ -194,7 +412,7 @@ TestCase {
         }
     }
     function test_window_controls_geometry_and_takeover() {
-        const controls = findChild(app, "windowControls")
+        const controls = findChild(findChild(app, "windowChrome"), "windowControls")
         const client = findChild(controls, "clientWindowControls")
         const original = controls.platformComponent
         controls.platformComponent = platformControlsMock
@@ -232,7 +450,7 @@ TestCase {
 
     function test_search_has_ten_pixel_gap_to_traffic_lights() {
         const toolbar = findChild(app, "readerHeader")
-        const controls = findChild(app, "windowControls")
+        const controls = findChild(findChild(app, "windowChrome"), "windowControls")
         for (const width of [1000, 1180, 1320, 1600]) {
             toolbar.closeSearch()
             app.width = width
@@ -257,7 +475,7 @@ TestCase {
         const contentPlane = findChild(app, "contentPlane")
         const backdrop = findChild(app, "chromeBackdrop")
         const chrome = findChild(app, "windowChrome")
-        const controls = findChild(app, "windowControls")
+        const controls = findChild(findChild(app, "windowChrome"), "windowControls")
         verify(planes !== null)
         verify(sidebarPlane !== null)
         verify(contentPlane !== null)
@@ -330,7 +548,7 @@ TestCase {
         const sidebar = findChild(app, "sidebarBody")
         const list = findChild(app, "messagePane")
         const reader = findChild(app, "messageReader")
-        const controls = findChild(app, "windowControls")
+        const controls = findChild(findChild(app, "windowChrome"), "windowControls")
         const listHeader = findChild(app, "listHeader")
         const readerHeader = findChild(app, "readerHeader")
         compare(findChild(app, "statusStrip"), null)
@@ -387,7 +605,7 @@ TestCase {
         app.readerVisible = true
         wait(30)
         compare(findChild(app, "detailsButton"), null)   // 窄宽下「详情」已并入「更多」，不再有独立按钮
-        app.showReview("details")
+        mouseClick(findChild(app, "messageDetailsButton"))
         const details = findChild(app, "messageDetailsPanel")
         verify(details !== null)
         tryCompare(details, "visible", true)
@@ -504,7 +722,7 @@ TestCase {
         compare(search.activeFocus, false)
         verify(app.activeFocusItem !== null)
     }
-    function test_escape_preserves_failed_draft_and_returns_from_narrow_reader() {
+    function test_composer_close_decision_save_failure_and_cancel() {
         activateApp()
         keyClick(Qt.Key_N, Qt.ControlModifier)
         const dialog = findChild(app, "composerDialog")
@@ -514,10 +732,19 @@ TestCase {
         body.forceActiveFocus()
         mock.failSave = true
         keyClick(Qt.Key_Escape)
+        const decision = findChild(dialog, "composerCloseDecision")
+        tryCompare(decision, "opened", true)
+        mouseClick(findChild(decision, "composerSaveAndClose"))
         compare(dialog.visible, true)
+        compare(decision.visible, true)
         compare(body.getText(0, body.length), "Do not discard on Escape.")
+        mouseClick(findChild(decision, "composerCancelClose"))
+        tryCompare(decision, "visible", false)
+        verify(dialog.visible)
         mock.failSave = false
-        keyClick(Qt.Key_Escape)
+        dialog.close()
+        tryCompare(decision, "opened", true)
+        mouseClick(findChild(decision, "composerSaveAndClose"))
         tryCompare(dialog, "visible", false)
         compare(mock.lastSaved.body, "Do not discard on Escape.")
         app.width = 650
@@ -525,6 +752,197 @@ TestCase {
         wait(30)
         keyClick(Qt.Key_Escape)
         compare(app.readerVisible, true)   // 窄宽返回列表的行为随 narrow 布局一起移除
+    }
+    function test_composer_is_independent_and_resizable() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        verify(editor !== null)
+        verify(editor.contentItem.Window.window === editor)
+        verify(editor.contentItem.Window.window !== app)
+        compare(editor.modality, Qt.NonModal)
+        const surface = findChild(editor, "composerSurface")
+        compare(surface.radius, 0)
+        compare(surface.border.width, 0)
+        const chrome = findChild(editor, "composerWindowChrome")
+        verify(chrome !== null)
+        const controls = findChild(chrome, "windowControls")
+        compare(controls.targetWindow, editor)
+        verify(controls.platformComponent !== null)
+        const backdrop = findChild(editor, "composerBackdrop")
+        compare(findChild(editor, "sendDraftButton").shellBackdrop, backdrop)
+        compare(findChild(editor, "sendDraftButton").floatingAction, true)
+        compare(findChild(editor, "composerActionGroupSurface").materialForm, !editor.liquidControls)
+        const send = findChild(editor, "sendDraftButton")
+        for (const width of [640, 800, 1040, 1400]) {
+            editor.width = width
+            wait(30)
+            const circle = controls.buttonLayout[0]
+            const circleLeft = controls.mapToItem(editor.contentItem, circle.x, circle.y)
+            const sendRight = send.mapToItem(editor.contentItem, send.width, send.height / 2)
+            fuzzyCompare(circleLeft.x - sendRight.x, 10, 0.5)
+            fuzzyCompare(circleLeft.y + circle.height / 2, sendRight.y, 0.5)
+        }
+        editor.width = 1000; editor.height = 800
+        compare(editor.width, 1000)
+        compare(editor.height, 800)
+        app.hide()
+        verify(editor.visible)
+        editor.showMinimized()
+        tryCompare(editor, "visibility", Window.Minimized)
+        editor.showNormal()
+        tryCompare(editor, "visibility", Window.Windowed)
+        verify(editor.finishEditing())
+    }
+    function test_composer_discard_removes_autosaved_draft() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        const body = findChild(editor, "composerBody")
+        body.text = "Discard this synthetic draft."
+        verify(editor.persist())
+        verify(mock.loadDraft(editor.draft.id).id)
+        editor.close()
+        const decision = findChild(editor, "composerCloseDecision")
+        tryCompare(decision, "opened", true)
+        mouseClick(findChild(decision, "composerDiscardAndClose"))
+        tryCompare(editor, "visible", false)
+        verify(!mock.loadDraft("test-draft").id)
+        wait(900)
+        verify(!mock.loadDraft("test-draft").id)
+    }
+    function test_composer_formats_selected_text() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        const body = findChild(editor, "composerBody")
+        body.text = "alpha beta"
+        editor.requestActivate()
+        tryCompare(editor, "active", true)
+        waitForRendering(body)
+        body.forceActiveFocus()
+        body.select(6, 10)
+        mouseClick(findChild(editor, "composerBold"))
+        body.select(6, 10)
+        verify(body.cursorSelection.font.bold)
+        body.select(0, 5)
+        verify(!body.cursorSelection.font.bold)
+        verify(editor.persist())
+        verify(mock.lastSaved.html.indexOf("font-weight") >= 0)
+    }
+    function test_composer_shared_selects_format_the_selection() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        const body = findChild(editor, "composerBody")
+        body.text = "alpha beta"
+        body.select(0, 5)
+        for (const name of ["composerParagraphStyle", "composerFontFamily", "composerFontStyle", "composerFontSize"]) {
+            const select = findChild(editor, name)
+            compare(select.materialForm, true)
+            compare(select.popupMaterialForm, true)
+            compare(select.cornerRadius, 6)
+            select.openMenu()
+            tryCompare(select, "popupOpened", true)
+            select.closeMenu()
+        }
+        const family = findChild(editor, "composerFontFamily")
+        family.select(1)
+        compare(body.cursorSelection.font.family, "serif")
+        const face = findChild(editor, "composerFontStyle")
+        face.select(2)
+        verify(body.cursorSelection.font.italic)
+        verify(!body.cursorSelection.font.bold)
+        const size = findChild(editor, "composerFontSize")
+        size.select(3)
+        compare(body.cursorSelection.font.pointSize, 16)
+        const toggle = findChild(editor, "composerFormattingToggle")
+        const before = editor.showFormatting
+        toggle.clicked()
+        compare(editor.showFormatting, !before)
+        compare(toggle.checked, false)
+        toggle.clicked()
+        verify(editor.persist())
+        verify(mock.lastSaved.html.indexOf("font-style:italic") >= 0)
+    }
+    function test_composer_emoji_picker_inserts_and_closes() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        const body = findChild(editor, "composerBody")
+        body.text = "hello"
+        body.select(0, 5)
+        findChild(editor, "composerEmoji").clicked()
+        const picker = findChild(editor, "composerEmojiPicker")
+        tryCompare(picker, "opened", true)
+        const choices = findChild(editor, "composerEmojiChoices")
+        compare(choices.count, 18)
+        for (let i = 0; i < choices.count; ++i) {
+            const choice = choices.itemAt(i)
+            const point = choice.mapToItem(picker.contentItem, 0, 0)
+            verify(point.x >= 0 && point.x + choice.width <= picker.contentItem.width + 0.5)
+            verify(point.y >= 0 && point.y + choice.height <= picker.contentItem.height + 0.5)
+            verify(choice.contentItem.width >= 22)
+        }
+        verify(choices.itemAt(0) !== null)
+        choices.itemAt(0).clicked()
+        compare(picker.visible, false)
+        verify(editor.persist())
+        compare(mock.lastSaved.body, "😀")
+    }
+    function test_composer_paragraph_tools_persist_and_undo() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        const body = findChild(editor, "composerBody")
+        body.text = "alpha\nbeta\ngamma"
+        body.select(0, 10)
+        findChild(editor, "composerNumbers").clicked()
+        verify(editor.paragraphState.numbered)
+        verify(editor.persist())
+        verify(mock.lastSaved.html.indexOf("<ol") >= 0)
+        findChild(editor, "composerBullets").clicked()
+        verify(editor.paragraphState.bullets)
+        verify(!editor.paragraphState.numbered)
+        findChild(editor, "composerBullets").clicked()
+        verify(!editor.paragraphState.bullets)
+        findChild(editor, "composerAlign1").clicked()
+        verify(editor.paragraphState.alignment & Qt.AlignHCenter)
+        findChild(editor, "composerIndent").clicked()
+        verify(editor.persist())
+        verify(mock.lastSaved.html.indexOf('align="center"') >= 0)
+        verify(mock.lastSaved.html.indexOf('-qt-block-indent:1') >= 0)
+        findChild(editor, "composerOutdent").clicked()
+        verify(editor.persist())
+        verify(mock.lastSaved.html.indexOf('-qt-block-indent:1') < 0)
+        verify(body.canUndo)
+        body.undo()
+        verify(editor.persist())
+        verify(mock.lastSaved.html.indexOf('-qt-block-indent:1') >= 0)
+    }
+    function test_composer_link_validation_and_emoji_replace_selection() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        const body = findChild(editor, "composerBody")
+        body.text = "alpha beta"
+        body.select(0, 5)
+        findChild(editor, "composerLink").clicked()
+        const url = findChild(editor, "composerLinkUrl")
+        const insert = findChild(editor, "composerInsertLink")
+        url.text = "javascript:alert(1)"
+        compare(insert.enabled, false)
+        url.text = "https://example.invalid/path"
+        compare(insert.enabled, true)
+        insert.clicked()
+        verify(editor.persist())
+        verify(mock.lastSaved.html.indexOf('href="https://example.invalid/path"') >= 0)
+        body.select(6, 10)
+        editor.insertText("😊")
+        verify(editor.persist())
+        compare(mock.lastSaved.body, "alpha 😊")
+        body.undo()
+        verify(editor.persist())
+        compare(mock.lastSaved.body, "alpha beta")
+        body.redo()
+        verify(editor.persist())
+        compare(mock.lastSaved.body, "alpha 😊")
+        editor.applyStyle(1)
+        verify(body.cursorSelection.font.bold)
+        compare(body.cursorSelection.font.pointSize, 24)
     }
     function test_three_pane_reader_is_plain_text() {
         const body = findChild(app, "messageBody")
@@ -575,6 +993,140 @@ TestCase {
         app.showReview("compose")
         compare(findChild(app, "composerDialog").visible, false)
     }
+    function test_navigation_uses_roles_without_merging_names() {
+        const folders = [{id:"custom",title:"Inbox"}, {id:"wire/sent",title:"Sent",role:"sent"}, {id:"INBOX",title:"Inbox"}]
+        const sorted = Navigation.ordered(folders)
+        compare(sorted.length, 3)
+        compare(sorted[0].id, "INBOX")
+        compare(sorted[1].id, "wire/sent")
+        compare(sorted[2].id, "custom")
+        compare(App.MailLabels.mailboxIcon(sorted[1]), "forward")
+        compare(App.MailLabels.mailboxIcon(sorted[2]), "folder")
+    }
+
+    function test_demo_address_can_be_typed_and_detects_provider() {
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        const address = findChild(dialog, "accountAddress")
+        address.forceActiveFocus()
+        tryCompare(address, "activeFocus", true)
+        for (const character of "preview@gmail.com") keyClick(character)
+        compare(address.text, "preview@gmail.com")
+        compare(findChild(dialog, "providerChoice").provider, "google")
+        dialog.close()
+    }
+
+    function test_provider_list_scrolls_to_last_choice() {
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        tryCompare(dialog, "opened", true)
+        const picker = findChild(dialog, "providerChoice")
+        const scroll = findChild(picker, "providerScroll")
+        const bar = findChild(picker, "providerScrollBar")
+        verify(dialog.height < 560)
+        verify(bar.visible && bar.size < 1)
+        verify(bar.x > scroll.width / 2)
+        mouseDrag(bar, bar.width / 2, bar.height * bar.size / 2,
+                  0, bar.height * (1 - bar.size), Qt.LeftButton)
+        tryVerify(() => scroll.contentItem.contentY > 0)
+        const manual = findChild(picker, "provider_manual")
+        const point = manual.mapToItem(scroll, manual.width / 2, manual.height / 2)
+        verify(point.y >= 0 && point.y <= scroll.height)
+        picker.currentIndex = 1
+        mouseClick(manual)
+        compare(picker.currentIndex, 0)
+        dialog.close()
+    }
+    function test_provider_presets_and_no_false_oauth_support() {
+        const expected = {icloud:"imap.mail.me.com",google:"imap.gmail.com",qq:"imap.qq.com",exmail:"imap.exmail.qq.com",
+            "163":"imap.163.com","126":"imap.126.com",yahoo:"imap.mail.yahoo.com",aol:"imap.aol.com"}
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        function visualChild(item, name) {
+            if (item.objectName === name) return item
+            for (const child of item.children || []) {
+                const found = visualChild(child, name)
+                if (found) return found
+            }
+            return null
+        }
+        const picker = findChild(dialog, "providerChoice")
+        for (const provider in expected) {
+            const logo = visualChild(picker, "providerLogo_" + provider)
+            verify(logo !== null, provider)
+            tryCompare(logo, "status", Image.Ready)
+            verify(logo.source.toString().indexOf("qrc:/data/providers/") === 0)
+            dialog.step = 0
+            findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf(provider)
+            dialog.nextStep()
+            compare(dialog.configuration().imapHost, expected[provider])
+            compare(dialog.configuration().imapPort, 993)
+            compare(dialog.configuration().imapStartTls, false)
+            compare(dialog.configuration().serverSavesSent, provider === "google")
+        }
+        compare(Profiles.forAddress(" USER@GMAIL.COM "), "google")
+        compare(Profiles.forAddress("person@company.invalid"), "manual")
+        compare(Profiles.forAddress("person@gmail.com.attacker.invalid"), "manual")
+        dialog.step = 0
+        findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("microsoft")
+        dialog.nextStep()
+        compare(dialog.step, 0)
+        tryCompare(visualChild(picker, "providerLogo_microsoft"), "status", Image.Ready)
+        compare(Profiles.logo("manual"), "")
+        dialog.close()
+    }
+    function test_account_wizard_preserves_config_on_failure() {
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        compare(dialog.step, 0)
+        const address = findChild(dialog, "accountAddress")
+        address.text = "sample@icloud.com"
+        findChild(dialog, "providerChoice").currentIndex = 1
+        dialog.nextStep()
+        compare(dialog.step, 1)
+        compare(dialog.configuration().imapHost, "imap.mail.me.com")
+        compare(dialog.configuration().smtpPort, 587)
+        mock.demo = false
+        findChild(dialog, "accountPassword").text = "test-secret"
+        dialog.validateConnection()
+        verify(dialog.submitting)
+        setupMock.finished(false, "Synthetic connection failure")
+        verify(!dialog.submitting)
+        compare(dialog.step, 1)
+        compare(dialog.configuration().address, "sample@icloud.com")
+        compare(findChild(dialog, "accountPassword").text, "")
+        findChild(dialog, "accountPassword").text = "retry-secret"
+        dialog.validateConnection()
+        setupMock.finished(true, "")
+        compare(dialog.step, 2)
+        compare(findChild(dialog, "accountPassword").text, "")
+        dialog.close()
+    }
+
+    function test_account_wizard_save_rejection_unlocks_retry() {
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        findChild(dialog, "accountAddress").text = "retry@icloud.com"
+        findChild(dialog, "providerChoice").currentIndex = 1
+        dialog.nextStep()
+        mock.demo = false
+        findChild(dialog, "accountPassword").text = "synthetic-secret"
+        dialog.validateConnection()
+        mock.busy = true // Background work started while verification was running.
+        setupMock.finished(true, "")
+        verify(!dialog.submitting)
+        compare(dialog.step, 1)
+        verify(dialog.setupError.length > 0)
+        compare(dialog.configuration().address, "retry@icloud.com")
+        compare(findChild(dialog, "accountPassword").text, "")
+        mock.busy = false
+        findChild(dialog, "accountPassword").text = "synthetic-retry"
+        dialog.validateConnection()
+        setupMock.finished(true, "")
+        compare(dialog.step, 2)
+        dialog.close()
+    }
+
     function test_account_password_is_not_prefilled() {
         app.showReview("account")
         compare(findChild(app, "accountPassword").text, "")

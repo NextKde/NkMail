@@ -8,6 +8,8 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <QPointer>
+#include <QBuffer>
+#include <QImageReader>
 namespace nkmail {
 namespace {
 bool remoteHttpUrl(const QString &value) {
@@ -111,9 +113,16 @@ void RemoteImageLoader::load(const QString &key, const QString &input) {
                 if (reply->error() == QNetworkReply::NoError && finalSchemeOk
                     && contentType.toLower().startsWith(QStringLiteral("image/"))
                     && data.size() <= maxBytes && !data.isEmpty()) {
-                    replacement = QStringLiteral("<img src=\"data:%1;base64,%2\">")
-                                      .arg(contentType,
-                                           QString::fromLatin1(data.toBase64()));
+                    QBuffer buffer;
+                    buffer.setData(data);
+                    buffer.open(QIODevice::ReadOnly);
+                    QImageReader reader(&buffer);
+                    const QSize size = reader.size();
+                    if (size.isValid()) {
+                        replacement = QStringLiteral("<img width=\"%1\" height=\"%2\" src=\"data:%3;base64,%4\">")
+                            .arg(size.width()).arg(size.height())
+                            .arg(contentType, QString::fromLatin1(data.toBase64()));
+                    }
                 }
                 delete reply;
             }

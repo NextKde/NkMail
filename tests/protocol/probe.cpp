@@ -24,10 +24,12 @@ int main(int argc, char **argv)
         try {
             if (operation == QStringLiteral("remove") || operation == QStringLiteral("move")) {
                 nkmail::MailioBackend::removeOrMove(a, "INBOX", "42", {"102"}, operation == "move" ? "Archive" : "");
+            } else if (operation == QStringLiteral("sent-folder")) {
+                result = {{"folder", nkmail::MailioBackend::sentFolder(a)}};
             } else if (operation == QStringLiteral("folders")) {
                 const auto folders = nkmail::MailioBackend::folders(a);
                 QJsonArray array;
-                for (const auto &f : folders) array.append(QJsonObject{{"id", f.id}, {"title", f.title}, {"total", f.total}});
+                for (const auto &f : folders) array.append(QJsonObject{{"id", f.id}, {"title", f.title}, {"total", f.total}, {"role", f.role}});
                 result = {{"folders", array}};
             } else if (operation == QStringLiteral("page")) {
                 const auto p = nkmail::MailioBackend::page(a, QStringLiteral("INBOX"), 0, 1);
@@ -39,6 +41,8 @@ int main(int argc, char **argv)
                 QJsonArray attachments;
                 for (const auto &at : c.attachments) attachments.append(QJsonObject{{"name", at.name}, {"bytes", QString::fromLatin1(at.bytes.toBase64())}, {"path", at.path}});
                 result = {{"uidValidity", c.summary.uidValidity}, {"uid", c.summary.uid}, {"subject", c.summary.subject}, {"text", c.text}, {"attachments", attachments}, {"to", c.to}, {"cc", c.cc}, {"replyTo", c.replyTo}};
+            } else if (operation == QStringLiteral("verify-smtp")) {
+                nkmail::MailioBackend::verifySmtp(a);
             } else if (operation == QStringLiteral("send")) {
                 nkmail::Draft d;
                 d.to = QStringLiteral("收件人 <to@fixture.invalid>"); d.cc = QStringLiteral("cc@fixture.invalid"); d.bcc = QStringLiteral("bcc@fixture.invalid");

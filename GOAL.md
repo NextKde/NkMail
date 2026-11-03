@@ -1,8 +1,151 @@
 # NkMail local delivery goal
 
+## Consolidated integration of PRs #7–#16 · 2026-11-03
+
+- Created a single integration branch from current main (27c884a), folding in the full provider-presets stack through 2240831 as one change. The existing main sidebar-heading correction is retained. Original branches and PRs remain intact until integration is accepted.
+- UI gitlink/lock remain e2592b2742c58c1bd797a8bcfa2a3ae7da4affd8. No component upgrade or real mailbox operation.
+- Pending: dependency guard and full validation in the VM, main-targeted integration PR and required remote release-gate. No host compilation, GUI execution or tests for this integration.
+
+## Composer public controls and glyph correction · 2026-11-03
+
+- Unified all header action glyphs to 16px SVG slots with the same stroke treatment; removed checked/active fills from the formatting and Bcc header launchers. The header retains canonical liquid material; embedded formatting controls remain ordinary.
+- Replaced the customized KosComboBox wrapper/background with canonical LiquidSelect in explicit solid trigger/popup modes, 24px height and 6px trigger corners. No custom select background or popup implementation remains. Shared keyboard/navigation/selection behavior is exercised by actual font/face/size selection tests.
+- Fixed emoji cell clipping/elision using a centered 22px Noto Color Emoji content item and no label padding. All 18 entries inspected in the opened native Wayland picker; regression checks every cell fits the content area and preserves insertion/close behavior.
+- Added isolated demo-only compose-emoji/font review scenarios; an explicitly requested demo scenario now opens in interactive preview too.
+- VM build/UI/i18n/catalog passed 3/3 in 40.83s (47 UI cases). User-authorized host build and native Wayland light/dark/emoji/font captures inspected; automated tests remained VM-only. Canonical library gitlink unchanged; no real mailbox operations.
+
+## Send action beside window controls · 2026-11-03
+
+- Composer send action now follows the inbox search placement: 10px from its right edge to the visible first traffic-light circle, with matching vertical center. It no longer offsets from the oversized reserved-control region.
+- Extended the independent-composer regression to measure the actual circle and send-action geometry at widths 640, 800, 1040 and 1400. VM build/UI/i18n/catalog checks passed (3/3, 31.10s; 46 UI cases); refreshed light/dark software-fallback screenshots inspected. No host validation performed.
+
+## Compact small-corner formatting controls · 2026-11-03
+
+- Corrected the misunderstanding of small corners as square corners: the entire formatting strip uses 24px-high ordinary controls with 6px corners. Emphasis, alignment, lists and indentation are grouped; all four select triggers, their popup panels and the color control share the small-corner treatment.
+- VM build and existing UI/i18n/catalog checks passed (3/3, 30.79s; 46 UI cases). Refreshed light/dark software-fallback captures inspected. No host validation performed.
+
+## Composer editing tools · 2026-11-03
+
+- Continued from the supplied macOS Mail reference while retaining the NextKde window/material contract. Added text presets, installed font families and faces, selection-aware formatting state, paragraph alignment, numbered lists and block indentation. Added anchored emoji/link editors and body-only formatting shortcuts. Selection replacement is one undo operation.
+- Added UI regressions for selected-block operations, saved HTML, indentation undo, unsafe link scheme rejection, selected-text links and emoji replacement/undo. Chinese and English catalogs updated.
+- VM source directory: `/home/amao/nextkde-validation/nkmail-composer-20261103` on `kos-vm-dev`. VM build and UI/i18n/catalog checks passed (3/3, 30.21s; 46 UI cases). Chinese light/dark software-fallback captures reviewed. Wayland screenshot capture failed because the preview was not exposed; compositor rendering/liquid refraction are not visually accepted by these exports. No host build, test or GUI run performed for this iteration.
+
+
+## Restore composer NextKde ownership contract · 2026-11-03
+
+- Corrected the reference-driven composer implementation: removed application-owned 22px window corners and border, the leading custom decoration layout and disabled platform adapter. The composer now reuses the inbox WindowChrome/MailWindowControls cooperative path over flush rectangular content planes. Window shape and decoration stay with NextKde/compositor ownership.
+- Floating header actions now use canonical liquid material with an explicit eligible same-window LiquidBackdrop. Embedded formatting controls remain ordinary material. Close confirmation again uses canonical LiquidDialog defaults and unmodified 30px LiquidDialogButton role styling; removed forced opaque mode and custom destructive tint.
+- Recorded the top-level window/material contract in AGENTS.md. Scoped inbox-control tests to their own chrome now that both windows share the canonical component. Added assertions for rectangular content, enabled protocol component, and liquid-action backdrop ownership.
+- Host build and UI/i18n/catalog checks passed (3/3, 15.89s; 43 UI cases). Synthetic Wayland composer and close-decision captures inspected; no capture runtime warnings. Client screenshot exports intentionally omit compositor-owned controls/corners. No KWin/reference code was modified or executed.
+
+## Compact account setup and provider scrolling · 2026-11-03
+
+- Account-dialog height now follows visible content up to the host-window limit, removing fixed-height blank space. Reduced header/content/footer padding and field spacing. Provider selection shows six rows with a persistent interactive scrollbar on the right.
+- Host build and UI/i18n/catalog checks passed (3/3, 16.21s; 43 UI cases). Pointer-drag regression reaches and selects the last provider; compact height and right-side scrollbar placement are checked. Synthetic Chinese Wayland capture inspected with no runtime warnings. Host testing remains authorized for these NkMail iterations.
+
+## Independent Mail-style composer · 2026-11-03
+
+- Replaced the inbox modal composer with an independent, nonmodal, resizable ApplicationWindow. Reused canonical window controls/resize handles and solid capsule actions; added a leading window-control cluster, centered toolbar, circular send action, full-width address rows, horizontal formatting strip and unboxed expanding editor.
+- Native window close and Escape/Ctrl+W offer Save / Don’t Save / Cancel. Save failure preserves the window; discard removes the local draft and stops autosave. Sending/pending send block close/discard; account mismatch disables editing and destructive actions. SMTP acceptance hides only the matching composer.
+- Formatting uses Qt TextSelection for current selection/insertion styling; list operations now receive the actual editor selection. Font family/size, text color and strikethrough join the existing bold/italic/underline/list actions. Synthetic compose capture now targets the separate window.
+- User explicitly authorized host testing for this composer iteration in this chat. Host build and UI/i18n/catalog checks passed (3/3, 15.76s; 42 UI cases). Selected-text formatting, independent resize/minimize, close/save failure, cancel and autosaved-draft discard are covered. Chinese light/dark and close-decision Wayland captures inspected; no runtime warnings in capture logs. Earlier Row-layout and offscreen raise issues were corrected before the passing run.
+
+## Local draft deletion entry · 2026-11-03
+
+- Exposed the existing account-scoped discardDraft operation through a trash action on each local draft, with cancel/confirm dialog and Chinese/English translations. Sending, pending send and account changes block confirmation; failed deletion keeps the dialog open.
+- UI regressions for cancellation, targeted deletion, send guards and stale-account confirmation passed with the composer suite after the user explicitly authorized host testing in this chat.
+
+## Pointer-positioned message context menu · 2026-11-03
+
+- Message right-click menus now use TapHandler pointer coordinates instead of anchoring below the whole row. Context menus omit the anchor arrow and clamp inside the overlay; Move-to uses the saved context point. Non-pointer review invocation falls back to row center.
+- UI regression passed (12.44s), including real right-clicks at distinct positions and bottom/right boundary placement. Synthetic Wayland capture inspected.
+
+## More menu empty first row · 2026-11-03
+
+- The compact-only Display item was invisible on wide windows but retained its 30px MenuItem height. Explicitly collapse its height with the compact-options condition. Shared Kos.Ui stays unchanged.
+- Wide/narrow/wide regression checks the first visible row position after the ListView layout settles. UI suite passed (12.25s); isolated Wayland More-menu screenshot inspected.
+
+## Editable demo email address · 2026-11-03
+
+- Removed demo-only readOnly from the email field so the interactive preview accepts typing and detects providers. Submission lock remains; demo credentials/network/send restrictions remain in place.
+- Keyboard-entry regression verifies typed Gmail address and automatic preset selection. UI suite passed (11.46s); rebuilt interactive preview replaced.
+
+## Account address input layout · 2026-11-03
+
+- Removed the indented SettingsGroup label/row for email. A left-aligned heading now sits over one full-width shared text field, with Chinese placeholder `请输入you@example.com`. The same address field continues to drive provider selection and saved configuration.
+- Host build, UI, i18n and translation checks passed (3/3, 11.07s); synthetic screenshot inspected.
+
+## iCloud logo clarity · 2026-11-03
+
+- Replaced the low-resolution ICO with Apple’s 180×180 touch icon, resolving its URL against the iCloud page’s HTML base. Display geometry stays unchanged; the bundled asset remains offline. Host build and UI regression passed (11.19s); updated screenshot inspected.
+
+## Provider icon sizing correction · 2026-11-03
+
+- Unified the icon column to 28px and enlarged Other's envelope to 28px. NetEase wordmarks now show only the numeric brand portion within a 24px square tile, removing long taglines and domain names.
+- Host build and UI regression passed (10.93s); updated synthetic light screenshot inspected.
+- iCloud is an IMAP/SMTP app-specific-password preset, not an Apple Account browser sign-in integration. No real iCloud account has been validated; official setup requirements were rechecked against Apple support.
+
+## Provider logo follow-up · 2026-11-03
+
+- User requested each provider's own logo. Added local provider identity assets, using shared LiquidNavigationButton behavior with an app-owned content layout to preserve brand colors and wide NetEase wordmarks. Other keeps its generic envelope; sources and rights are recorded in data/providers/README.md. No runtime provider requests or shared component edits.
+- Host build and UI suite passed (11.14s), including decoded packaged logo checks for every provider. Catalog/i18n checks and canonical dependency gate passed. Chinese/light and English/dark synthetic Wayland screenshots inspected; wide NetEase logos receive a light backing in dark mode for contrast. Follow-up targets PR #16.
+
+## Provider presets and protocol compatibility · 2026-11-03
+
+- Continued the interrupted provider-presets task. Added independent ProviderPicker/ProviderProfiles for iCloud, Gmail, QQ, Tencent Exmail, 163, 126, Yahoo, AOL and manual IMAP/SMTP. Unknown custom domains remain manual. Microsoft/Exchange is visibly unavailable; OAuth registration and implementation remain deferred by user choice.
+- Existing AccountSetup, MailTransport and SendService remain responsible for connection verification and mail operations. Added capability-gated static IMAP ID, server special-use Sent/All roles and a persisted server-managed Sent-copy option (enabled by the Gmail preset). No real mailbox writes or SMTP submissions were performed.
+- Full host CTest passed 8/8 in 44.98s on takeover. Synthetic Chinese Wayland screenshot inspected; protocol fixtures cover 44 loopback/TLS scenarios. Provider behavior, optional-ID refusal, special Sent selection and no duplicate Sent copy have regressions. Dependency gate and 32 guard tests passed. Remote PR/release-gate is still required; do not imply live-provider verification or completed OAuth.
+- Delivery details and limitations: docs/PROVIDERS.md and docs/progress/2026-11-03-provider-presets/README.md.
+
+## Sidebar reference hierarchy correction · 2026-11-03
+
+- The earlier completion statement overstated the visual scope: account folder sections alone did not match the reference navigation. Added always-visible Favorites (Inbox, Flagged, Local drafts, Sent), custom pins, Smart mailboxes (Unread, With attachments) and expandable account folders identified by address. Only the actual navigation origin is highlighted.
+- Smart queries include all cached folders of the current account, retaining folder/UIDVALIDITY/UID and pagination/search semantics. This is explicitly not a cross-account unified inbox. Reading routes to the original mailbox; existing command service rejects mixed-folder batches before any mutation.
+- Added account/cache isolation, stale validity, pagination, duplicate-UID source routing, mixed-folder rejection and sidebar interaction regressions. Full host CTest passed 8/8 in 43.80s. Synthetic Wayland navigation and Flagged captures inspected. Shared liquid source/material/radius unchanged.
+
+## Confirmed first-stage delivery complete · 2026-11-03
+
+- Scope: the user-confirmed three-row table plus reader/details reference. Implemented in PRs #8–#13, with the final wizard busy-save retry fix following #13. Optional local initials, grouped reply/forward and batch targeting, email-first verified setup, account-scoped navigation/roles/status, compact reader and inline details are all implemented.
+- Final audit: save rejection now always releases wizard submission state, preserves non-sensitive configuration and supports retry. Its regression passed in the final host UI run (9.84s). Full suite before this focused QML fix passed 8/8 in 43.20s; dependency gate and 32 guard tests passed. Foundation PR #7 remote release-gate passed. Stacked PRs are pending review/merge, not represented as merged or independently CI-approved.
+- Screenshots are synthetic application captures from the host. They preserve liquid controls, shared pinned source and compact geometry; compositor-owned traffic lights are not captured. No live provider authentication or real mailbox mutations were performed.
+- Later-phase product ideas below (OAuth/Exchange, unified inbox, copy/attachment-forward, colored flags/reminders/rules) remain explicitly deferred, not delivered by this first-stage work. Current provider preset is iCloud; other providers use manual IMAP/SMTP.
+- Per-feature matrix and screenshots: docs/progress/2026-11-03-completion/README.md.
+
+## Compact reader · 2026-11-03
+
+- Independent MailMessageHeader presents sender, subject, recipient, source, time and inline details. Narrow layouts stack safely; long subjects wrap. ReaderLayout scales explicitly loaded data images using dimensions provided by RemoteImageLoader, preserving aspect ratio and blocked remote placeholders. Existing sanitizer and attachment behavior remain.
+- Host full CTest passed 8/8 in 43.20s, including long-header and image sizing regressions. UI dependency gate and 32 guard tests passed. Chinese/light and English/dark synthetic Wayland screenshots inspected; compositor traffic lights are outside these captures.
+- Final audit found a wizard save rejection could leave submitting true when mailbox work is busy; follow-up fix is next.
+
+## Account-scoped mailbox navigation · 2026-11-03
+
+- Background/favorite unread badges read account-scoped cached counts. Added independent navigation ordering, server special-use role preservation/storage (schema v5), explicit local/server drafts and transient account sync/error text. Same-named folder identities remain distinct.
+- Seven full-run suites passed; the existing folder-role count assertion was updated for the new field and core rerun passed (0.43s), including new account-scoped cache coverage. Protocol special-use and UI ordering tests passed. Screenshot inspected. Continuing compact reader header.
+
+## Account setup wizard · 2026-11-03
+
+- Email-first setup, iCloud/manual profile choice, collapsed advanced settings, independent IMAP/SMTP verification and explicit save completion. ProviderProfiles and AccountSetup own their respective logic. Failed verification retains fields, clears password, and permits retry. Saving reports success explicitly.
+- Local full suite 8/8 passed in 41.87s; final UI/catalog/protocol checks 3/3 passed in 28.09s. Auth-only loopback checks assert no message submission. Synthetic local screenshot inspected. Continuing navigation and compact reader.
+
+## Optional sender initials · 2026-11-03
+
+- Added locally generated initials behind a Display option with per-profile persistence, preserving compact row height and selection geometry. Local CLI/UI/catalog checks passed; Wayland synthetic screenshot inspected. Continuing account wizard, navigation and reader header.
+
+## Message context actions · 2026-11-03
+
+- Added reply/reply-all/forward group to the existing liquid context menu. Compose actions require matching loaded UID and UIDVALIDITY and are unavailable during sending or multi-selection. Existing command service handles single/batch read, flag, move, archive and delete through the same bulk entry points. Right-click outside the selection clears stale batch targets.
+- Local UI and catalog regression passed 2/2 in 8.66s, including multi-selection targeting and stale/missing content gating. Synthetic Wayland menu screenshot inspected; no shared style changes.
+- Remaining planned work: optional list avatars, account setup wizard, navigation counts/roles and on-demand sync status.
+
+## Reader-local details entry · 2026-11-03
+
+- First incremental feature: removed toolbar details cell, added canonical inline action beside message time, and moved the existing details panel below the mail header. No shared UI material or radius changes.
+- User now authorizes host testing/screenshots. Local Wayland synthetic captures are included; application captures omit compositor-drawn traffic lights. Local UI interaction regression activates the new details entry. Full test results are reported in the PR.
+- Foundation PR #7 holds prior reviewed work; this feature is stacked on that branch. Next: compact reader header and unified message action menus.
+
 ## 下一阶段产品目标：邮件操作、账户接入与导航一致性 · 2026-11-02
 
-本轮完成参考图与代码差距评估并制定目标，尚未开始本节功能实现。参考图只作为信息层级与交互参考；不复制截图内真实邮件、地址或密钥片段。
+以下是最初的差距评估与分阶段规划；阶段一现已完成，最新交付状态见本文顶部。参考图只作为信息层级与交互参考；不复制截图内真实邮件、地址或密钥片段。
 
 目标：在保留紧凑三栏布局、液态按钮组、6px 选中圆角、中英文和单实例托盘行为的前提下，让用户能够清楚地添加账户、定位邮件、执行常用操作，并确保每个可见入口对应真实能力。保留已确认的标题栏居中、4px 下移和搜索距交通灯10px布局。
 

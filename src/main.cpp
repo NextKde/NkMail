@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
     parser.addOption({"demo", "Use isolated synthetic mail; no network or saved credentials."});
     parser.addOption({"data-dir", "Use a separate local data directory.", "path"});
     parser.addOption({"screenshot", "Capture this application's synthetic preview window and exit (requires --demo).", "path"});
-    parser.addOption({"review-scenario", "Synthetic review: inbox, compose, account or details.", "name", "inbox"});
+    parser.addOption({"review-scenario", "Synthetic review: inbox, compose, compose-close, compose-emoji, compose-font, account or details.", "name", "inbox"});
     parser.addOption({"appearance", "Review appearance: light or dark.", "name", "light"});
     parser.addOption({"review-width", "Synthetic preview window width.", "pixels", "1240"});
     parser.addOption({"review-height", "Synthetic preview window height.", "pixels", "800"});
@@ -140,6 +140,7 @@ int main(int argc, char **argv) {
         restored.moveLeft(qBound(available.left(), restored.x(), available.right() - restored.width() + 1));
         restored.moveTop(qBound(available.top(), restored.y(), available.bottom() - restored.height() + 1));
         window->setGeometry(restored);
+        window->setProperty("showAvatars", windowSettings->value("showAvatars", false));
         normalGeometry = restored;
         maximized = windowSettings->value("maximized", false).toBool();
         if (maximized) window->showMaximized();
@@ -149,6 +150,7 @@ int main(int argc, char **argv) {
             windowSettings->setValue("maximized", maximized);
             windowSettings->setValue("sidebarWidth", window->property("sidebarPreferredWidth"));
             windowSettings->setValue("listWidth", window->property("listPreferredWidth"));
+            windowSettings->setValue("showAvatars", window->property("showAvatars"));
             windowSettings->sync();
             QFile::setPermissions(windowSettings->fileName(), QFileDevice::ReadOwner | QFileDevice::WriteOwner);
         };
@@ -167,6 +169,7 @@ int main(int argc, char **argv) {
             else if (visibility == QWindow::Windowed) maximized = false;
             preferenceSave.start();
         });
+        QQmlProperty(window, "showAvatars").connectNotifySignal(&preferenceSave, SLOT(start()));
         // QQmlProperty bridges QML-generated notify signals to the debounce timer.
         QQmlProperty(window, "sidebarPreferredWidth").connectNotifySignal(&preferenceSave, SLOT(start()));
         QQmlProperty(window, "listPreferredWidth").connectNotifySignal(&preferenceSave, SLOT(start()));
@@ -174,15 +177,23 @@ int main(int argc, char **argv) {
     if (demo && window && (parser.isSet("screenshot") || parser.isSet("review-width") || parser.isSet("review-height"))) {
         window->resize(qBound(580, parser.value("review-width").toInt(), 2000), qBound(520, parser.value("review-height").toInt(), 1600));
     }
+    if (demo && parser.isSet("review-scenario") && !parser.isSet("screenshot")) {
+        const QString scenario = parser.value("review-scenario");
+        QTimer::singleShot(1200, &app, [window, scenario] {
+            if (window) QMetaObject::invokeMethod(window, "showReview", Q_ARG(QVariant, QVariant(scenario)));
+        });
+    }
     if (parser.isSet("screenshot")) {
         const QString path = parser.value("screenshot");
         const QString scenario = parser.value("review-scenario");
         QTimer::singleShot(1200, &app, [window, scenario] {
             if (window) QMetaObject::invokeMethod(window, "showReview", Q_ARG(QVariant, QVariant(scenario)));
         });
-        QTimer::singleShot(3000, &app, [window, path, &app] {
-            if (!window || !window->isExposed()) { std::fprintf(stderr, "Preview window is not exposed.\n"); app.exit(3); return; }
-            const QImage image = window->grabWindow();
+        QTimer::singleShot(3000, &app, [window, path, scenario, &app] {
+            auto *capture = scenario.startsWith(QStringLiteral("compose")) && window
+                ? window->findChild<QQuickWindow *>(QStringLiteral("composerDialog")) : window;
+            if (!capture || !capture->isExposed()) { std::fprintf(stderr, "Preview window is not exposed.\n"); app.exit(3); return; }
+            const QImage image = capture->grabWindow();
             if (image.isNull()) { std::fprintf(stderr, "Application screenshot capture failed.\n"); app.exit(3); return; }
             QDir().mkpath(QFileInfo(path).absolutePath());
             if (!image.save(path)) { std::fprintf(stderr, "Cannot save application screenshot.\n"); app.exit(3); return; }

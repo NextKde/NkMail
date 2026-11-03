@@ -1,4 +1,5 @@
 #include "MailController.h"
+#include "services/AccountSetup.h"
 #include "MessageListModel.h"
 #include "NotificationService.h"
 #include "storage/MailDatabase.h"
@@ -26,6 +27,8 @@ bool isArchiveFolder(const QVariantList &folders, const QString &destination) {
         const auto folder = value.toMap();
         const auto id = folder.value("id").toString();
         if (id != destination) continue;
+        const auto role = folder.value("role").toString();
+        if (role == "archive" || role == "all") return true;
         const auto title = folder.value("title").toString();
         for (const auto &name : names)
             if (title.compare(name, Qt::CaseInsensitive) == 0 || id.compare(name, Qt::CaseInsensitive) == 0) return true;
@@ -36,6 +39,7 @@ bool isArchiveFolder(const QVariantList &folders, const QString &destination) {
 MailController::MailController(bool demo, const QString &dataRoot, QObject *parent, std::shared_ptr<MailTransport> transport)
     : QObject(parent), m_transport(transport ? std::move(transport) : std::make_shared<MailTransport>()), m_demo(demo), m_root(dataRoot), m_database(std::make_unique<MailDatabase>()),
       m_messages(new MessageListModel(this)), m_credentials(new AccountSession(dataRoot, this)) {
+    m_accountSetup = new AccountSetup(m_transport, !demo, this);
     m_drafts = new DraftService(*m_database, dataRoot, this);
     connect(m_drafts, &DraftService::draftsChanged, this, &MailController::draftsChanged);
     connect(m_drafts, &DraftService::status, this, &MailController::setStatus);
@@ -65,6 +69,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         }
         m_accountUnread.remove(m_account.id); ++m_accountUnreadRevision;
         emit accountUnreadChanged(); emit folderUnreadChanged();
+        if (!m_smartMailbox.isEmpty()) loadCached();
         setStatus(error.isEmpty() ? tr("Messages updated") : tr("Mailbox operation needs attention"), error);
     });
     m_sync = new MailboxSync(m_transport, this);
@@ -223,7 +228,7 @@ void MailController::initialize() {
         if (!m_database->open(m_root, first.id)) { setStatus(tr("Storage unavailable"), m_database->error()); return; }
         m_account = m_database->account();
     }
-    for (const auto &folder : m_database->folders()) m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
+    for (const auto &folder : m_database->folders()) m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}, {"role", folder.role}});
     emit accountChanged(); emit foldersChanged(); emit draftsChanged();
     loadCached();
     setStatus(configured() ? tr("Offline · cached mail") : tr("Add your email account to get started"));
@@ -240,7 +245,7 @@ void MailController::seedDemo() {
     m_account.smtpHost = QStringLiteral("smtp.example.invalid");
     const QList<Folder> folders{{"INBOX", "Inbox", 8}, {"Sent", "Sent", 1}, {"Archive", "Archive", 0}};
     m_database->saveFolders(folders);
-    for (const auto &f : folders) m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"total", f.total}});
+    for (const auto &f : folders) m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"total", f.total}, {"role", f.role}});
     const QStringList senders{"Maya Chen", "NextKde Design", "Oliver Martin", "Studio Notes", "Lin Wei", "Alex Rivera", "Open Source Weekly", "NkMail"};
     const QStringList subjects{"A quieter place for your inbox", "NextKde · the details make the difference", "Friday's design review", "A few things worth keeping", "关于下一次设计讨论", "Re: The little things", "This week in open source", "Welcome to NkMail"};
     const QStringList previews{"A first look at a more thoughtful mail experience.", "A small update on components, spacing and the next steps.", "I've added a few notes ahead of our conversation.", "References, ideas, and some room to think.", "整理了一些界面与交互建议，期待你的想法。", "Thank you for the careful feedback. Here's the revised direction.", "Good projects, thoughtful tools, and community updates.", "Your mail, with a little more breathing room."};
@@ -265,14 +270,14 @@ void MailController::seedDemo() {
     setStatus(tr("Preview · synthetic mail · not connected"));
     if (!page.messages.isEmpty()) openMessage(page.messages.first().uid, page.uidValidity);
 }
-void MailController::configureAccount(const QVariantMap &configuration, const QString &password, bool remember) {
-    if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return; }
-    if (m_busy || sending() || m_commands->busy()) return;
+bool MailController::configureAccount(const QVariantMap &configuration, const QString &password, bool remember) {
+    if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return false; }
+    if (m_busy || sending() || m_commands->busy()) return false;
     Account next = accountFromMap(configuration);
     const auto validHost = [](const QString &host) { return !host.trimmed().isEmpty() && !host.contains('/') && !host.contains('\n') && !host.contains('\r'); };
     if (!next.address.contains('@') || next.username.trimmed().isEmpty() || !validHost(next.imapHost) || !validHost(next.smtpHost)
         || next.imapPort < 1 || next.imapPort > 65535 || next.smtpPort < 1 || next.smtpPort > 65535) {
-        setStatus(tr("Check account settings"), tr("Enter an email address, username, valid server names and ports.")); return;
+        setStatus(tr("Check account settings"), tr("Enter an email address, username, valid server names and ports.")); return false;
     }
     // An explicit id selects an existing account to edit; otherwise the address
     // (case-folded, whitespace trimmed) is the stable identity, and a random id is
@@ -287,11 +292,11 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
     // are independent records and may differ freely.
     if (editingCurrent && configured() && (next.address.compare(m_account.address, Qt::CaseInsensitive) != 0
         || next.imapHost != m_account.imapHost || next.username != m_account.username)) {
-        setStatus(tr("Account change requires a separate data directory"), tr("Remove and re-add the account to change its email address, username or IMAP host.")); return;
+        setStatus(tr("Account change requires a separate data directory"), tr("Remove and re-add the account to change its email address, username or IMAP host.")); return false;
     }
     // Only the live account may reuse the session-only password held in memory.
     next.password = password.isEmpty() ? (editingCurrent ? m_account.password : QString{}) : password;
-    if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return; }
+    if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return false; }
     m_credentials->setPassword(next);
     if (!editingCurrent) {
         // Adding or editing a background account must not disturb the live mailbox.
@@ -300,7 +305,7 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
         emit accountsChanged();
         if (!configured()) switchAccount(next.id);
         setStatus(tr("Account saved."));
-        return;
+        return true;
     }
     const bool changedMailbox = m_account.address != next.address
         || m_account.username != next.username || m_account.imapHost != next.imapHost
@@ -321,6 +326,7 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
     else m_credentials->remove(credentialKey());
     startRefreshTimer();
     setStatus(tr("Account saved. Refresh to connect."));
+    return true;
 }
 void MailController::switchAccount(const QString &id) {
     const QString accountId = id.trimmed();
@@ -345,14 +351,14 @@ void MailController::switchAccount(const QString &id) {
     // Foreground view starts cached-only; background accounts poll inbox statistics.
     m_messages->replace({});
     m_selected.clear(); m_selectedUid.clear(); m_content = {};
-    m_folder = QStringLiteral("INBOX");
+    m_folder = QStringLiteral("INBOX"); m_smartMailbox.clear();
     m_search.clear();
     m_offset = 0; m_hasMore = false; m_uidValidity.clear(); m_cachedOnly = true;
 
     m_account = m_database->account();
     m_folders.clear();
     for (const auto &folder : m_database->folders())
-        m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
+        m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}, {"role", folder.role}});
     loadCached();
     // Account has no per-account interval yet; reuse the controller-wide value.
     startRefreshTimer();
@@ -376,7 +382,7 @@ QVariantList MailController::foldersFor(const QString &accountId) const {
     QVariantList out;
     if (!m_database->isOpen()) return out;
     for (const auto &folder : m_database->folders(accountId))
-        out.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}});
+        out.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}, {"role", folder.role}});
     return out;
 }
 QVariantMap MailController::folderUnread() const {
@@ -385,6 +391,13 @@ QVariantMap MailController::folderUnread() const {
     const auto counts = m_database->unreadCounts();
     for (auto it = counts.cbegin(); it != counts.cend(); ++it)
         out.insert(it.key(), it.value());
+    return out;
+}
+QVariantMap MailController::folderUnreadFor(const QString &accountId) const {
+    QVariantMap out;
+    if (!m_database || !m_database->isOpen()) return out;
+    const auto counts = m_database->unreadCounts(accountId);
+    for (auto it = counts.cbegin(); it != counts.cend(); ++it) out.insert(it.key(), it.value());
     return out;
 }
 int MailController::accountUnread(const QString &accountId) const {
@@ -418,6 +431,7 @@ void MailController::removeAccount(const QString &id) {
     setStatus(tr("No accounts left"));
 }
 void MailController::refresh() {
+    if (!m_smartMailbox.isEmpty()) { loadCached(); setStatus(tr("Smart mailbox · current account cached messages")); return; }
     if (m_demo) { setStatus(tr("Preview · synthetic mail · not connected")); return; }
     if (m_busy || sending() || m_commands->busy()) return;
     if (!configured() || m_account.password.isEmpty()) { setStatus(tr("Account needs attention"), tr("Add an account and enter an application password before connecting.")); return; }
@@ -428,7 +442,7 @@ void MailController::refresh() {
         m_busy = false;
         if (!error.isEmpty()) { m_cachedOnly = true; loadCached(); setStatus(tr("Offline · cached mail"), error); return; }
         m_database->saveFolders(folders); m_folders.clear();
-        for (const auto &f : folders) m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"total", f.total}});
+        for (const auto &f : folders) m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"total", f.total}, {"role", f.role}});
         emit foldersChanged(); m_busy = false; m_offset = 0;
         fetchPage(false);
     });
@@ -436,14 +450,27 @@ void MailController::refresh() {
 
 void MailController::loadCached(bool append) {
     if (!m_database->isOpen()) return;
-    auto page = m_database->cachedPage(m_folder, append ? m_offset : 0, pageSize, m_search, m_unreadOnly);
+    auto page = m_smartMailbox.isEmpty()
+        ? m_database->cachedPage(m_folder, append ? m_offset : 0, pageSize, m_search, m_unreadOnly)
+        : m_database->smartPage(m_smartMailbox, append ? m_offset : 0, pageSize, m_search, m_unreadOnly);
     m_uidValidity = page.uidValidity;
     if (append) m_messages->append(page.messages); else m_messages->replace(page.messages);
     m_offset = page.nextOffset; m_hasMore = page.hasMore; emit statusChanged();
     emit folderUnreadChanged();
 }
+void MailController::selectSmartMailbox(const QString &kind) {
+    if (kind != "flagged" && kind != "unread" && kind != "attachments") return;
+    if (m_commands->busy()) return;
+    ++m_generation; ++m_selectionGeneration; m_busy = false; m_offset = 0;
+    m_smartMailbox = kind; m_cachedOnly = true; m_search.clear(); m_unreadOnly = false;
+    m_selected.clear(); m_selectedUid.clear(); m_content = {};
+    emit folderChanged(); emit selectionChanged(); emit searchChanged(); emit unreadOnlyChanged();
+    loadCached();
+    setStatus(tr("Smart mailbox · current account cached messages"));
+}
 void MailController::selectFolder(const QString &folder) {
-    if (folder == m_folder) return;
+    if (folder == m_folder && m_smartMailbox.isEmpty()) return;
+    m_smartMailbox.clear();
     ++m_generation; ++m_selectionGeneration; m_busy = false; m_folder = folder; m_offset = 0;
     m_selected.clear(); m_selectedUid.clear(); m_content = {}; emit selectionChanged(); emit folderChanged();
     loadCached();
@@ -453,7 +480,7 @@ void MailController::setSearch(const QString &query) {
     if (m_search == query) return;
     ++m_generation; m_busy = false; m_cachedOnly = true; m_search = query; m_offset = 0;
     emit searchChanged(); loadCached();
-    const bool server = query.size() >= 2 && configured() && !m_demo
+    const bool server = m_smartMailbox.isEmpty() && query.size() >= 2 && configured() && !m_demo
         && !m_account.password.isEmpty() && !m_uidValidity.isEmpty();
     setStatus(server ? tr("Searching server…")
                      : m_demo ? tr("Preview · search synthetic cached messages")
@@ -462,7 +489,7 @@ void MailController::setSearch(const QString &query) {
 }
 void MailController::searchServer() {
     const QString query = m_search;
-    if (query.isEmpty() || !configured() || m_demo || m_account.password.isEmpty() || m_uidValidity.isEmpty()) return;
+    if (!m_smartMailbox.isEmpty() || query.isEmpty() || !configured() || m_demo || m_account.password.isEmpty() || m_uidValidity.isEmpty()) return;
     const auto generation = m_generation; const auto account = m_account;
     const auto folder = m_folder; const auto validity = m_uidValidity;
     m_serverSearching = true; setStatus(tr("Searching server…"));
@@ -548,7 +575,7 @@ void MailController::loadMore() {
 }
 void MailController::fetchPage(bool append, bool quiet) {
     if (m_busy || m_commands->busy() || m_demo || m_account.password.isEmpty()) return;
-    if (!m_search.isEmpty()) { loadCached(append); return; }
+    if (!m_smartMailbox.isEmpty() || !m_search.isEmpty()) { loadCached(append); return; }
     const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
     const auto offset = append ? m_offset : 0;
     m_busy = true; if (!quiet) setStatus(tr("Fetching message headers…"));
@@ -609,13 +636,15 @@ int MailController::blockedImageCount() const {
 void MailController::loadRemoteImages() {
     m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary), m_content.html);
 }
-void MailController::openMessage(const QString &uid, const QString &validity) {
+void MailController::openMessage(const QString &uid, const QString &validity, const QString &sourceFolder) {
+    const auto folder = sourceFolder.isEmpty() ? m_folder : sourceFolder;
+    if (!m_smartMailbox.isEmpty() && m_messages->indexOf(folder, validity, uid) < 0) return;
     if (m_commands->busy()) return;
     const auto selectionGeneration = ++m_selectionGeneration;
-    if (auto cached = m_database->content(m_folder, validity, uid)) { present(*cached); return; }
+    if (auto cached = m_database->content(folder, validity, uid)) { present(*cached); return; }
     m_selectedUid = uid; m_selected.clear(); m_content = {}; emit selectionChanged();
     if (m_demo || m_account.password.isEmpty()) { setStatus(tr("This message is not cached"), tr("Connect to download its content.")); return; }
-    const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
+    const auto generation = m_generation; const auto account = m_account;
     setStatus(tr("Loading message without changing server flags…"));
     m_sync->content(account, folder, validity, uid, [this, generation, selectionGeneration](const Content &content, const QString &error) {
         if (generation != m_generation || selectionGeneration != m_selectionGeneration) return;
@@ -669,7 +698,7 @@ void MailController::archiveMessages(const QVariantList &indices) {
     setStatus(tr("Archive folder unavailable"), tr("This account has no Archive, Archives or All Mail folder."));
 }
 void MailController::moveMessages(const QVariantList &indices, const QString &destination) {
-    if (destination.trimmed().isEmpty() || destination == m_folder) {
+    if (destination.trimmed().isEmpty() || (m_smartMailbox.isEmpty() && destination == m_folder)) {
         setStatus(tr("Choose a different destination folder")); return;
     }
     executeCommand(indices, MailboxCommands::Action::Move, false, destination);
@@ -686,8 +715,10 @@ void MailController::executeCommand(const QVariantList &indices, MailboxCommands
         const auto map = m_messages->get(index.toInt());
         if (map.isEmpty()) continue;
         const auto summary = summaryFromMap(map);
-        if (summary.folder != m_folder || summary.uidValidity != m_uidValidity || seen.contains(summary.uid)) continue;
-        seen.insert(summary.uid); selected.append(summary);
+        if (m_smartMailbox.isEmpty() && (summary.folder != m_folder || summary.uidValidity != m_uidValidity)) continue;
+        const auto identity = MessageListModel::identity(summary);
+        if (seen.contains(identity)) continue;
+        seen.insert(identity); selected.append(summary);
     }
     if (selected.isEmpty()) return;
     ++m_generation; ++m_selectionGeneration; m_serverSearching = false;

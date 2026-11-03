@@ -34,6 +34,7 @@ public:
     bool savePage(const Page &page);
     Page cachedPage(const QString &folder, int offset = 0, int limit = 50,
                     const QString &search = {}, bool unreadOnly = false) const;
+    Page smartPage(const QString &kind, int offset, int limit, const QString &search = {}, bool unreadOnly = false) const;
     QMap<QString, int> unreadCounts(const QString &accountId = {}) const;
 
     bool saveContent(const Content &content);

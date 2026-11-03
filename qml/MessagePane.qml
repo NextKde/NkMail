@@ -12,15 +12,22 @@ Rectangle {
     property bool draftsVisible: false
     property bool groupThreads: true
     property bool showSummary: true
+    property bool showAvatars: false
     readonly property color ink: AppTheme.text
     readonly property color muted: AppTheme.mutedText
     readonly property color rule: AppTheme.border
     readonly property color selectedSurface: AppTheme.withAlpha(AppTheme.accent, AppTheme.dark ? 0.18 : 0.10)
     readonly property color hoverSurface: AppTheme.cardHover
     signal messageOpened()
+    signal composeRequested(string mode)
     signal addAccountRequested()
     signal editDraftRequested(string draftId)
 
+    function showReviewMenu() {
+        if (!mail.demo) return
+        const row = messageList.itemAtIndex(0)
+        if (row) row.openContextMenu()
+    }
     objectName: "messagePane"
     color: "transparent"
     ColumnLayout {
@@ -37,6 +44,7 @@ Rectangle {
                 id: messageRow
                 required property int index
                 required property string uid
+                required property string folder
                 required property string uidValidity
                 required property string sender
                 required property string senderAddress
@@ -55,14 +63,51 @@ Rectangle {
                 height: visible ? MailStyle.messageRowHeight : 0
                 implicitHeight: visible ? MailStyle.messageRowHeight : 0
                 hoverEnabled: true
-                readonly property bool selected: mail.selectedUid === uid
+                readonly property bool selected: mail.selectedUid === uid && (mail.selectedMessage.folder || (mail.smartMailbox ? "" : mail.currentFolder)) === folder
                 readonly property color rowInk: selected ? "#ffffff" : root.ink
                 readonly property color rowMuted: selected ? "#ffffff" : root.muted
                 readonly property color rowAccent: selected ? "#ffffff" : AppTheme.accent
                 readonly property bool multiSelected: root.selection.isRowSelected(index)
                 readonly property int messageIndex: (mail.messages && typeof mail.messages.indexOf === "function")
-                    ? mail.messages.indexOf(mail.currentFolder, uidValidity, uid) : -1
-                function selectRow() { mail.openMessage(uid, uidValidity); root.messageOpened() }
+                    ? mail.messages.indexOf(folder, uidValidity, uid) : -1
+                readonly property bool bulkMenu: root.selection.isRowSelected(index) && root.selection.selectionSize > 1
+                readonly property bool canCompose: !bulkMenu && !mail.sending
+                    && (mail.selectedMessage.folder || (mail.smartMailbox ? "" : mail.currentFolder)) === folder && mail.selectedMessage.uid === uid && mail.selectedMessage.uidValidity === uidValidity
+                function composeMessage(mode) {
+                    if (!canCompose) return
+                    rowMenu.close()
+                    root.composeRequested(mode)
+                }
+                function contextCommand(action, value) {
+                    if (messageIndex < 0) return
+                    const rows = bulkMenu ? root.selection.selectedIndexList() : [messageIndex]
+                    if (action === "read") mail.setMessagesRead(rows, value)
+                    else if (action === "flag") mail.setMessagesFlagged(rows, value)
+                    else if (action === "archive") mail.archiveMessages(rows)
+                    else if (action === "delete") mail.deleteMessages(rows)
+                    else if (action === "move") mail.moveMessages(rows, value)
+                }
+                property point contextPosition: Qt.point(0, 0)
+                function openMenuAtContext(menu) {
+                    function place() {
+                        const edge = menu.margins
+                        menu.x = Math.max(edge, Math.min(contextPosition.x, menu.parent.width - menu.width - edge))
+                        menu.y = Math.max(edge, Math.min(contextPosition.y, menu.parent.height - menu.height - edge))
+                    }
+                    place()
+                    menu.open()
+                    Qt.callLater(place)
+                }
+                function openContextMenu(position) {
+                    // Pointer invocation uses the actual click; keyboard/review
+                    // invocation falls back to the middle of the selected row.
+                    const point = position || Qt.point(width / 2, height / 2)
+                    contextPosition = mapToItem(rowMenu.parent, point.x, point.y)
+                    if (!root.selection.isRowSelected(index)) root.selection.clearSelection()
+                    selectRow()
+                    openMenuAtContext(rowMenu)
+                }
+                function selectRow() { mail.openMessage(uid, uidValidity, folder); root.messageOpened() }
                 function openRow() {
                     selectRow()
                     if (unread) mail.setMessageRead(messageIndex, true)
@@ -82,49 +127,53 @@ Rectangle {
                 }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    onTapped: { messageRow.selectRow(); rowMenu.openAtAnchor() }
+                    onTapped: (eventPoint) => messageRow.openContextMenu(eventPoint.position)
                 }
                 LiquidPopover {
                     id: rowMenu
                     objectName: "messageRowMenu"
                     sourceItem: root.surface
-                    anchorItem: messageRow
+                    arrowEnabled: false
                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
-                    LiquidPopoverItem { text: qsTr("打开"); iconName: "reminder"; onTriggered: messageRow.openRow() }
+                    LiquidPopoverItem { text: qsTr("打开"); iconName: "reminder"; enabled: !messageRow.bulkMenu; onTriggered: messageRow.openRow() }
+                    LiquidPopoverItem { objectName: "rowReply"; text: qsTr("Reply"); iconName: "undo"; enabled: messageRow.canCompose; onTriggered: messageRow.composeMessage("reply") }
+                    LiquidPopoverItem { objectName: "rowReplyAll"; text: qsTr("Reply to all"); iconName: "arrows"; enabled: messageRow.canCompose; onTriggered: messageRow.composeMessage("replyAll") }
+                    LiquidPopoverItem { objectName: "rowForward"; text: qsTr("Forward"); iconName: "forward"; enabled: messageRow.canCompose; onTriggered: messageRow.composeMessage("forward") }
+                    Rectangle { implicitHeight: 1; Layout.fillWidth: true; color: root.rule }
                     LiquidPopoverItem {
                         text: messageRow.unread ? qsTr("标为已读") : qsTr("标为未读")
                         iconName: messageRow.unread ? "envelopeOpen" : "envelope"
-                        onTriggered: mail.setMessageRead(messageRow.messageIndex, messageRow.unread)
+                        onTriggered: messageRow.contextCommand("read", messageRow.unread)
                     }
                     LiquidPopoverItem {
                         text: messageRow.flagged ? qsTr("移除旗标") : qsTr("添加旗标")
                         iconName: "flag"
-                        onTriggered: mail.toggleFlagged(messageRow.messageIndex)
+                        onTriggered: messageRow.contextCommand("flag", !messageRow.flagged)
                     }
                     LiquidPopoverItem {
                         objectName: "moveToMenuItem"
                         text: qsTr("移动到…")
                         iconName: "folder"
-                        enabled: mail.folders.filter(f => f.id !== mail.currentFolder).length > 0
-                        onTriggered: { rowMenu.close(); messageMoveMenu.openAtAnchor() }
+                        enabled: mail.folders.filter(f => f.id !== messageRow.folder).length > 0
+                        onTriggered: { rowMenu.close(); messageRow.openMenuAtContext(messageMoveMenu) }
                     }
-                    LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; onTriggered: mail.archiveMessage(messageRow.messageIndex) }
-                    LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; onTriggered: mail.deleteMessage(messageRow.messageIndex) }
+                    LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; onTriggered: messageRow.contextCommand("archive") }
+                    LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; onTriggered: messageRow.contextCommand("delete") }
                 }
                 LiquidPopover {
                     id: messageMoveMenu
                     objectName: "messageMoveMenu"
                     sourceItem: root.surface
-                    anchorItem: messageRow
+                    arrowEnabled: false
                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
                     Repeater {
-                        model: mail.folders.filter(f => f.id !== mail.currentFolder)
+                        model: mail.folders.filter(f => f.id !== messageRow.folder)
                         LiquidPopoverItem {
                             text: modelData.title || modelData.id
                             iconName: "folder"
                             onTriggered: {
                                 messageMoveMenu.close()
-                                mail.moveMessage(messageRow.messageIndex, modelData.id)
+                                messageRow.contextCommand("move", modelData.id)
                             }
                         }
                     }
@@ -150,9 +199,21 @@ Rectangle {
                     }
                 }
                 contentItem: Item {
+                    Rectangle {
+                        visible: root.showAvatars
+                        x: 24; y: 12; width: 28; height: 28; radius: 14
+                        color: messageRow.selected ? Qt.rgba(1, 1, 1, 0.22) : MailStyle.avatar
+                        Text {
+                            anchors.centerIn: parent
+                            text: (messageRow.sender || messageRow.senderAddress || "?").trim().slice(0, 1).toUpperCase()
+                            color: messageRow.selected ? "white" : AppTheme.accent
+                            font.pixelSize: 13; font.weight: Font.DemiBold
+                            textFormat: Text.PlainText
+                        }
+                    }
                     Rectangle { x: 12; y: 14; width: 6; height: 6; radius: 3; color: messageRow.rowAccent; visible: messageRow.unread }
                     ColumnLayout {
-                        anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; anchors.topMargin: 7; anchors.bottomMargin: 7
+                        anchors.fill: parent; anchors.leftMargin: root.showAvatars ? 60 : 24; anchors.rightMargin: 24; anchors.topMargin: 7; anchors.bottomMargin: 7
                         spacing: 3
                         RowLayout {
                             Layout.fillWidth: true
@@ -211,6 +272,7 @@ Rectangle {
             }
         }
         ListView {
+            objectName: "draftList"
             visible: root.draftsVisible
             Layout.fillWidth: true; Layout.fillHeight: true
             model: mail.drafts; clip: true
@@ -221,15 +283,76 @@ Rectangle {
                 Accessible.name: MailLabels.value(modelData, "subject") || qsTr("Untitled draft")
                 onClicked: root.editDraftRequested(modelData.id)
                 background: Rectangle { color: "transparent"; Rectangle { anchors.bottom: parent.bottom; height: 1; width: parent.width; color: root.rule } }
-                contentItem: ColumnLayout {
-                    spacing: 5
-                    Text { text: MailLabels.value(draftRow.modelData, "subject") || qsTr("Untitled draft"); color: root.ink; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                    Text { text: MailLabels.value(draftRow.modelData, "to") || qsTr("No recipient"); color: root.muted; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                    Text { text: MailLabels.draftStateLabel(draftRow.modelData.state); color: root.muted; font.pixelSize: 10 }
+                contentItem: RowLayout {
+                    spacing: 12
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 5
+                        Text { text: MailLabels.value(draftRow.modelData, "subject") || qsTr("Untitled draft"); color: root.ink; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
+                        Text { text: MailLabels.value(draftRow.modelData, "to") || qsTr("No recipient"); color: root.muted; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
+                        Text { text: MailLabels.draftStateLabel(draftRow.modelData.state); color: root.muted; font.pixelSize: 10 }
+                    }
+                    MailAction {
+                        objectName: "deleteLocalDraft"
+                        iconOnly: true; iconName: "trash"
+                        accessibleText: qsTr("Delete local draft")
+                        enabled: !root.mail.sending && !root.mail.sendPending && draftRow.modelData.state !== "sending"
+                        onClicked: {
+                            deleteDraftDialog.targetId = String(draftRow.modelData.id)
+                            deleteDraftDialog.targetAccountId = root.mail.currentAccountId
+                            deleteDraftDialog.open()
+                        }
+                    }
                 }
                 leftPadding: 22; rightPadding: 18; topPadding: 14; bottomPadding: 14
             }
             Text { anchors.centerIn: parent; visible: mail.drafts.length === 0; text: qsTr("Your drafts will be saved here."); color: root.muted; font.pixelSize: 12 }
+        }
+    }
+    LiquidDialog {
+        id: deleteDraftDialog
+        objectName: "deleteDraftDialog"
+        parent: Overlay.overlay
+        sourceItem: root.surface
+        property string targetId: ""
+        property string targetAccountId: ""
+        readonly property bool canDelete: targetAccountId === root.mail.currentAccountId
+            && !root.mail.sending && !root.mail.sendPending
+            && root.mail.drafts.some(d => String(d.id) === targetId && d.state !== "sending")
+        width: Math.min(420, parent ? parent.width - 32 : 420)
+        anchors.centerIn: parent
+        title: qsTr("Delete local draft?")
+        contentItem: Text {
+            text: qsTr("This draft will be permanently deleted from this device.")
+            textFormat: Text.PlainText
+            color: root.ink
+            wrapMode: Text.Wrap
+        }
+        footer: Item {
+            implicitHeight: MailStyle.footerHeight
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 12; anchors.bottomMargin: 20
+                spacing: 8
+                Item { Layout.fillWidth: true }
+                LiquidDialogButton {
+                    objectName: "cancelDeleteDraft"
+                    text: qsTr("Cancel")
+                    onClicked: deleteDraftDialog.close()
+                }
+                LiquidDialogButton {
+                    objectName: "confirmDeleteDraft"
+                    text: qsTr("Delete")
+                    destructive: true
+                    enabled: deleteDraftDialog.canDelete
+                    onClicked: {
+                        if (!deleteDraftDialog.canDelete) return
+                        root.mail.discardDraft(deleteDraftDialog.targetId)
+                        if (!root.mail.drafts.some(d => String(d.id) === deleteDraftDialog.targetId))
+                            deleteDraftDialog.close()
+                    }
+                }
+            }
         }
     }
 }

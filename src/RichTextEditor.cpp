@@ -21,14 +21,26 @@ namespace {
 QTextDocument *documentFor(QQuickTextDocument *doc) {
     return doc ? doc->textDocument() : nullptr;
 }
+QTextCursor selectedCursor(QTextDocument *text, int start, int end) {
+    QTextCursor cursor(text);
+    const int last = qMax(0, text->characterCount() - 1);
+    cursor.setPosition(qBound(0, start, last));
+    cursor.setPosition(qBound(0, end, last), QTextCursor::KeepAnchor);
+    return cursor;
+}
 }
 
 RichTextEditor::RichTextEditor(QObject *parent) : QObject(parent) {}
 
+void RichTextEditor::setSelection(int start, int end) {
+    m_selectionStart = start;
+    m_selectionEnd = end;
+}
+
 void RichTextEditor::toggleBold(QQuickTextDocument *doc) {
     QTextDocument *text = documentFor(doc);
     if (!text) return;
-    QTextCursor cursor(text);
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
     bool autoSelected = false;
     if (!cursor.hasSelection()) {
         cursor.select(QTextCursor::WordUnderCursor);
@@ -44,7 +56,7 @@ void RichTextEditor::toggleBold(QQuickTextDocument *doc) {
 void RichTextEditor::toggleItalic(QQuickTextDocument *doc) {
     QTextDocument *text = documentFor(doc);
     if (!text) return;
-    QTextCursor cursor(text);
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
     bool autoSelected = false;
     if (!cursor.hasSelection()) {
         cursor.select(QTextCursor::WordUnderCursor);
@@ -60,7 +72,7 @@ void RichTextEditor::toggleItalic(QQuickTextDocument *doc) {
 void RichTextEditor::toggleUnderline(QQuickTextDocument *doc) {
     QTextDocument *text = documentFor(doc);
     if (!text) return;
-    QTextCursor cursor(text);
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
     bool autoSelected = false;
     if (!cursor.hasSelection()) {
         cursor.select(QTextCursor::WordUnderCursor);
@@ -73,12 +85,16 @@ void RichTextEditor::toggleUnderline(QQuickTextDocument *doc) {
     if (autoSelected) cursor.clearSelection();
 }
 
-void RichTextEditor::toggleBulletList(QQuickTextDocument *doc) {
+void RichTextEditor::toggleBulletList(QQuickTextDocument *doc) { toggleList(doc, false); }
+void RichTextEditor::toggleNumberedList(QQuickTextDocument *doc) { toggleList(doc, true); }
+
+void RichTextEditor::toggleList(QQuickTextDocument *doc, bool numbered) {
     QTextDocument *text = documentFor(doc);
     if (!text) return;
-    QTextCursor cursor(text);
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
 
-    if (cursor.currentList()) {
+    const auto style = numbered ? QTextListFormat::ListDecimal : QTextListFormat::ListDisc;
+    if (cursor.currentList() && cursor.currentList()->format().style() == style) {
         const QTextBlock first = text->findBlock(cursor.selectionStart());
         const QTextBlock last = text->findBlock(qMax(cursor.selectionStart(), cursor.selectionEnd() - 1));
         cursor.beginEditBlock();
@@ -96,16 +112,64 @@ void RichTextEditor::toggleBulletList(QQuickTextDocument *doc) {
     }
 
     QTextListFormat listFormat;
-    listFormat.setStyle(QTextListFormat::ListDisc);
+    listFormat.setStyle(style);
     listFormat.setIndent(1);
     cursor.createList(listFormat);
     cursor.clearSelection();
 }
 
+void RichTextEditor::setAlignment(QQuickTextDocument *doc, int alignment) {
+    auto *text = documentFor(doc);
+    if (!text) return;
+    if (alignment != Qt::AlignLeft && alignment != Qt::AlignHCenter && alignment != Qt::AlignRight) return;
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
+    QTextBlockFormat format;
+    format.setAlignment(Qt::Alignment(alignment));
+    cursor.mergeBlockFormat(format);
+}
+
+void RichTextEditor::changeIndent(QQuickTextDocument *doc, int delta) {
+    auto *text = documentFor(doc);
+    if (!text || !delta) return;
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
+    const QTextBlock first = text->findBlock(cursor.selectionStart());
+    const QTextBlock last = text->findBlock(qMax(cursor.selectionStart(), cursor.selectionEnd() - 1));
+    cursor.beginEditBlock();
+    for (QTextBlock block = first; block.isValid(); block = block.next()) {
+        QTextCursor item(block);
+        auto format = block.blockFormat();
+        // Block-local indentation preserves neighbouring list items and numbering.
+        format.setIndent(qBound(0, format.indent() + (delta > 0 ? 1 : -1), 12));
+        item.setBlockFormat(format);
+        if (block == last) break;
+    }
+    cursor.endEditBlock();
+}
+
+QVariantMap RichTextEditor::blockState(QQuickTextDocument *doc) const {
+    auto *text = documentFor(doc);
+    if (!text) return {};
+    const auto cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
+    const auto *list = cursor.currentList();
+    return {{"alignment", int(cursor.blockFormat().alignment())},
+            {"bullets", list && list->format().style() == QTextListFormat::ListDisc},
+            {"numbered", list && list->format().style() == QTextListFormat::ListDecimal}};
+}
+
+int RichTextEditor::insertText(QQuickTextDocument *doc, const QString &value) {
+    auto *text = documentFor(doc);
+    if (!text) return 0;
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
+    cursor.beginEditBlock();
+    cursor.insertText(value);
+    cursor.endEditBlock();
+    return cursor.position();
+}
+
 void RichTextEditor::insertLink(QQuickTextDocument *doc, const QString &url) {
     QTextDocument *text = documentFor(doc);
     if (!text) return;
-    QTextCursor cursor(text);
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
     if (!cursor.hasSelection()) return;
     QTextCharFormat format;
     format.setAnchor(true);

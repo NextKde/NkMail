@@ -105,6 +105,7 @@ void login(Imap &imap, const Account &a)
     imap.ssl_options(tlsOptions(a));
     imap.start_tls(a.imapStartTls);
     imap.authenticate(utf8(a.username), utf8(a.password), Imap::auth_method_t::LOGIN);
+    if (imap.capabilities().count("ID")) imap.client_id("NkMail");
 }
 Imap::fetch_options_t options(bool headers)
 {
@@ -403,7 +404,14 @@ QList<Folder> MailioBackend::folders(const Account &a)
                 const auto id = prefix.isEmpty() ? unicode(name) : prefix + delimiter + unicode(name);
                 if (child.selectable) {
                     const auto stat = imap.statistics(utf8(id));
-                    result << Folder{id, folderTitle(id), int(std::min<unsigned long>(stat.messages_no, std::numeric_limits<int>::max()))};
+                    QString role;
+                    if (id.compare("INBOX", Qt::CaseInsensitive) == 0) role = "inbox";
+                    for (const auto &attribute : child.attributes) {
+                        const auto flag = unicode(attribute).toLower();
+                        for (const auto &name : {"sent", "drafts", "archive", "trash", "junk", "all"})
+                            if (flag == QStringLiteral("\\") + QLatin1String(name)) role = QLatin1String(name);
+                    }
+                    result << Folder{id, folderTitle(id), int(std::min<unsigned long>(stat.messages_no, std::numeric_limits<int>::max())), role};
                 }
                 visit(child, id, depth + 1);
             }
@@ -507,6 +515,14 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate.")); }
 }
+void MailioBackend::verifySmtp(const Account &a)
+{
+    accountValid(a, true);
+    mailio::smtp smtp(utf8(a.smtpHost), a.smtpPort, Timeout);
+    smtp.ssl_options(tlsOptions(a)); smtp.start_tls(a.smtpStartTls);
+    smtp.source_hostname("nkmail.invalid");
+    smtp.authenticate(utf8(a.username), utf8(a.password), mailio::smtp::auth_method_t::LOGIN);
+}
 SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *raw)
 {
     bool submitting = false;
@@ -547,6 +563,7 @@ QString MailioBackend::sentFolder(const Account &a)
         const auto tree = imap.list_folders(std::string());
         const auto delimiter = unicode(imap.folder_delimiter());
         QStringList ids, lasts;
+        QString specialSent;
         int nodes = 0;
         std::function<void(const Imap::mailbox_folder_t &, const QString &, int)> visit;
         visit = [&](const auto &node, const QString &prefix, int depth) {
@@ -555,6 +572,11 @@ QString MailioBackend::sentFolder(const Account &a)
                 if (++nodes > 1000) return;
                 const auto id = prefix.isEmpty() ? unicode(name) : prefix + delimiter + unicode(name);
                 if (child.selectable) {
+                    if (specialSent.isEmpty()) {
+                        for (const auto &attribute : child.attributes)
+                            if (QString::fromStdString(attribute).compare(QStringLiteral("\\Sent"), Qt::CaseInsensitive) == 0)
+                                specialSent = id;
+                    }
                     ids << id;
                     lasts << (delimiter.isEmpty() ? id : id.section(delimiter, -1));
                 }
@@ -562,6 +584,7 @@ QString MailioBackend::sentFolder(const Account &a)
             }
         };
         visit(tree, {}, 0);
+        if (!specialSent.isEmpty()) return specialSent;
         static const QStringList candidates{
             QStringLiteral("sent"), QStringLiteral("sent items"), QStringLiteral("sent messages"),
             QStringLiteral("sent mail"), QStringLiteral("sent-mail"),

@@ -36,13 +36,18 @@ qt_add_lrelease(nkmail
     QM_FILES_OUTPUT_VARIABLE NKMAIL_QM_FILES)
 qt_add_resources(nkmail nkmail_translations PREFIX "/i18n"
     BASE "${CMAKE_CURRENT_BINARY_DIR}" FILES ${NKMAIL_QM_FILES})
+set(NKMAIL_PROVIDER_LOGOS
+    data/providers/icloud.png data/providers/google.svg data/providers/qq.png
+    data/providers/exmail.ico data/providers/163.png data/providers/126.png
+    data/providers/yahoo.png data/providers/aol.png data/providers/microsoft.ico)
+qt_add_resources(nkmail nkmail_provider_logos PREFIX "/" FILES ${NKMAIL_PROVIDER_LOGOS})
 qt_add_resources(nkmail nkmail_icons PREFIX "/" FILES data/nkmail.svg)
 qt_add_resources(nkmail nkmail_window_controls PREFIX "/nkmail/platform"
     BASE qml FILES qml/NativeWindowControls.qml)
 set_source_files_properties(qml/MailLabels.qml qml/MailStyle.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(nkmail
     URI NextKde.Mail VERSION 1.0 RESOURCE_PREFIX /qt/qml
-    QML_FILES qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/Main.qml qml/WindowChrome.qml qml/MailWindowControls.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
+    QML_FILES qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/MailMessageHeader.qml qml/Main.qml qml/WindowChrome.qml qml/MailWindowControls.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml qml/ProviderProfiles.js qml/ProviderPicker.qml qml/MailboxNavigation.js qml/ReaderLayout.js)
 target_link_libraries(nkmail PRIVATE nkmail_core Kos::Ui Kos::UiPlugin
     Qt6::Quick Qt6::QuickControls2 Qt6::QuickDialogs2 Qt6::Concurrent Qt6::Network Qt6::DBus Qt6::Widgets)
 target_compile_definitions(nkmail PRIVATE NKMAIL_VERSION="${PROJECT_VERSION}")
@@ -65,7 +70,8 @@ if(NKMAIL_BUILD_TESTS)
     qt_add_executable(nkmail_ui_tests tests/ui/main.cpp src/RichTextEditor.cpp src/RichTextEditor.h)
     qt_add_qml_module(nkmail_ui_tests
         URI NextKde.Mail.TestViews VERSION 1.0 RESOURCE_PREFIX /qt/qml
-        QML_FILES qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/Main.qml qml/WindowChrome.qml qml/MailWindowControls.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml)
+        QML_FILES qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/MailMessageHeader.qml qml/Main.qml qml/WindowChrome.qml qml/MailWindowControls.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml qml/ProviderProfiles.js qml/ProviderPicker.qml qml/MailboxNavigation.js qml/ReaderLayout.js)
+    qt_add_resources(nkmail_ui_tests nkmail_test_provider_logos PREFIX "/" FILES ${NKMAIL_PROVIDER_LOGOS})
     qt_add_resources(nkmail_ui_tests nkmail_test_window_controls PREFIX "/nkmail/platform"
         BASE qml FILES qml/NativeWindowControls.qml)
     target_compile_definitions(nkmail_ui_tests PRIVATE QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/ui")

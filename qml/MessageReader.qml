@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Kos.Ui
+import "ReaderLayout.js" as ReaderLayout
 
 Rectangle {
     id: root
@@ -17,6 +18,7 @@ Rectangle {
     readonly property color muted: AppTheme.mutedText
     readonly property color rule: AppTheme.border
     signal closeDetailsRequested()
+    signal detailsRequested()
     signal saveAttachmentRequested(int index)
     signal addAccountRequested()
 
@@ -41,6 +43,18 @@ Rectangle {
                     Layout.maximumWidth: Math.max(0, Math.min(MailStyle.readerMaximumWidth, readerScroll.availableWidth - (root.compact ? 48 : 72)))
                     Layout.minimumWidth: 0
                     spacing: 14
+                    MailMessageHeader {
+                        objectName: "mailMessageHeader"
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        Layout.topMargin: 12
+                        message: root.message
+                        localeName: root.localeName
+                        sourceLabel: (root.mail.account.name || root.mail.account.address || "") + " · " + (root.message.folder || root.mail.currentFolder)
+                        expanded: root.detailsVisible
+                        onToggleDetails: root.detailsVisible ? root.closeDetailsRequested() : root.detailsRequested()
+                    }
+                    Rectangle { Layout.fillWidth: true; height: 1; color: root.rule; Layout.topMargin: 4; Layout.bottomMargin: 6 }
                     Item {
                         id: detailsPanel
                         objectName: "messageDetailsPanel"
@@ -61,7 +75,7 @@ Rectangle {
                             height: 28
                             spacing: 8
                             Text { text: qsTr("Message details"); color: root.ink; font.pixelSize: 15; font.weight: Font.DemiBold; Layout.fillWidth: true }
-                            MailAction { stacked: true; stackedText: qsTr("关闭"); iconName: "close"; accessibleText: qsTr("Close message details"); onClicked: root.closeDetailsRequested() }
+                            MailAction { iconOnly: true; text: "×"; font.pixelSize: 20; accessibleText: qsTr("Close message details"); onClicked: root.closeDetailsRequested() }
                         }
                         ScrollView {
                             id: detailsScroll
@@ -107,25 +121,7 @@ Rectangle {
                             color: root.rule
                         }
                     }
-                    Text {
-                        text: MailLabels.value(root.message, "subject") || qsTr("(No subject)")
-                        color: root.ink; font.pixelSize: 25; font.weight: Font.Bold
-                        wrapMode: Text.Wrap; Layout.fillWidth: true; textFormat: Text.PlainText
-                    }
-                    RowLayout {
-                        Layout.fillWidth: true; spacing: 12
-                        Rectangle {
-                            width: 36; height: 36; radius: 18; color: MailStyle.avatar
-                            Text { anchors.centerIn: parent; text: (MailLabels.value(root.message, "sender") || "?").slice(0, 1).toUpperCase(); color: AppTheme.accent; font.pixelSize: 16; font.weight: Font.DemiBold }
-                        }
-                        ColumnLayout {
-                            Layout.fillWidth: true; spacing: 4
-                            Text { text: MailLabels.value(root.message, "sender") || MailLabels.value(root.message, "senderAddress"); color: root.ink; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                            Text { text: qsTr("To: ") + MailLabels.value(root.message, "to"); color: root.muted; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                        }
-                    }
-                    Text { text: MailLabels.dateLabel(root.message.date, root.localeName); color: root.muted; font.pixelSize: 11; Layout.fillWidth: true }
-                    Rectangle { Layout.fillWidth: true; height: 1; color: root.rule; Layout.topMargin: 4; Layout.bottomMargin: 6 }
+
                     RowLayout {
                         objectName: "blockedImagesBar"
                         Layout.fillWidth: true
@@ -150,7 +146,7 @@ Rectangle {
                         Layout.preferredHeight: Math.max(200, contentHeight)
                         readonly property string richHtml: MailLabels.value(root.message, "html") || ""
                         readonly property bool asRich: root.showRichText && String(richHtml).length > 0
-                        text: asRich ? String(richHtml) : MailLabels.value(root.message, "text")
+                        text: asRich ? ReaderLayout.fitImages(richHtml, width) : MailLabels.value(root.message, "text")
                         textFormat: asRich ? TextEdit.RichText : TextEdit.PlainText
                         readOnly: true; selectByMouse: true
                         wrapMode: TextEdit.Wrap
