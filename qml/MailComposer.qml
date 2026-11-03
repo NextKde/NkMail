@@ -2,10 +2,11 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import QtQuick.Window
 import Kos.Ui
 import NextKde.Mail.Editor 1.0
 
-LiquidDialog {
+ApplicationWindow {
     id: root
     required property var mail
     required property var hostWindow
@@ -14,18 +15,61 @@ LiquidDialog {
     property bool dirty: false
     property bool saveFailed: false
     property string localStatus: ""
-    property bool showCc: false
     property bool showBcc: false
-    objectName: "composerDialog"
-    parent: Overlay.overlay
-    width: Math.min(760, hostWindow.width - 32)
-    height: Math.min(690, hostWindow.height - 32)
-    anchors.centerIn: parent
-    title: qsTr("New message")
-    closePolicy: Popup.NoAutoClose
-    focus: true
-    padding: 24
-    materialOpacity: 0.99
+    property bool showFormatting: true
+    property string fromAddress: ""
+    readonly property bool accountMatches: !draft.accountId || draft.accountId === mail.currentAccountId
+    readonly property bool editable: accountMatches && !mail.sending && !mail.sendPending
+    objectName: "composerDialog" // Preserve the public review/test lookup.
+    width: 920; height: 740
+    minimumWidth: 640; minimumHeight: 500
+    visible: false
+    modality: Qt.NonModal
+    // A separate top-level window remains usable while the inbox is minimized.
+    transientParent: null
+    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
+    color: "transparent"
+    title: subjectField.text.trim() || qsTr("New message")
+    background: Rectangle {
+        radius: root.visibility === Window.Maximized ? 0 : 22
+        color: AppTheme.windowSurface
+        border.width: root.visibility === Window.Maximized ? 0 : 1
+        border.color: AppTheme.border
+    }
+    font.family: "sans-serif"
+    font.pixelSize: 13
+
+    component ComposerAction: LiquidActionButton {
+        materialForm: true
+        implicitHeight: 32
+        implicitWidth: iconOnly ? 32 : Math.max(44, contentItem.implicitWidth + leftPadding + rightPadding)
+        focusPolicy: Qt.NoFocus
+        Accessible.name: text
+        KosToolTip { target: parent; text: parent.Accessible.name }
+    }
+    component AddressField: TextField {
+        Layout.fillWidth: true
+        implicitHeight: 42
+        color: AppTheme.text
+        selectionColor: AppTheme.accent
+        selectedTextColor: AppTheme.accentText
+        font.pixelSize: 14
+        selectByMouse: true
+        leftPadding: 0; rightPadding: 0
+        background: Item {}
+        enabled: root.editable
+        onTextChanged: root.changed()
+    }
+    component FieldLabel: Text {
+        Layout.preferredWidth: 58
+        color: AppTheme.mutedText
+        font.pixelSize: 13
+    }
+    component Rule: Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 1
+        color: AppTheme.border
+    }
 
     function copy(map) { return JSON.parse(JSON.stringify(map || {})) }
     function editDraft(value) {
@@ -33,17 +77,20 @@ LiquidDialog {
         if (!value || !value.id) return false
         populating = true
         draft = copy(value)
+        fromAddress = String(root.mail.account.address || "")
         toField.text = String(draft.to || "")
         ccField.text = String(draft.cc || "")
         bccField.text = String(draft.bcc || "")
         subjectField.text = String(draft.subject || "")
-        bodyField.text = draft.html ? String(draft.html) : String(draft.body || "")
-        showCc = ccField.text.length > 0
+        const plainBody = String(draft.body || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        bodyField.text = draft.html ? String(draft.html) : "<p>" + plainBody.replace(/\n/g, "<br>") + "</p>"
         showBcc = bccField.text.length > 0
         dirty = false; saveFailed = false
         localStatus = qsTr("Saved locally")
         populating = false
-        open()
+        closeDecision.close()
+        showNormal()
+        requestActivate()
         toField.forceActiveFocus()
         return true
     }
@@ -76,17 +123,47 @@ LiquidDialog {
         localStatus = qsTr("Saved locally")
         return true
     }
+    // Explicit save-and-close is separate from the window's close request.
     function finishEditing() {
-        if (mail.sending || !persist()) return false
-        close()
+        if (mail.sending || mail.sendPending || !persist()) return false
+        closeDecision.close()
+        hide()
         return true
     }
+    function requestClose() {
+        if (mail.sending || mail.sendPending) {
+            requestActivate()
+            return false
+        }
+        autosave.stop()
+        closeDecision.open()
+        return false
+    }
+    function discardAndClose() {
+        if (!editable || !draft.id) return false
+        autosave.stop()
+        mail.discardDraft(draft.id)
+        const remaining = mail.loadDraft(draft.id)
+        if (remaining && remaining.id) return false
+        dirty = false; saveFailed = false
+        closeDecision.close()
+        hide()
+        return true
+    }
+    function format(action) {
+        if (!editable) return
+        richEditor.setSelection(bodyField.selectionStart, bodyField.selectionEnd)
+        action()
+        changed()
+        bodyField.forceActiveFocus()
+    }
+    onClosing: event => { event.accepted = false; requestClose() }
     Timer { id: autosave; interval: 800; onTriggered: root.persist() }
     RichTextEditor { id: richEditor }
     Connections {
         target: root.mail
         function onDraftsChanged() {
-            if (!root.visible || !root.draft.id) return
+            if (!root.visible || !root.draft.id || !root.accountMatches) return
             const latest = root.mail.loadDraft(root.draft.id)
             if (!latest || !latest.id) return
             const updated = root.copy(root.draft)
@@ -97,104 +174,207 @@ LiquidDialog {
             if (String(root.draft.id) === String(id)) {
                 autosave.stop()
                 root.dirty = false
-                root.close()
+                closeDecision.close()
+                root.hide()
             }
         }
     }
-    Shortcut { sequence: "Escape"; enabled: root.visible; onActivated: root.finishEditing() }
-    Shortcut { sequence: "Ctrl+S"; enabled: root.visible && !root.mail.sending; onActivated: root.persist() }
+    Shortcut { sequence: "Escape"; enabled: root.active && !closeDecision.visible; onActivated: root.requestClose() }
+    Shortcut { sequence: "Ctrl+W"; enabled: root.active && !closeDecision.visible; onActivated: root.requestClose() }
+    Shortcut { sequence: "Ctrl+S"; enabled: root.active && root.editable && !closeDecision.visible; onActivated: root.persist() }
 
-    contentItem: Item {
+    Item {
+        id: composeScene
+        anchors.fill: parent
+        anchors.margins: root.visibility === Window.Maximized ? 0 : 1
         ColumnLayout {
             anchors.fill: parent
             spacing: 0
-            RowLayout {
-                Layout.fillWidth: true; Layout.bottomMargin: 10
-                Text { text: qsTr("From"); color: AppTheme.mutedText; font.pixelSize: AppTheme.compactControlFontSize; Layout.preferredWidth: 56 }
-                Text { text: String(root.mail.account.address || qsTr("Example account")); color: AppTheme.text; font.pixelSize: AppTheme.compactControlFontSize; Layout.fillWidth: true; elide: Text.ElideRight; Accessible.name: qsTr("From address") }
-                MailAction { text: qsTr("Cc"); toolbarAction: false; checkable: true; checked: root.showCc; enabled: !root.mail.sending; Accessible.name: qsTr("Show carbon copy field"); onToggled: root.showCc = checked }
-                MailAction { text: qsTr("Bcc"); toolbarAction: false; checkable: true; checked: root.showBcc; enabled: !root.mail.sending; Accessible.name: qsTr("Show blind carbon copy field"); onToggled: root.showBcc = checked }
-            }
-            GridLayout {
-                Layout.fillWidth: true
-                columns: 2; columnSpacing: 10; rowSpacing: 8
-                enabled: !root.mail.sending
-                Text { text: qsTr("To"); color: AppTheme.mutedText; font.pixelSize: 12; Layout.preferredWidth: 54 }
-                KosTextField { id: toField; objectName: "composerTo"; Layout.fillWidth: true; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; Accessible.name: qsTr("To"); placeholderText: qsTr("Recipient address"); onTextChanged: root.changed() }
-                Text { visible: root.showCc; text: qsTr("Cc"); color: AppTheme.mutedText; font.pixelSize: 12 }
-                KosTextField { id: ccField; visible: root.showCc; Layout.fillWidth: true; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; Accessible.name: qsTr("Cc"); onTextChanged: root.changed() }
-                Text { visible: root.showBcc; text: qsTr("Bcc"); color: AppTheme.mutedText; font.pixelSize: 12 }
-                KosTextField { id: bccField; visible: root.showBcc; Layout.fillWidth: true; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; Accessible.name: qsTr("Bcc"); onTextChanged: root.changed() }
-                Text { text: qsTr("Subject"); color: AppTheme.mutedText; font.pixelSize: 12 }
-                KosTextField { id: subjectField; objectName: "composerSubject"; Layout.fillWidth: true; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; Accessible.name: qsTr("Subject"); placeholderText: qsTr("Subject"); onTextChanged: root.changed() }
-            }
             Item {
-                Layout.fillWidth: true; Layout.fillHeight: true; Layout.topMargin: 14; Layout.bottomMargin: 10
-                KosCard {
+                Layout.fillWidth: true; Layout.preferredHeight: 62
+                MouseArea {
                     anchors.fill: parent
-                    padding: 12
-                    background: KosSurface {
-                        radius: AppTheme.smallRadius
-                        fillColor: AppTheme.controlBackground
-                        strokeColor: AppTheme.border
-                        strokeWidth: 1
-                        elevation: 0
+                    onPressed: root.startSystemMove()
+                    onDoubleClicked: {
+                        if (root.visibility === Window.Maximized) root.showNormal()
+                        else root.showMaximized()
                     }
+                }
+                MailWindowControls {
+                    id: windowControls
+                    targetWindow: root
+                    maximizeMode: true
+                    // Native protocol adapters assume the inbox's right-side order;
+                    // this window uses the canonical fallback controls on the left.
+                    platformComponent: null
+                    layoutDirection: Qt.RightToLeft
+                    circleSize: 13; buttonWidth: 22; buttonHeight: 28; spacing: 3
+                    anchors.left: parent.left; anchors.leftMargin: 17
+                    anchors.verticalCenter: parent.verticalCenter
                 }
                 RowLayout {
-                    id: formatBar
-                    anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
-                    anchors.leftMargin: 12; anchors.rightMargin: 12; anchors.topMargin: 8
-                    spacing: 4
-                    Row {
-                        spacing: 4
-                        Layout.alignment: Qt.AlignLeft
-                        Layout.preferredHeight: 22
-                        MailAction {
-                            text: "B"; accessibleText: qsTr("Bold"); toolbarAction: false
-                            implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.bold: true
-                            enabled: !root.mail.sending
-                            onClicked: { richEditor.toggleBold(bodyField.textDocument); root.changed() }
-                        }
-                        MailAction {
-                            text: "I"; accessibleText: qsTr("Italic"); toolbarAction: false
-                            implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.italic: true
-                            enabled: !root.mail.sending
-                            onClicked: { richEditor.toggleItalic(bodyField.textDocument); root.changed() }
-                        }
-                        MailAction {
-                            text: "U"; accessibleText: qsTr("Underline"); toolbarAction: false
-                            implicitWidth: 26; implicitHeight: 22; font.pixelSize: 11; font.underline: true
-                            enabled: !root.mail.sending
-                            onClicked: { richEditor.toggleUnderline(bodyField.textDocument); root.changed() }
-                        }
-                        MailAction {
-                            text: qsTr("• 列表"); accessibleText: qsTr("Bullet list"); toolbarAction: false
-                            implicitWidth: 56; implicitHeight: 22; font.pixelSize: 11
-                            enabled: !root.mail.sending
-                            onClicked: { richEditor.toggleBulletList(bodyField.textDocument); root.changed() }
+                    anchors.centerIn: parent
+                    spacing: 10
+                    Item {
+                        implicitWidth: headerActions.implicitWidth; implicitHeight: 32
+                        LiquidActionButton { anchors.fill: parent; materialForm: true; enabled: false; Accessible.ignored: true }
+                        Row {
+                            id: headerActions
+                            ComposerAction { flat: true; text: qsTr("Undo"); iconOnly: true; iconName: "undo"; enabled: root.editable && bodyField.canUndo; onClicked: bodyField.undo() }
+                            ComposerAction { flat: true; text: qsTr("Redo"); iconOnly: true; iconName: "forward"; enabled: root.editable && bodyField.canRedo; onClicked: bodyField.redo() }
+                            ComposerAction { flat: true; text: "Aa"; Accessible.name: qsTr("Formatting options"); onClicked: root.showFormatting = !root.showFormatting }
                         }
                     }
+                    ComposerAction {
+                        text: qsTr("Attach file…"); iconOnly: true
+                        enabled: root.editable
+                        contentItem: Item {
+                            Image {
+                                anchors.centerIn: parent
+                                width: 19; height: 19
+                                sourceSize: Qt.size(36, 36)
+                                fillMode: Image.PreserveAspectFit
+                                source: "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="' + (root.editable ? AppTheme.text : AppTheme.disabledText) + '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="m21 11-9 9a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8L15 6"/></svg>')
+                            }
+                        }
+                        onClicked: attachmentDialog.open()
+                    }
+                    ComposerAction { text: qsTr("Bcc"); checkable: true; checked: root.showBcc; enabled: root.editable; onClicked: root.showBcc = !root.showBcc }
                 }
-                ScrollView {
-                    anchors.fill: parent; anchors.margins: 12; anchors.topMargin: 42
-                    contentWidth: availableWidth
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                    KosTextArea {
-                        id: bodyField
-                        objectName: "composerBody"
-                        width: parent.width
-                        enabled: !root.mail.sending
-                        placeholderText: qsTr("Write something thoughtful…")
-                        font.pixelSize: 14
-                        wrapMode: TextEdit.Wrap
-                        textFormat: TextEdit.RichText
-                        selectByMouse: true
-                        Accessible.name: qsTr("Message body")
-                        padding: 0
-                        background: null
-                        onTextChanged: root.changed()
+                ComposerAction {
+                    objectName: "sendDraftButton"
+                    anchors.right: parent.right; anchors.rightMargin: 18
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: 40; implicitHeight: 40
+                    highlighted: true
+                    text: root.mail.sendPending ? qsTr("撤销发送") : root.mail.sending ? qsTr("Sending…") : qsTr("Send")
+                    enabled: root.mail.sendPending ? true : (root.editable && !root.mail.busy && !root.mail.demo && root.mail.configured
+                        && (toField.text.trim().length > 0 || ccField.text.trim().length > 0 || bccField.text.trim().length > 0)
+                        && ["unknown", "accepted", "sending"].indexOf(root.draft.state) < 0)
+                    contentItem: Text {
+                        text: root.mail.sendPending ? "↶" : "↑"
+                        font.pixelSize: 27
+                        color: parent.enabled ? "white" : AppTheme.disabledText
+                        horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
                     }
+                    onClicked: { if (root.mail.sendPending) root.mail.cancelSend(); else if (root.persist()) root.mail.sendDraft(root.currentDraft()) }
+                }
+            }
+            Rule {}
+            RowLayout {
+                Layout.fillWidth: true; Layout.leftMargin: 26; Layout.rightMargin: 26
+                spacing: 6
+                FieldLabel { text: qsTr("To") + ":" }
+                AddressField { id: toField; objectName: "composerTo"; Accessible.name: qsTr("To"); placeholderText: qsTr("Recipient address") }
+            }
+            Rule {}
+            RowLayout {
+                Layout.fillWidth: true; Layout.leftMargin: 26; Layout.rightMargin: 26
+                spacing: 6
+                FieldLabel { text: qsTr("Cc") + ":" }
+                AddressField { id: ccField; Accessible.name: qsTr("Cc") }
+            }
+            Rule {}
+            RowLayout {
+                visible: root.showBcc
+                Layout.fillWidth: true; Layout.leftMargin: 26; Layout.rightMargin: 26
+                spacing: 6
+                FieldLabel { text: qsTr("Bcc") + ":" }
+                AddressField { id: bccField; Accessible.name: qsTr("Bcc") }
+            }
+            Rule { visible: root.showBcc }
+            RowLayout {
+                Layout.fillWidth: true; Layout.leftMargin: 26; Layout.rightMargin: 26
+                spacing: 6
+                FieldLabel { text: qsTr("Subject") + ":" }
+                AddressField { id: subjectField; objectName: "composerSubject"; Accessible.name: qsTr("Subject") }
+            }
+            Rule {}
+            RowLayout {
+                Layout.fillWidth: true; Layout.leftMargin: 26; Layout.rightMargin: 26
+                Layout.preferredHeight: 32
+                FieldLabel { text: qsTr("From") + ":" }
+                Text {
+                    text: String(root.fromAddress || qsTr("Example account"))
+                    color: AppTheme.mutedText; font.pixelSize: 12
+                    Layout.fillWidth: true; elide: Text.ElideRight
+                    textFormat: Text.PlainText
+                    Accessible.name: qsTr("From address")
+                }
+            }
+            Flickable {
+                visible: root.showFormatting
+                Layout.fillWidth: true; Layout.preferredHeight: 46
+                Layout.leftMargin: 24; Layout.rightMargin: 24
+                contentWidth: formatRow.implicitWidth
+                contentHeight: height
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                RowLayout {
+                    id: formatRow
+                    height: parent.height
+                    spacing: 7
+                    enabled: root.editable
+                    KosComboBox {
+                        objectName: "composerFontFamily"
+                        implicitWidth: 150; implicitHeight: 30
+                        model: [qsTr("System font"), qsTr("Serif"), qsTr("Monospace")]
+                        Accessible.name: qsTr("Font family")
+                        onActivated: index => root.format(() => bodyField.cursorSelection.font.family = ["sans-serif", "serif", "monospace"][index])
+                    }
+                    KosComboBox {
+                        objectName: "composerFontSize"
+                        implicitWidth: 72; implicitHeight: 30
+                        model: ["10", "12", "14", "16", "18", "24", "32"]
+                        currentIndex: 2
+                        Accessible.name: qsTr("Font size")
+                        onActivated: root.format(() => bodyField.cursorSelection.font.pointSize = Number(currentText))
+                    }
+                    ComposerAction {
+                        text: qsTr("Text color"); implicitWidth: 30; implicitHeight: 30
+                        contentItem: Item {
+                            Rectangle { anchors.centerIn: parent; width: 22; height: 22; color: colorDialog.selectedColor; radius: 6; border.width: 1; border.color: AppTheme.border }
+                        }
+                        onClicked: colorDialog.open()
+                    }
+                    Item {
+                        implicitWidth: styleActions.implicitWidth; implicitHeight: 32
+                        LiquidActionButton { anchors.fill: parent; materialForm: true; enabled: false; Accessible.ignored: true }
+                        Row {
+                            id: styleActions
+                            spacing: 1
+                            ComposerAction { objectName: "composerBold"; flat: true; text: "B"; Accessible.name: qsTr("Bold"); font.bold: true; onClicked: root.format(() => bodyField.cursorSelection.font.bold = !bodyField.cursorSelection.font.bold) }
+                            ComposerAction { flat: true; text: "I"; Accessible.name: qsTr("Italic"); font.italic: true; onClicked: root.format(() => bodyField.cursorSelection.font.italic = !bodyField.cursorSelection.font.italic) }
+                            ComposerAction { flat: true; text: "U"; Accessible.name: qsTr("Underline"); font.underline: true; onClicked: root.format(() => bodyField.cursorSelection.font.underline = !bodyField.cursorSelection.font.underline) }
+                            ComposerAction { flat: true; text: "S"; Accessible.name: qsTr("Strikethrough"); font.strikeout: true; onClicked: root.format(() => bodyField.cursorSelection.font.strikeout = !bodyField.cursorSelection.font.strikeout) }
+                        }
+                    }
+                    ComposerAction { text: "• ≡"; Accessible.name: qsTr("Bullet list"); onClicked: root.format(() => richEditor.toggleBulletList(bodyField.textDocument)) }
+                }
+            }
+            ScrollView {
+                Layout.fillWidth: true; Layout.fillHeight: true
+                Layout.leftMargin: 28; Layout.rightMargin: 28
+                Layout.topMargin: 12; Layout.bottomMargin: 20
+                contentWidth: availableWidth
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                TextArea {
+                    id: bodyField
+                    objectName: "composerBody"
+                    enabled: root.editable
+                    color: AppTheme.text
+                    selectionColor: AppTheme.accent; selectedTextColor: AppTheme.accentText
+                    placeholderText: qsTr("Write something thoughtful…")
+                    placeholderTextColor: AppTheme.mutedText
+                    font.pixelSize: 14
+                    wrapMode: TextEdit.Wrap
+                    textFormat: TextEdit.RichText
+                    selectByMouse: true
+                    persistentSelection: true
+                    Accessible.name: qsTr("Message body")
+                    padding: 0
+                    background: null
+                    onTextChanged: root.changed()
                 }
             }
             Repeater {
@@ -203,11 +383,11 @@ LiquidDialog {
                     id: attachment
                     required property var modelData
                     required property int index
-                    Layout.fillWidth: true
-                    Text { text: attachment.modelData.name; color: AppTheme.text; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true; textFormat: Text.PlainText }
-                    MailAction {
-                        implicitHeight: 24; iconOnly: true; iconName: "close"; accessibleText: qsTr("Remove draft attachment")
-                        enabled: !root.mail.sending
+                    Layout.fillWidth: true; Layout.leftMargin: 26; Layout.rightMargin: 26
+                    Text { text: attachment.modelData.name; color: AppTheme.text; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true; textFormat: Text.PlainText }
+                    ComposerAction {
+                        implicitHeight: 28; iconOnly: true; iconName: "close"; text: qsTr("Remove draft attachment")
+                        enabled: root.editable
                         onClicked: {
                             const next = root.copy(root.draft)
                             next.attachments.splice(attachment.index, 1)
@@ -216,34 +396,22 @@ LiquidDialog {
                     }
                 }
             }
-            RowLayout {
-                Layout.fillWidth: true
-                MailAction { text: qsTr("Attach file…"); iconName: ""; enabled: !root.mail.sending; onClicked: attachmentDialog.open() }
-                Text {
-                    text: root.mail.demo ? qsTr("Demo · sending is disabled") : root.mail.sending ? qsTr("Submitting to SMTP…") : root.localStatus
-                    color: root.saveFailed ? AppTheme.destructive : AppTheme.mutedText
-                    font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignRight
-                }
-            }
             Text {
-                visible: !!root.mail.error
-                text: root.mail.error
-                color: AppTheme.destructive; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap
-                Layout.topMargin: 8
-            }
-            Text {
-                visible: root.draft.state === "unknown"
-                text: qsTr("The server response was uncertain. Verify your Sent mailbox before sending again.")
-                color: AppTheme.destructive; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap
+                visible: root.saveFailed || !!root.mail.error || root.draft.state === "unknown" || !root.accountMatches
+                text: !root.accountMatches ? qsTr("Switch back to this draft's account to continue editing.")
+                    : root.saveFailed ? root.localStatus : root.mail.error || qsTr("The server response was uncertain. Verify your Sent mailbox before sending again.")
+                color: AppTheme.destructive; font.pixelSize: 12
+                Layout.fillWidth: true; Layout.margins: 16
+                wrapMode: Text.Wrap; textFormat: Text.PlainText
             }
         }
         DropArea {
             objectName: "attachmentDropArea"
             anchors.fill: parent
-            z: 1
-            onEntered: (drag) => { drag.accepted = drag.hasUrls }
-            onDropped: (drop) => {
-                if (!drop.hasUrls) return
+            enabled: root.editable && !closeDecision.visible
+            onEntered: drag => { drag.accepted = drag.hasUrls }
+            onDropped: drop => {
+                if (!drop.hasUrls || !root.editable) return
                 let added = 0
                 for (const url of drop.urls) {
                     const item = root.mail.addAttachment(String(url))
@@ -257,30 +425,70 @@ LiquidDialog {
             }
         }
     }
-    footer: Item {
-        implicitHeight: MailStyle.footerHeight
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 12; anchors.bottomMargin: 20
+    KosWindowResizeHandles { targetWindow: root }
+    LiquidDialog {
+        id: closeDecision
+        objectName: "composerCloseDecision"
+        parent: Overlay.overlay
+        sourceItem: composeScene
+        reduceTransparency: true
+        width: Math.min(360, root.width - 48)
+        anchors.centerIn: parent
+        title: qsTr("Save this message as a draft?")
+        closePolicy: Popup.NoAutoClose
+        contentItem: ColumnLayout {
             spacing: 8
-            Item { Layout.fillWidth: true }
-            LiquidDialogButton { text: qsTr("Save draft & close"); enabled: !root.mail.sending; onClicked: root.finishEditing() }
+            Text {
+                Layout.fillWidth: true; Layout.bottomMargin: 12
+                text: qsTr("This message has not been sent. Save it as a draft to continue writing later.")
+                color: AppTheme.text; font.pixelSize: 14
+                wrapMode: Text.Wrap; textFormat: Text.PlainText
+            }
+            Text {
+                visible: root.saveFailed || !!root.mail.error
+                Layout.fillWidth: true
+                text: root.saveFailed ? root.localStatus : root.mail.error
+                color: AppTheme.destructive
+                wrapMode: Text.Wrap; textFormat: Text.PlainText
+            }
             LiquidDialogButton {
-                objectName: "sendDraftButton"
-                text: root.mail.sendPending ? qsTr("撤销发送") : (root.mail.sending ? qsTr("Sending…") : qsTr("Send"))
-                primaryAction: !root.mail.sendPending
-                enabled: root.mail.sendPending ? true : (!root.mail.sending && !root.mail.busy && !root.mail.demo && root.mail.configured
-                    && (toField.text.trim().length > 0 || ccField.text.trim().length > 0 || bccField.text.trim().length > 0)
-                    && ["unknown", "accepted", "sending"].indexOf(root.draft.state) < 0)
-                onClicked: { if (root.mail.sendPending) root.mail.cancelSend(); else { if (root.persist()) root.mail.sendDraft(root.currentDraft()) } }
+                objectName: "composerSaveAndClose"
+                Layout.fillWidth: true; implicitHeight: 36
+                text: qsTr("Save"); primaryAction: true
+                enabled: root.accountMatches && !root.mail.sending && !root.mail.sendPending
+                onClicked: root.finishEditing()
+            }
+            LiquidDialogButton {
+                objectName: "composerDiscardAndClose"
+                Layout.fillWidth: true; implicitHeight: 36
+                text: qsTr("Don't Save"); destructive: true
+                // The reference uses a tinted destructive action in the close decision.
+                surfaceColor: AppTheme.withAlpha(AppTheme.destructive, AppTheme.dark ? 0.22 : 0.16)
+                enabled: root.editable
+                onClicked: root.discardAndClose()
+            }
+            LiquidDialogButton {
+                objectName: "composerCancelClose"
+                Layout.fillWidth: true; implicitHeight: 36
+                text: qsTr("Cancel")
+                onClicked: { closeDecision.close(); if (root.dirty) autosave.restart() }
             }
         }
+        footer: Item {}
+        Shortcut { sequence: "Escape"; enabled: closeDecision.visible; onActivated: { closeDecision.close(); if (root.dirty) autosave.restart() } }
+    }
+    ColorDialog {
+        id: colorDialog
+        selectedColor: AppTheme.text
+        title: qsTr("Text color")
+        onAccepted: root.format(() => bodyField.cursorSelection.color = selectedColor)
     }
     FileDialog {
         id: attachmentDialog
         title: qsTr("Attach a file")
         fileMode: FileDialog.OpenFile
         onAccepted: {
+            if (!root.editable) return
             const item = root.mail.addAttachment(selectedFile.toString())
             if (!item || !item.path) return
             const next = root.copy(root.draft)

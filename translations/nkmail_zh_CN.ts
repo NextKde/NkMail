@@ -271,21 +271,11 @@
             <translation>抄送</translation>
         </message>
         <message>
-            <location filename="../qml/MailComposer.qml" line="115" />
-            <source>Show carbon copy field</source>
-            <translation>显示抄送栏</translation>
-        </message>
-        <message>
             <location filename="../qml/MailComposer.qml" line="116" />
             <location filename="../qml/MailComposer.qml" line="126" />
             <location filename="../qml/MailComposer.qml" line="127" />
             <source>Bcc</source>
             <translation>密送</translation>
-        </message>
-        <message>
-            <location filename="../qml/MailComposer.qml" line="116" />
-            <source>Show blind carbon copy field</source>
-            <translation>显示密送栏</translation>
         </message>
         <message>
             <location filename="../qml/MailComposer.qml" line="122" />
@@ -322,11 +312,6 @@
         </message>
         <message>
             <location filename="../qml/MailComposer.qml" line="172" />
-            <source>• 列表</source>
-            <translation>• 列表</translation>
-        </message>
-        <message>
-            <location filename="../qml/MailComposer.qml" line="172" />
             <source>Bullet list</source>
             <translation>项目符号列表</translation>
         </message>
@@ -351,16 +336,6 @@
             <translation>添加附件…</translation>
         </message>
         <message>
-            <location filename="../qml/MailComposer.qml" line="223" />
-            <source>Demo · sending is disabled</source>
-            <translation>演示模式 · 无法发送邮件</translation>
-        </message>
-        <message>
-            <location filename="../qml/MailComposer.qml" line="223" />
-            <source>Submitting to SMTP…</source>
-            <translation>正在提交到 SMTP 服务器…</translation>
-        </message>
-        <message>
             <location filename="../qml/MailComposer.qml" line="236" />
             <source>The server response was uncertain. Verify your Sent mailbox before sending again.</source>
             <translation>服务器响应不明确。再次发送前请检查已发送文件夹。</translation>
@@ -369,11 +344,6 @@
             <location filename="../qml/MailComposer.qml" line="256" />
             <source>Attached %1 file(s)</source>
             <translation>已添加 %1 个附件</translation>
-        </message>
-        <message>
-            <location filename="../qml/MailComposer.qml" line="267" />
-            <source>Save draft &amp; close</source>
-            <translation>保存草稿并关闭</translation>
         </message>
         <message>
             <location filename="../qml/MailComposer.qml" line="270" />
@@ -394,6 +364,70 @@
             <location filename="../qml/MailComposer.qml" line="281" />
             <source>Attach a file</source>
             <translation>添加附件</translation>
+        </message>
+        <message>
+            <source>Cancel</source>
+            <translation>取消</translation>
+        </message>
+        <message>
+            <source>Don't Save</source>
+            <translation>不存储</translation>
+        </message>
+        <message>
+            <source>Font family</source>
+            <translation>字体</translation>
+        </message>
+        <message>
+            <source>Font size</source>
+            <translation>字号</translation>
+        </message>
+        <message>
+            <source>Formatting options</source>
+            <translation>格式选项</translation>
+        </message>
+        <message>
+            <source>Redo</source>
+            <translation>重做</translation>
+        </message>
+        <message>
+            <source>Save</source>
+            <translation>存储</translation>
+        </message>
+        <message>
+            <source>Save this message as a draft?</source>
+            <translation>将这封邮件存储为草稿？</translation>
+        </message>
+        <message>
+            <source>Strikethrough</source>
+            <translation>删除线</translation>
+        </message>
+        <message>
+            <source>Switch back to this draft's account to continue editing.</source>
+            <translation>请切回这份草稿所属的账号以继续编辑。</translation>
+        </message>
+        <message>
+            <source>Text color</source>
+            <translation>文字颜色</translation>
+        </message>
+        <message>
+            <source>This message has not been sent. Save it as a draft to continue writing later.</source>
+            <translation>这封邮件尚未发送。您可以将其存储为草稿，以便稍后继续编写。</translation>
+        </message>
+        <message>
+            <source>Undo</source>
+            <translation>撤销</translation>
+        </message>
+        <message>
+            <source>System font</source>
+            <translation>系统字体</translation>
+        </message>
+        <message>
+            <source>Serif</source>
+            <translation>衬线字体</translation>
+        </message>
+        <message>
+            <source>Monospace</source>
+            <translation>等宽字体</translation>
         </message>
     </context>
     <context>
@@ -1366,6 +1400,26 @@ Alex
             <location filename="../qml/MessagePane.qml" line="278" />
             <source>Your drafts will be saved here.</source>
             <translation>你的草稿将保存在这里。</translation>
+        </message>
+        <message>
+            <source>Delete local draft</source>
+            <translation>删除本地草稿</translation>
+        </message>
+        <message>
+            <source>Delete local draft?</source>
+            <translation>删除本地草稿？</translation>
+        </message>
+        <message>
+            <source>This draft will be permanently deleted from this device.</source>
+            <translation>这份草稿将从此设备永久删除。</translation>
+        </message>
+        <message>
+            <source>Cancel</source>
+            <translation>取消</translation>
+        </message>
+        <message>
+            <source>Delete</source>
+            <translation>删除</translation>
         </message>
     </context>
     <context>

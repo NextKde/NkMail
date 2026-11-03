@@ -1,5 +1,17 @@
 # NkMail local delivery goal
 
+## Independent Mail-style composer · 2026-11-03
+
+- Replaced the inbox modal composer with an independent, nonmodal, resizable ApplicationWindow. Reused canonical window controls/resize handles and solid capsule actions; added a leading window-control cluster, centered toolbar, circular send action, full-width address rows, horizontal formatting strip and unboxed expanding editor.
+- Native window close and Escape/Ctrl+W offer Save / Don’t Save / Cancel. Save failure preserves the window; discard removes the local draft and stops autosave. Sending/pending send block close/discard; account mismatch disables editing and destructive actions. SMTP acceptance hides only the matching composer.
+- Formatting uses Qt TextSelection for current selection/insertion styling; list operations now receive the actual editor selection. Font family/size, text color and strikethrough join the existing bold/italic/underline/list actions. Synthetic compose capture now targets the separate window.
+- User explicitly authorized host testing for this composer iteration in this chat. Host build and UI/i18n/catalog checks passed (3/3, 15.76s; 42 UI cases). Selected-text formatting, independent resize/minimize, close/save failure, cancel and autosaved-draft discard are covered. Chinese light/dark and close-decision Wayland captures inspected; no runtime warnings in capture logs. Earlier Row-layout and offscreen raise issues were corrected before the passing run.
+
+## Local draft deletion entry · 2026-11-03
+
+- Exposed the existing account-scoped discardDraft operation through a trash action on each local draft, with cancel/confirm dialog and Chinese/English translations. Sending, pending send and account changes block confirmation; failed deletion keeps the dialog open.
+- UI regressions for cancellation, targeted deletion, send guards and stale-account confirmation passed with the composer suite after the user explicitly authorized host testing in this chat.
+
 ## Pointer-positioned message context menu · 2026-11-03
 
 - Message right-click menus now use TapHandler pointer coordinates instead of anchoring below the whole row. Context menus omit the anchor arrow and clamp inside the overlay; Move-to uses the saved context point. Non-pointer review invocation falls back to row center.

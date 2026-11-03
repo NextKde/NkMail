@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import QtTest
 import Kos.Ui
 import "../../qml/MailboxNavigation.js" as Navigation
@@ -89,14 +90,15 @@ TestCase {
         function loadMore() {}
         function openMessage(uid, validity) { selectedUid = uid }
         function newDraft(mode) { return {id: "test-draft", to: "", cc: "", bcc: "", subject: "", body: "", inReplyTo: "", references: "", state: "draft", attachments: []} }
-        function loadDraft(id) { return newDraft("new") }
+        function loadDraft(id) { return drafts.find(d => d.id === id) || ({}) }
         function saveDraft(draft) {
             saveCount++
             if (failSave) return ({})
             lastSaved = JSON.parse(JSON.stringify(draft))
+            drafts = drafts.filter(d => d.id !== draft.id).concat([lastSaved])
             return lastSaved
         }
-        function discardDraft(id) {}
+        function discardDraft(id) { drafts = drafts.filter(d => d.id !== id) }
         function addAttachment(url) { return ({}) }
         function saveAttachment(index, url) {}
         function sendDraft(draft) { sending = true }
@@ -126,6 +128,7 @@ TestCase {
         failOnWarning(/.*/)
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
         mock.refreshCount = 0; mock.search = ""
+        mock.drafts = []; mock.sendPending = false
         mock.smartMailbox = ""; mock.sending = false; mock.busy = false; mock.demo = true; mock.error = ""
         app = createTemporaryObject(appComponent, testCase, {mail: mock})
         verify(app !== null)
@@ -139,6 +142,59 @@ TestCase {
     function activateApp() {
         app.requestActivate()
         wait(40)
+    }
+    function test_local_draft_delete_cancel_and_confirm() {
+        activateApp()
+        mock.drafts = [{id: "delete-me", subject: "First draft", state: "draft"},
+                       {id: "keep-me", subject: "Second draft", state: "draft"}]
+        app.draftsVisible = true
+        const list = findChild(app, "draftList")
+        tryCompare(list, "count", 2)
+        wait(50)
+        const button = findChild(list.itemAtIndex(0), "deleteLocalDraft")
+        mouseClick(button)
+        const dialog = findChild(app, "deleteDraftDialog")
+        tryCompare(dialog, "opened", true)
+        verify(!findChild(app, "composerDialog").visible)
+        mouseClick(findChild(dialog, "cancelDeleteDraft"))
+        tryCompare(dialog, "visible", false)
+        compare(mock.drafts.length, 2)
+        mouseClick(button)
+        tryCompare(dialog, "opened", true)
+        mouseClick(findChild(dialog, "confirmDeleteDraft"))
+        tryCompare(dialog, "visible", false)
+        compare(mock.drafts.length, 1)
+        compare(mock.drafts[0].id, "keep-me")
+    }
+    function test_local_draft_delete_blocks_send_and_stale_account() {
+        activateApp()
+        mock.drafts = [{id: "protected-draft", subject: "Draft", state: "draft"}]
+        app.draftsVisible = true
+        const list = findChild(app, "draftList")
+        tryCompare(list, "count", 1)
+        wait(50)
+        const button = findChild(list.itemAtIndex(0), "deleteLocalDraft")
+        mock.sending = true
+        verify(!button.enabled)
+        mock.sending = false; mock.sendPending = true
+        verify(!button.enabled)
+        mock.sendPending = false
+        mouseClick(button)
+        const dialog = findChild(app, "deleteDraftDialog")
+        tryCompare(dialog, "opened", true)
+        const confirm = findChild(dialog, "confirmDeleteDraft")
+        const previousAccount = mock.currentAccountId
+        try {
+            mock.sendPending = true
+            verify(!confirm.enabled)
+            mock.sendPending = false
+            mock.currentAccountId = "another-account"
+            verify(!confirm.enabled)
+            compare(mock.drafts.length, 1)
+        } finally {
+            mock.currentAccountId = previousAccount
+            dialog.close()
+        }
     }
     function test_more_menu_hidden_row_does_not_leave_gap() {
         const menu = findChild(app, "moreMessageMenu")
@@ -666,7 +722,7 @@ TestCase {
         compare(search.activeFocus, false)
         verify(app.activeFocusItem !== null)
     }
-    function test_escape_preserves_failed_draft_and_returns_from_narrow_reader() {
+    function test_composer_close_decision_save_failure_and_cancel() {
         activateApp()
         keyClick(Qt.Key_N, Qt.ControlModifier)
         const dialog = findChild(app, "composerDialog")
@@ -676,10 +732,19 @@ TestCase {
         body.forceActiveFocus()
         mock.failSave = true
         keyClick(Qt.Key_Escape)
+        const decision = findChild(dialog, "composerCloseDecision")
+        tryCompare(decision, "opened", true)
+        mouseClick(findChild(decision, "composerSaveAndClose"))
         compare(dialog.visible, true)
+        compare(decision.visible, true)
         compare(body.getText(0, body.length), "Do not discard on Escape.")
+        mouseClick(findChild(decision, "composerCancelClose"))
+        tryCompare(decision, "visible", false)
+        verify(dialog.visible)
         mock.failSave = false
-        keyClick(Qt.Key_Escape)
+        dialog.close()
+        tryCompare(decision, "opened", true)
+        mouseClick(findChild(decision, "composerSaveAndClose"))
         tryCompare(dialog, "visible", false)
         compare(mock.lastSaved.body, "Do not discard on Escape.")
         app.width = 650
@@ -687,6 +752,58 @@ TestCase {
         wait(30)
         keyClick(Qt.Key_Escape)
         compare(app.readerVisible, true)   // 窄宽返回列表的行为随 narrow 布局一起移除
+    }
+    function test_composer_is_independent_and_resizable() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        verify(editor !== null)
+        verify(editor.contentItem.Window.window === editor)
+        verify(editor.contentItem.Window.window !== app)
+        compare(editor.modality, Qt.NonModal)
+        editor.width = 1000; editor.height = 800
+        compare(editor.width, 1000)
+        compare(editor.height, 800)
+        app.hide()
+        verify(editor.visible)
+        editor.showMinimized()
+        tryCompare(editor, "visibility", Window.Minimized)
+        editor.showNormal()
+        tryCompare(editor, "visibility", Window.Windowed)
+        verify(editor.finishEditing())
+    }
+    function test_composer_discard_removes_autosaved_draft() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        const body = findChild(editor, "composerBody")
+        body.text = "Discard this synthetic draft."
+        verify(editor.persist())
+        verify(mock.loadDraft(editor.draft.id).id)
+        editor.close()
+        const decision = findChild(editor, "composerCloseDecision")
+        tryCompare(decision, "opened", true)
+        mouseClick(findChild(decision, "composerDiscardAndClose"))
+        tryCompare(editor, "visible", false)
+        verify(!mock.loadDraft("test-draft").id)
+        wait(900)
+        verify(!mock.loadDraft("test-draft").id)
+    }
+    function test_composer_formats_selected_text() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        const body = findChild(editor, "composerBody")
+        body.text = "alpha beta"
+        editor.requestActivate()
+        tryCompare(editor, "active", true)
+        waitForRendering(body)
+        body.forceActiveFocus()
+        body.select(6, 10)
+        mouseClick(findChild(editor, "composerBold"))
+        body.select(6, 10)
+        verify(body.cursorSelection.font.bold)
+        body.select(0, 5)
+        verify(!body.cursorSelection.font.bold)
+        verify(editor.persist())
+        verify(mock.lastSaved.html.indexOf("font-weight") >= 0)
     }
     function test_three_pane_reader_is_plain_text() {
         const body = findChild(app, "messageBody")

@@ -123,13 +123,14 @@ ApplicationWindow {
         if (scenario === "avatars") { window.showAvatars = true; return }
         if (scenario === "more-menu") { moreMenu.openAtAnchor(); return }
         if (scenario === "message-menu") { messagePane.showReviewMenu(); return }
-        if (scenario === "compose") {
+        if (scenario === "compose" || scenario === "compose-close") {
             const sample = mail.newDraft("new")
             if (!sample || !sample.id) return
             sample.to = "studio@example.invalid"
             sample.subject = qsTr("A few thoughts for Friday")
             sample.body = qsTr("Hi Maya,\n\nI like the quieter direction. A little more space to read, and fewer things competing for attention.\n\nLet's bring these ideas to our next review.\n\nTalk soon,\nAlex\n\n—\nSynthetic demo draft. Sending is disabled.")
             composer.editDraft(mail.saveDraft(sample))
+            if (scenario === "compose-close") Qt.callLater(() => composer.requestClose())
         }
         else if (scenario === "account") accountDialog.editAccount()
         else if (scenario === "details" && hasMessage) window.detailsVisible = true
@@ -155,7 +156,7 @@ ApplicationWindow {
             return false
         }
         if (composer.visible && !composer.persist()) {
-            composer.forceActiveFocus()
+            composer.requestActivate()
             return false
         }
         lifecycleNotice = ""
@@ -164,7 +165,7 @@ ApplicationWindow {
     onClosing: close => {
         if (composer.visible && !composer.persist()) {
             close.accepted = false
-            composer.forceActiveFocus()
+            composer.requestActivate()
             return
         }
         if (desktop && desktop.hideToTray()) {
@@ -717,7 +718,7 @@ ApplicationWindow {
             onTriggered: mail.toggleFlagged(window.selectedIndex())
         }
     }
-    MailComposer { id: composer; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
+    MailComposer { id: composer; mail: window.mail; hostWindow: window }
     AccountDialog { id: accountDialog; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
     LiquidDialog {
         id: deleteAccountDialog

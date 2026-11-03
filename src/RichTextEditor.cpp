@@ -21,14 +21,26 @@ namespace {
 QTextDocument *documentFor(QQuickTextDocument *doc) {
     return doc ? doc->textDocument() : nullptr;
 }
+QTextCursor selectedCursor(QTextDocument *text, int start, int end) {
+    QTextCursor cursor(text);
+    const int last = qMax(0, text->characterCount() - 1);
+    cursor.setPosition(qBound(0, start, last));
+    cursor.setPosition(qBound(0, end, last), QTextCursor::KeepAnchor);
+    return cursor;
+}
 }
 
 RichTextEditor::RichTextEditor(QObject *parent) : QObject(parent) {}
 
+void RichTextEditor::setSelection(int start, int end) {
+    m_selectionStart = start;
+    m_selectionEnd = end;
+}
+
 void RichTextEditor::toggleBold(QQuickTextDocument *doc) {
     QTextDocument *text = documentFor(doc);
     if (!text) return;
-    QTextCursor cursor(text);
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
     bool autoSelected = false;
     if (!cursor.hasSelection()) {
         cursor.select(QTextCursor::WordUnderCursor);
@@ -44,7 +56,7 @@ void RichTextEditor::toggleBold(QQuickTextDocument *doc) {
 void RichTextEditor::toggleItalic(QQuickTextDocument *doc) {
     QTextDocument *text = documentFor(doc);
     if (!text) return;
-    QTextCursor cursor(text);
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
     bool autoSelected = false;
     if (!cursor.hasSelection()) {
         cursor.select(QTextCursor::WordUnderCursor);
@@ -60,7 +72,7 @@ void RichTextEditor::toggleItalic(QQuickTextDocument *doc) {
 void RichTextEditor::toggleUnderline(QQuickTextDocument *doc) {
     QTextDocument *text = documentFor(doc);
     if (!text) return;
-    QTextCursor cursor(text);
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
     bool autoSelected = false;
     if (!cursor.hasSelection()) {
         cursor.select(QTextCursor::WordUnderCursor);
@@ -76,7 +88,7 @@ void RichTextEditor::toggleUnderline(QQuickTextDocument *doc) {
 void RichTextEditor::toggleBulletList(QQuickTextDocument *doc) {
     QTextDocument *text = documentFor(doc);
     if (!text) return;
-    QTextCursor cursor(text);
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
 
     if (cursor.currentList()) {
         const QTextBlock first = text->findBlock(cursor.selectionStart());
@@ -105,7 +117,7 @@ void RichTextEditor::toggleBulletList(QQuickTextDocument *doc) {
 void RichTextEditor::insertLink(QQuickTextDocument *doc, const QString &url) {
     QTextDocument *text = documentFor(doc);
     if (!text) return;
-    QTextCursor cursor(text);
+    QTextCursor cursor = selectedCursor(text, m_selectionStart, m_selectionEnd);
     if (!cursor.hasSelection()) return;
     QTextCharFormat format;
     format.setAnchor(true);

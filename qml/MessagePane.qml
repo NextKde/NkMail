@@ -272,6 +272,7 @@ Rectangle {
             }
         }
         ListView {
+            objectName: "draftList"
             visible: root.draftsVisible
             Layout.fillWidth: true; Layout.fillHeight: true
             model: mail.drafts; clip: true
@@ -282,15 +283,76 @@ Rectangle {
                 Accessible.name: MailLabels.value(modelData, "subject") || qsTr("Untitled draft")
                 onClicked: root.editDraftRequested(modelData.id)
                 background: Rectangle { color: "transparent"; Rectangle { anchors.bottom: parent.bottom; height: 1; width: parent.width; color: root.rule } }
-                contentItem: ColumnLayout {
-                    spacing: 5
-                    Text { text: MailLabels.value(draftRow.modelData, "subject") || qsTr("Untitled draft"); color: root.ink; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                    Text { text: MailLabels.value(draftRow.modelData, "to") || qsTr("No recipient"); color: root.muted; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                    Text { text: MailLabels.draftStateLabel(draftRow.modelData.state); color: root.muted; font.pixelSize: 10 }
+                contentItem: RowLayout {
+                    spacing: 12
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 5
+                        Text { text: MailLabels.value(draftRow.modelData, "subject") || qsTr("Untitled draft"); color: root.ink; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
+                        Text { text: MailLabels.value(draftRow.modelData, "to") || qsTr("No recipient"); color: root.muted; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
+                        Text { text: MailLabels.draftStateLabel(draftRow.modelData.state); color: root.muted; font.pixelSize: 10 }
+                    }
+                    MailAction {
+                        objectName: "deleteLocalDraft"
+                        iconOnly: true; iconName: "trash"
+                        accessibleText: qsTr("Delete local draft")
+                        enabled: !root.mail.sending && !root.mail.sendPending && draftRow.modelData.state !== "sending"
+                        onClicked: {
+                            deleteDraftDialog.targetId = String(draftRow.modelData.id)
+                            deleteDraftDialog.targetAccountId = root.mail.currentAccountId
+                            deleteDraftDialog.open()
+                        }
+                    }
                 }
                 leftPadding: 22; rightPadding: 18; topPadding: 14; bottomPadding: 14
             }
             Text { anchors.centerIn: parent; visible: mail.drafts.length === 0; text: qsTr("Your drafts will be saved here."); color: root.muted; font.pixelSize: 12 }
+        }
+    }
+    LiquidDialog {
+        id: deleteDraftDialog
+        objectName: "deleteDraftDialog"
+        parent: Overlay.overlay
+        sourceItem: root.surface
+        property string targetId: ""
+        property string targetAccountId: ""
+        readonly property bool canDelete: targetAccountId === root.mail.currentAccountId
+            && !root.mail.sending && !root.mail.sendPending
+            && root.mail.drafts.some(d => String(d.id) === targetId && d.state !== "sending")
+        width: Math.min(420, parent ? parent.width - 32 : 420)
+        anchors.centerIn: parent
+        title: qsTr("Delete local draft?")
+        contentItem: Text {
+            text: qsTr("This draft will be permanently deleted from this device.")
+            textFormat: Text.PlainText
+            color: root.ink
+            wrapMode: Text.Wrap
+        }
+        footer: Item {
+            implicitHeight: MailStyle.footerHeight
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 12; anchors.bottomMargin: 20
+                spacing: 8
+                Item { Layout.fillWidth: true }
+                LiquidDialogButton {
+                    objectName: "cancelDeleteDraft"
+                    text: qsTr("Cancel")
+                    onClicked: deleteDraftDialog.close()
+                }
+                LiquidDialogButton {
+                    objectName: "confirmDeleteDraft"
+                    text: qsTr("Delete")
+                    destructive: true
+                    enabled: deleteDraftDialog.canDelete
+                    onClicked: {
+                        if (!deleteDraftDialog.canDelete) return
+                        root.mail.discardDraft(deleteDraftDialog.targetId)
+                        if (!root.mail.drafts.some(d => String(d.id) === deleteDraftDialog.targetId))
+                            deleteDraftDialog.close()
+                    }
+                }
+            }
         }
     }
 }

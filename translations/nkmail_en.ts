@@ -271,21 +271,11 @@
             <translation>Cc</translation>
         </message>
         <message>
-            <location filename="../qml/MailComposer.qml" line="115" />
-            <source>Show carbon copy field</source>
-            <translation>Show carbon copy field</translation>
-        </message>
-        <message>
             <location filename="../qml/MailComposer.qml" line="116" />
             <location filename="../qml/MailComposer.qml" line="126" />
             <location filename="../qml/MailComposer.qml" line="127" />
             <source>Bcc</source>
             <translation>Bcc</translation>
-        </message>
-        <message>
-            <location filename="../qml/MailComposer.qml" line="116" />
-            <source>Show blind carbon copy field</source>
-            <translation>Show blind carbon copy field</translation>
         </message>
         <message>
             <location filename="../qml/MailComposer.qml" line="122" />
@@ -322,11 +312,6 @@
         </message>
         <message>
             <location filename="../qml/MailComposer.qml" line="172" />
-            <source>• 列表</source>
-            <translation>• List</translation>
-        </message>
-        <message>
-            <location filename="../qml/MailComposer.qml" line="172" />
             <source>Bullet list</source>
             <translation>Bullet list</translation>
         </message>
@@ -351,16 +336,6 @@
             <translation>Attach file…</translation>
         </message>
         <message>
-            <location filename="../qml/MailComposer.qml" line="223" />
-            <source>Demo · sending is disabled</source>
-            <translation>Demo · sending is disabled</translation>
-        </message>
-        <message>
-            <location filename="../qml/MailComposer.qml" line="223" />
-            <source>Submitting to SMTP…</source>
-            <translation>Submitting to SMTP…</translation>
-        </message>
-        <message>
             <location filename="../qml/MailComposer.qml" line="236" />
             <source>The server response was uncertain. Verify your Sent mailbox before sending again.</source>
             <translation>The server response was uncertain. Verify your Sent mailbox before sending again.</translation>
@@ -369,11 +344,6 @@
             <location filename="../qml/MailComposer.qml" line="256" />
             <source>Attached %1 file(s)</source>
             <translation>Attached %1 file(s)</translation>
-        </message>
-        <message>
-            <location filename="../qml/MailComposer.qml" line="267" />
-            <source>Save draft &amp; close</source>
-            <translation>Save draft &amp; close</translation>
         </message>
         <message>
             <location filename="../qml/MailComposer.qml" line="270" />
@@ -394,6 +364,70 @@
             <location filename="../qml/MailComposer.qml" line="281" />
             <source>Attach a file</source>
             <translation>Attach a file</translation>
+        </message>
+        <message>
+            <source>Cancel</source>
+            <translation>Cancel</translation>
+        </message>
+        <message>
+            <source>Don't Save</source>
+            <translation>Don't Save</translation>
+        </message>
+        <message>
+            <source>Font family</source>
+            <translation>Font family</translation>
+        </message>
+        <message>
+            <source>Font size</source>
+            <translation>Font size</translation>
+        </message>
+        <message>
+            <source>Formatting options</source>
+            <translation>Formatting options</translation>
+        </message>
+        <message>
+            <source>Redo</source>
+            <translation>Redo</translation>
+        </message>
+        <message>
+            <source>Save</source>
+            <translation>Save</translation>
+        </message>
+        <message>
+            <source>Save this message as a draft?</source>
+            <translation>Save this message as a draft?</translation>
+        </message>
+        <message>
+            <source>Strikethrough</source>
+            <translation>Strikethrough</translation>
+        </message>
+        <message>
+            <source>Switch back to this draft's account to continue editing.</source>
+            <translation>Switch back to this draft's account to continue editing.</translation>
+        </message>
+        <message>
+            <source>Text color</source>
+            <translation>Text color</translation>
+        </message>
+        <message>
+            <source>This message has not been sent. Save it as a draft to continue writing later.</source>
+            <translation>This message has not been sent. Save it as a draft to continue writing later.</translation>
+        </message>
+        <message>
+            <source>Undo</source>
+            <translation>Undo</translation>
+        </message>
+        <message>
+            <source>System font</source>
+            <translation>System font</translation>
+        </message>
+        <message>
+            <source>Serif</source>
+            <translation>Serif</translation>
+        </message>
+        <message>
+            <source>Monospace</source>
+            <translation>Monospace</translation>
         </message>
     </context>
     <context>
@@ -1366,6 +1400,26 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../qml/MessagePane.qml" line="278" />
             <source>Your drafts will be saved here.</source>
             <translation>Your drafts will be saved here.</translation>
+        </message>
+        <message>
+            <source>Delete local draft</source>
+            <translation>Delete local draft</translation>
+        </message>
+        <message>
+            <source>Delete local draft?</source>
+            <translation>Delete local draft?</translation>
+        </message>
+        <message>
+            <source>This draft will be permanently deleted from this device.</source>
+            <translation>This draft will be permanently deleted from this device.</translation>
+        </message>
+        <message>
+            <source>Cancel</source>
+            <translation>Cancel</translation>
+        </message>
+        <message>
+            <source>Delete</source>
+            <translation>Delete</translation>
         </message>
     </context>
     <context>

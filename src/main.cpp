@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
     parser.addOption({"demo", "Use isolated synthetic mail; no network or saved credentials."});
     parser.addOption({"data-dir", "Use a separate local data directory.", "path"});
     parser.addOption({"screenshot", "Capture this application's synthetic preview window and exit (requires --demo).", "path"});
-    parser.addOption({"review-scenario", "Synthetic review: inbox, compose, account or details.", "name", "inbox"});
+    parser.addOption({"review-scenario", "Synthetic review: inbox, compose, compose-close, account or details.", "name", "inbox"});
     parser.addOption({"appearance", "Review appearance: light or dark.", "name", "light"});
     parser.addOption({"review-width", "Synthetic preview window width.", "pixels", "1240"});
     parser.addOption({"review-height", "Synthetic preview window height.", "pixels", "800"});
@@ -183,9 +183,11 @@ int main(int argc, char **argv) {
         QTimer::singleShot(1200, &app, [window, scenario] {
             if (window) QMetaObject::invokeMethod(window, "showReview", Q_ARG(QVariant, QVariant(scenario)));
         });
-        QTimer::singleShot(3000, &app, [window, path, &app] {
-            if (!window || !window->isExposed()) { std::fprintf(stderr, "Preview window is not exposed.\n"); app.exit(3); return; }
-            const QImage image = window->grabWindow();
+        QTimer::singleShot(3000, &app, [window, path, scenario, &app] {
+            auto *capture = (scenario == QStringLiteral("compose") || scenario == QStringLiteral("compose-close")) && window
+                ? window->findChild<QQuickWindow *>(QStringLiteral("composerDialog")) : window;
+            if (!capture || !capture->isExposed()) { std::fprintf(stderr, "Preview window is not exposed.\n"); app.exit(3); return; }
+            const QImage image = capture->grabWindow();
             if (image.isNull()) { std::fprintf(stderr, "Application screenshot capture failed.\n"); app.exit(3); return; }
             QDir().mkpath(QFileInfo(path).absolutePath());
             if (!image.save(path)) { std::fprintf(stderr, "Cannot save application screenshot.\n"); app.exit(3); return; }
