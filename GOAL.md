@@ -1,9 +1,9 @@
 # NkMail local delivery goal
 
-## Compact rectangular formatting groups · 2026-11-03
+## Compact small-corner formatting controls · 2026-11-03
 
-- Applied the user’s explicit formatting-toolbar correction: 24px ordinary rectangular button groups for emphasis, alignment, lists and indentation, with square action cells and group surfaces. Removed separate circular/pill buttons and the oversized emphasis capsule. Aligned font selectors and color control to the compact row.
-- VM build and existing UI/i18n/catalog checks passed (3/3, 30.38s; 46 UI cases). Final glyph-padding adjustment is covered by the VM build and light/dark software-fallback captures. No host validation performed.
+- Corrected the misunderstanding of small corners as square corners: the entire formatting strip uses 24px-high ordinary controls with 6px corners. Emphasis, alignment, lists and indentation are grouped; all four select triggers, their popup panels and the color control share the small-corner treatment.
+- VM build and existing UI/i18n/catalog checks passed (3/3, 30.79s; 46 UI cases). Refreshed light/dark software-fallback captures inspected. No host validation performed.
 
 ## Composer editing tools · 2026-11-03
 

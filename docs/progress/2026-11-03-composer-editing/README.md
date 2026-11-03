@@ -15,8 +15,8 @@ Chinese light/dark client captures were inspected using the VM's offscreen softw
 - `compose-light.png`: Chinese synthetic light composer, software fallback.
 - `compose-dark.png`: Chinese synthetic dark composer, software fallback.
 
-## Compact formatting groups
+## Compact formatting controls
 
-The user's follow-up specifies small, non-rounded button groups for the formatting strip. Emphasis, alignment, lists and indentation now each share a rectangular ordinary surface with 24px-high square action cells; the font selectors and color control match the compact height. The app composes existing shared action controls without changing the pinned UI library. Header floating controls retain their existing material and shape.
+The formatting strip uses 24px-high ordinary controls with 6px small corners throughout. Emphasis, alignment, lists and indentation each share a small-corner group surface. The body-style, font-family, font-face and font-size select triggers and their popup panels use the same 6px corner radius, as does the color control. This corrects the earlier mistaken interpretation of small corners as square corners. The app composes existing shared action controls without changing the pinned UI library. Header floating controls retain their existing material and shape.
 
-VM build and existing UI/i18n/catalog checks passed 3/3 in 30.38s (46 UI cases). The final icon-only/padding adjustment was rebuilt and reviewed in refreshed light/dark software-fallback exports. No host build, test or GUI execution was performed.
+VM build and existing UI/i18n/catalog checks passed 3/3 in 30.79s (46 UI cases). Refreshed light/dark software-fallback exports were inspected. No host build, test or GUI execution was performed.

@@ -52,7 +52,7 @@ ApplicationWindow {
         flat: true
         iconOnly: true
         leftPadding: 0; rightPadding: 0
-        cornerRadius: 0
+        cornerRadius: 6
     }
     component FormatGroup: Item {
         default property alias actions: groupActions.data
@@ -61,11 +61,27 @@ ApplicationWindow {
         LiquidActionButton {
             anchors.fill: parent
             materialForm: true
-            cornerRadius: 0
+            cornerRadius: 6
             enabled: false
             Accessible.ignored: true
         }
         Row { id: groupActions; spacing: 0 }
+    }
+    component FormatSelect: KosComboBox {
+        id: formatSelect
+        implicitHeight: 24
+        background: KosSurface {
+            radius: 6
+            fillColor: AppTheme.fieldSurface
+            elevation: 0
+            focused: formatSelect.activeFocus
+            hovered: formatSelect.hovered
+        }
+        Binding {
+            target: formatSelect.popup.background
+            property: "radius"
+            value: 6
+        }
     }
     component ListAction: FormatAction {
         id: listAction
@@ -417,7 +433,7 @@ ApplicationWindow {
                     height: parent.height
                     spacing: 7
                     enabled: root.editable
-                    KosComboBox {
+                    FormatSelect {
                         objectName: "composerParagraphStyle"
                         implicitWidth: 104; implicitHeight: 24
                         model: [qsTr("Body"), qsTr("Title"), qsTr("Heading")]
@@ -426,7 +442,7 @@ ApplicationWindow {
                         Accessible.name: qsTr("Paragraph style")
                         onActivated: index => root.applyStyle(index)
                     }
-                    KosComboBox {
+                    FormatSelect {
                         objectName: "composerFontFamily"
                         implicitWidth: 136; implicitHeight: 24
                         model: root.availableFonts
@@ -435,7 +451,7 @@ ApplicationWindow {
                         Accessible.name: qsTr("Font family")
                         onActivated: index => root.format(() => bodyField.cursorSelection.font.family = root.availableFonts[index])
                     }
-                    KosComboBox {
+                    FormatSelect {
                         objectName: "composerFontStyle"
                         implicitWidth: 104; implicitHeight: 24
                         model: [qsTr("Regular"), qsTr("Bold"), qsTr("Italic"), qsTr("Bold italic")]
@@ -446,7 +462,7 @@ ApplicationWindow {
                             bodyField.cursorSelection.font.italic = (index & 2) !== 0
                         })
                     }
-                    KosComboBox {
+                    FormatSelect {
                         objectName: "composerFontSize"
                         implicitWidth: 64; implicitHeight: 24
                         model: ["10", "12", "14", "16", "18", "24", "32"]
@@ -458,7 +474,7 @@ ApplicationWindow {
                     FormatAction {
                         text: qsTr("Text color"); implicitWidth: 24; implicitHeight: 24; flat: false
                         contentItem: Item {
-                            Rectangle { anchors.centerIn: parent; width: 16; height: 16; color: bodyField.cursorSelection.color; radius: 0; border.width: 1; border.color: AppTheme.border }
+                            Rectangle { anchors.centerIn: parent; width: 16; height: 16; color: bodyField.cursorSelection.color; radius: 6; border.width: 1; border.color: AppTheme.border }
                         }
                         onClicked: { colorDialog.selectedColor = bodyField.cursorSelection.color; colorDialog.open() }
                     }
