@@ -438,3 +438,9 @@ The scoped local implementation is substantially complete, but real-provider rea
 - Fixed the header fallback to resolve `INBOX` through the existing localized mailbox labels when the folder list is empty. Custom folder names remain unchanged.
 - Kept account creation in the sidebar and removed duplicate account buttons and unused signals from the message list and reader. The list's cached-unread reset action remains available. Removed obsolete translation entries from both catalogs.
 - Added a UI regression for the empty-account folder fallback, sidebar add-account dialog opening, absence of the list add-account action, and custom folder naming. VM default pinned-source build succeeded; UI/i18n/catalog checks passed 3/3 in 38.55 seconds (48 UI cases including init/cleanup). No host build, tests or GUI execution performed.
+
+## Inbox account entry follow-up · 2026-11-03
+
+- User requested an additional account entry in the inbox empty state. Added a canonical KosButton with the neutral secondary solid style (30px, no liquid rendering or raised surface). Sidebar entry remains; reader duplicate remains removed. Both entries open addAccount().
+- VM build passed. Final UI regression passed 48 cases including init/cleanup in 37.65s; i18n and catalog checks passed (0.04s / 0.10s). The first UI attempt checked visibility before the empty list updated; now the regression waits for the list count and button visibility before clicking.
+- At the user's explicit request, rebuilt and replaced the host's normal Chinese-mode NkMail process without modifying account/mail data. Automated tests ran only in the VM.

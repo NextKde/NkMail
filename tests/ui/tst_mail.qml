@@ -147,12 +147,16 @@ TestCase {
         const folders = mock.folders
         const accounts = mock.accounts
         const selectedUid = mock.selectedUid
+        const messages = []
+        for (let i = 0; i < mock.messages.count; ++i)
+            messages.push(JSON.parse(JSON.stringify(mock.messages.get(i))))
         try {
             mock.configured = false
             mock.demo = false
             mock.folders = []
             mock.accounts = []
             mock.selectedUid = ""
+            mock.messages.clear()
             compare(app.folderTitle(), App.MailLabels.mailboxTitle({id: "INBOX"}))
             verify(app.folderTitle() !== "INBOX")
             compare(findChild(app, "messageEmptyState").actionText, "")
@@ -160,6 +164,15 @@ TestCase {
             verify(addAccount.visible)
             mouseClick(addAccount)
             tryCompare(findChild(app, "accountDialog"), "visible", true)
+            const dialog = findChild(app, "accountDialog")
+            dialog.close()
+            tryCompare(dialog, "visible", false)
+            const inboxAdd = findChild(app, "inboxAddAccountButton")
+            tryCompare(findChild(app, "messageList"), "count", 0)
+            tryCompare(inboxAdd, "visible", true)
+            compare(inboxAdd.secondary, true)
+            mouseClick(inboxAdd)
+            tryCompare(dialog, "visible", true)
             mock.currentFolder = "Projects"
             compare(app.folderTitle(), "Projects")
         } finally {
@@ -168,6 +181,7 @@ TestCase {
             mock.folders = folders
             mock.accounts = accounts
             mock.selectedUid = selectedUid
+            for (const message of messages) mock.messages.append(message)
             mock.currentFolder = "INBOX"
         }
     }

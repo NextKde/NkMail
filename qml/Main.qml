@@ -449,6 +449,7 @@ ApplicationWindow {
                 Layout.maximumWidth: window.narrow ? -1 : window.listWidth
                 Layout.fillWidth: window.narrow
                 Layout.fillHeight: true
+                onAddAccountRequested: accountDialog.addAccount()
                 onMessageOpened: window.readerVisible = true
                 onComposeRequested: function(mode) { window.compose(mode) }
                 onEditDraftRequested: function(draftId) { composer.editDraft(mail.loadDraft(draftId)) }

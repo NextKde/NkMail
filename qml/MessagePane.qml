@@ -20,6 +20,7 @@ Rectangle {
     readonly property color hoverSurface: AppTheme.cardHover
     signal messageOpened()
     signal composeRequested(string mode)
+    signal addAccountRequested()
     signal editDraftRequested(string draftId)
 
     function showReviewMenu() {
@@ -255,16 +256,29 @@ Rectangle {
                 width: messageList.width; height: mail.hasMore ? 48 : 0
                 MailAction { anchors.centerIn: parent; visible: mail.hasMore; text: qsTr("Load older messages"); enabled: !mail.busy; onClicked: mail.loadMore() }
             }
-            KosEmptyState {
+            Column {
                 anchors.centerIn: parent
                 width: parent.width - 40
+                spacing: 18
                 visible: messageList.count === 0
-                symbol: mail.busy ? "…" : mail.search ? "⌕" : "✉"
-                objectName: "messageEmptyState"
-                title: mail.busy ? qsTr("Getting your mail…") : mail.search ? qsTr("No cached matches") : mail.unreadOnly ? qsTr("No unread messages in cached mail") : mail.configured || mail.demo ? qsTr("No messages here") : qsTr("Welcome to your new inbox")
-                description: mail.busy ? "" : mail.unreadOnly ? qsTr("Only cached unread messages are shown. Clear the filter to browse all messages.") : mail.search ? qsTr("Try a different search term.") : mail.configured || mail.demo ? qsTr("There is nothing to show in this mailbox yet.") : qsTr("Add an account to start reading mail locally.")
-                actionText: mail.unreadOnly ? qsTr("Show all cached messages") : ""
-                onActionTriggered: mail.unreadOnly = false
+                KosEmptyState {
+                    width: parent.width
+                    symbol: mail.busy ? "…" : mail.search ? "⌕" : "✉"
+                    objectName: "messageEmptyState"
+                    title: mail.busy ? qsTr("Getting your mail…") : mail.search ? qsTr("No cached matches") : mail.unreadOnly ? qsTr("No unread messages in cached mail") : mail.configured || mail.demo ? qsTr("No messages here") : qsTr("Welcome to your new inbox")
+                    description: mail.busy ? "" : mail.unreadOnly ? qsTr("Only cached unread messages are shown. Clear the filter to browse all messages.") : mail.search ? qsTr("Try a different search term.") : mail.configured || mail.demo ? qsTr("There is nothing to show in this mailbox yet.") : qsTr("Add an account to start reading mail locally.")
+                    actionText: mail.unreadOnly ? qsTr("Show all cached messages") : ""
+                    onActionTriggered: mail.unreadOnly = false
+                }
+                KosButton {
+                    objectName: "inboxAddAccountButton"
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: !mail.configured && !mail.demo
+                    text: qsTr("Add an account")
+                    secondary: true
+                    implicitHeight: 30
+                    onClicked: root.addAccountRequested()
+                }
             }
         }
         ListView {

@@ -1307,6 +1307,10 @@ Alex
     <context>
         <name>MessagePane</name>
         <message>
+            <source>Add an account</source>
+            <translation>添加账号</translation>
+        </message>
+        <message>
             <location filename="../qml/MessagePane.qml" line="123" />
             <source>打开</source>
             <translation>打开</translation>

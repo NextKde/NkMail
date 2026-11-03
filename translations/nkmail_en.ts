@@ -1307,6 +1307,10 @@ Synthetic demo draft. Sending is disabled.</translation>
     <context>
         <name>MessagePane</name>
         <message>
+            <source>Add an account</source>
+            <translation>Add an account</translation>
+        </message>
+        <message>
             <location filename="../qml/MessagePane.qml" line="123" />
             <source>打开</source>
             <translation>Open</translation>
