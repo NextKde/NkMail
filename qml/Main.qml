@@ -123,7 +123,7 @@ ApplicationWindow {
         if (scenario === "avatars") { window.showAvatars = true; return }
         if (scenario === "more-menu") { moreMenu.openAtAnchor(); return }
         if (scenario === "message-menu") { messagePane.showReviewMenu(); return }
-        if (scenario === "compose" || scenario === "compose-close") {
+        if (["compose", "compose-close", "compose-emoji", "compose-font"].indexOf(scenario) >= 0) {
             const sample = mail.newDraft("new")
             if (!sample || !sample.id) return
             sample.to = "studio@example.invalid"
@@ -131,6 +131,8 @@ ApplicationWindow {
             sample.body = qsTr("Hi Maya,\n\nI like the quieter direction. A little more space to read, and fewer things competing for attention.\n\nLet's bring these ideas to our next review.\n\nTalk soon,\nAlex\n\n—\nSynthetic demo draft. Sending is disabled.")
             composer.editDraft(mail.saveDraft(sample))
             if (scenario === "compose-close") Qt.callLater(() => composer.requestClose())
+            if (scenario === "compose-emoji") Qt.callLater(() => composer.showToolsReview("emoji"))
+            if (scenario === "compose-font") Qt.callLater(() => composer.showToolsReview("font"))
         }
         else if (scenario === "account") accountDialog.editAccount()
         else if (scenario === "details" && hasMessage) window.detailsVisible = true

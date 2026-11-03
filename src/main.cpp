@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
     parser.addOption({"demo", "Use isolated synthetic mail; no network or saved credentials."});
     parser.addOption({"data-dir", "Use a separate local data directory.", "path"});
     parser.addOption({"screenshot", "Capture this application's synthetic preview window and exit (requires --demo).", "path"});
-    parser.addOption({"review-scenario", "Synthetic review: inbox, compose, compose-close, account or details.", "name", "inbox"});
+    parser.addOption({"review-scenario", "Synthetic review: inbox, compose, compose-close, compose-emoji, compose-font, account or details.", "name", "inbox"});
     parser.addOption({"appearance", "Review appearance: light or dark.", "name", "light"});
     parser.addOption({"review-width", "Synthetic preview window width.", "pixels", "1240"});
     parser.addOption({"review-height", "Synthetic preview window height.", "pixels", "800"});
@@ -177,6 +177,12 @@ int main(int argc, char **argv) {
     if (demo && window && (parser.isSet("screenshot") || parser.isSet("review-width") || parser.isSet("review-height"))) {
         window->resize(qBound(580, parser.value("review-width").toInt(), 2000), qBound(520, parser.value("review-height").toInt(), 1600));
     }
+    if (demo && parser.isSet("review-scenario") && !parser.isSet("screenshot")) {
+        const QString scenario = parser.value("review-scenario");
+        QTimer::singleShot(1200, &app, [window, scenario] {
+            if (window) QMetaObject::invokeMethod(window, "showReview", Q_ARG(QVariant, QVariant(scenario)));
+        });
+    }
     if (parser.isSet("screenshot")) {
         const QString path = parser.value("screenshot");
         const QString scenario = parser.value("review-scenario");
@@ -184,7 +190,7 @@ int main(int argc, char **argv) {
             if (window) QMetaObject::invokeMethod(window, "showReview", Q_ARG(QVariant, QVariant(scenario)));
         });
         QTimer::singleShot(3000, &app, [window, path, scenario, &app] {
-            auto *capture = (scenario == QStringLiteral("compose") || scenario == QStringLiteral("compose-close")) && window
+            auto *capture = scenario.startsWith(QStringLiteral("compose")) && window
                 ? window->findChild<QQuickWindow *>(QStringLiteral("composerDialog")) : window;
             if (!capture || !capture->isExposed()) { std::fprintf(stderr, "Preview window is not exposed.\n"); app.exit(3); return; }
             const QImage image = capture->grabWindow();

@@ -1,28 +1,19 @@
 # Composer editing tools · 2026-11-03
 
-The reference guides composer content and editing actions. NextKde retains ownership of window corners and decoration, through the existing cooperative WindowChrome/MailWindowControls adapter. Floating header controls retain the canonical same-window liquid backdrop; the formatting strip and popover interiors use ordinary controls.
+The reference guides content and editing actions. NextKde owns window corners and decorations through the existing cooperative WindowChrome/MailWindowControls adapter. The send action sits 10px before the visible first traffic-light circle, sharing its vertical center, as the inbox search action does.
 
-The composer now exposes body/title/heading text presets, installed font families, regular/bold/italic/bold-italic faces, size and color, selection-aware emphasis, three paragraph alignments, bullet/numbered lists and bounded block indentation. Cursor movement updates format controls. The strip scrolls horizontally in narrow windows. Ctrl+B/I/U and Ctrl+K act only when editing the body.
+Header icons share 16px SVG slots and a consistent stroke. Undo/redo, formatting, emoji, selected-text links, attachment, Bcc and sending use the same sizing. Formatting/Bcc launchers no longer show checked/active fills. The floating header retains the shared liquid material and explicit same-window backdrop.
 
-Header actions include undo/redo, formatting visibility, an anchored emoji picker and an anchored link editor. Links apply to selected text and accept HTTP(S) or mailto addresses. Emoji insertion replaces the current selection in one undo step. Existing attachment, Bcc, send and draft lifecycle behavior remains in place. Apple-only Siri and Hide My Email services are outside this implementation.
+Embedded format controls are ordinary solid material: 24px small button groups and 6px corners, with body/title/heading presets, installed fonts, faces, size/color, emphasis, three alignments, bullet/numbered lists and bounded indentation. All four selects use canonical LiquidSelect with materialForm and popupMaterialForm enabled. No custom select background or popup is supplied. Public keyboard navigation and selection remain intact; decorative focus color is suppressed without disabling focus.
 
-Validation is performed only in the development VM, in an isolated source directory. No real account or mailbox operations are used. Screenshot exports show synthetic client content; compositor-owned decorations and corners are outside the exported image.
+The anchored emoji picker uses centered 22px Noto Color Emoji glyphs without text-button padding or elision. All 18 choices fit inside the panel. Emoji insertion replaces the selection in one undo step. The link editor accepts selected-text HTTP(S)/mailto links. Existing draft/send/account guards remain. Apple Siri and Hide My Email are outside this implementation.
 
-Validation results: VM build succeeded; UI/i18n/catalog CTest checks passed 3/3 in 30.21s, including 46 passing UI cases. Tests cover the emoji chooser opening/insertion/closing, selected-text links, invalid URL scheme rejection, emoji replacement as one undo step, numbered/bullet conversion, alignment, indentation persistence and undo. Initial alignment-button lookup failure was resolved by using explicit button instances.
+Validation: development-VM build and UI/i18n/catalog CTest passed 3/3 in 40.83s, including 47 passing UI cases. Regressions exercise public select opening and actual font/face/size changes, header formatting without checked state, all emoji cell bounds, insertion/closing, selected-text links, unsafe schemes, lists, alignment/indentation persistence and undo, and send-control spacing at four widths.
 
-Chinese light/dark client captures were inspected using the VM's offscreen software backend. All format actions remain visible at the initial size, with a scrollbar for narrow windows. Wayland capture reported that the preview was not exposed, so these images establish content layout and opaque fallback only; they do not validate liquid refraction or compositor decoration. No host compilation, tests or GUI execution were performed.
+The user explicitly requested host compilation/preview in this chat. The latest host build and native Wayland light/dark, opened emoji and opened font-menu captures were inspected. Automated checks remained VM-only. The interactive preview is replaced rather than accumulating demo instances and now directly opens the requested synthetic compose scenario. No real mailbox operations were performed. Exports omit compositor-owned corners/buttons and cannot independently validate compositor decoration.
 
-- `compose-light.png`: Chinese synthetic light composer, software fallback.
-- `compose-dark.png`: Chinese synthetic dark composer, software fallback.
+- `compose-light.png`: latest native Wayland Chinese synthetic composer.
+- `compose-dark.png`: latest native Wayland dark synthetic composer.
+- `compose-emoji.png`: opened emoji picker with all 18 glyphs visible.
 
-## Compact formatting controls
-
-The formatting strip uses 24px-high ordinary controls with 6px small corners throughout. Emphasis, alignment, lists and indentation each share a small-corner group surface. The body-style, font-family, font-face and font-size select triggers and their popup panels use the same 6px corner radius, as does the color control. This corrects the earlier mistaken interpretation of small corners as square corners. The app composes existing shared action controls without changing the pinned UI library. Header floating controls retain their existing material and shape.
-
-VM build and existing UI/i18n/catalog checks passed 3/3 in 30.79s (46 UI cases). Refreshed light/dark software-fallback exports were inspected. No host build, test or GUI execution was performed.
-
-## Send action spacing
-
-The send button now sits 10px to the left of the first visible traffic-light circle and shares its vertical center, matching the inbox search action. Position follows the actual control geometry rather than the wider reserved-control region. The existing independent-composer regression measures this gap and alignment at widths 640, 800, 1040 and 1400.
-
-VM build/UI/i18n/catalog checks passed 3/3 in 31.10s (46 UI cases). Refreshed light/dark software-fallback captures were inspected. No host build, test or GUI execution was performed.
+Font-menu review stays in temporary local artifacts; no local configuration or raw logs are published. The canonical component library gitlink is unchanged.

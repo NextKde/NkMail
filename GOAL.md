@@ -1,5 +1,13 @@
 # NkMail local delivery goal
 
+## Composer public controls and glyph correction · 2026-11-03
+
+- Unified all header action glyphs to 16px SVG slots with the same stroke treatment; removed checked/active fills from the formatting and Bcc header launchers. The header retains canonical liquid material; embedded formatting controls remain ordinary.
+- Replaced the customized KosComboBox wrapper/background with canonical LiquidSelect in explicit solid trigger/popup modes, 24px height and 6px trigger corners. No custom select background or popup implementation remains. Shared keyboard/navigation/selection behavior is exercised by actual font/face/size selection tests.
+- Fixed emoji cell clipping/elision using a centered 22px Noto Color Emoji content item and no label padding. All 18 entries inspected in the opened native Wayland picker; regression checks every cell fits the content area and preserves insertion/close behavior.
+- Added isolated demo-only compose-emoji/font review scenarios; an explicitly requested demo scenario now opens in interactive preview too.
+- VM build/UI/i18n/catalog passed 3/3 in 40.83s (47 UI cases). User-authorized host build and native Wayland light/dark/emoji/font captures inspected; automated tests remained VM-only. Canonical library gitlink unchanged; no real mailbox operations.
+
 ## Send action beside window controls · 2026-11-03
 
 - Composer send action now follows the inbox search placement: 10px from its right edge to the visible first traffic-light circle, with matching vertical center. It no longer offsets from the oversized reserved-control region.

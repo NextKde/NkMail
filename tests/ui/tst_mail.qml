@@ -827,6 +827,40 @@ TestCase {
         verify(editor.persist())
         verify(mock.lastSaved.html.indexOf("font-weight") >= 0)
     }
+    function test_composer_shared_selects_format_the_selection() {
+        app.showReview("compose")
+        const editor = findChild(app, "composerDialog")
+        const body = findChild(editor, "composerBody")
+        body.text = "alpha beta"
+        body.select(0, 5)
+        for (const name of ["composerParagraphStyle", "composerFontFamily", "composerFontStyle", "composerFontSize"]) {
+            const select = findChild(editor, name)
+            compare(select.materialForm, true)
+            compare(select.popupMaterialForm, true)
+            compare(select.cornerRadius, 6)
+            select.openMenu()
+            tryCompare(select, "popupOpened", true)
+            select.closeMenu()
+        }
+        const family = findChild(editor, "composerFontFamily")
+        family.select(1)
+        compare(body.cursorSelection.font.family, "serif")
+        const face = findChild(editor, "composerFontStyle")
+        face.select(2)
+        verify(body.cursorSelection.font.italic)
+        verify(!body.cursorSelection.font.bold)
+        const size = findChild(editor, "composerFontSize")
+        size.select(3)
+        compare(body.cursorSelection.font.pointSize, 16)
+        const toggle = findChild(editor, "composerFormattingToggle")
+        const before = editor.showFormatting
+        toggle.clicked()
+        compare(editor.showFormatting, !before)
+        compare(toggle.checked, false)
+        toggle.clicked()
+        verify(editor.persist())
+        verify(mock.lastSaved.html.indexOf("font-style:italic") >= 0)
+    }
     function test_composer_emoji_picker_inserts_and_closes() {
         app.showReview("compose")
         const editor = findChild(app, "composerDialog")
@@ -835,9 +869,16 @@ TestCase {
         body.select(0, 5)
         findChild(editor, "composerEmoji").clicked()
         const picker = findChild(editor, "composerEmojiPicker")
-        tryCompare(picker, "visible", true)
+        tryCompare(picker, "opened", true)
         const choices = findChild(editor, "composerEmojiChoices")
         compare(choices.count, 18)
+        for (let i = 0; i < choices.count; ++i) {
+            const choice = choices.itemAt(i)
+            const point = choice.mapToItem(picker.contentItem, 0, 0)
+            verify(point.x >= 0 && point.x + choice.width <= picker.contentItem.width + 0.5)
+            verify(point.y >= 0 && point.y + choice.height <= picker.contentItem.height + 0.5)
+            verify(choice.contentItem.width >= 22)
+        }
         verify(choices.itemAt(0) !== null)
         choices.itemAt(0).clicked()
         compare(picker.visible, false)

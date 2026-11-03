@@ -19,7 +19,7 @@ ApplicationWindow {
     property bool showFormatting: true
     property string fromAddress: ""
     property var paragraphState: ({ alignment: Qt.AlignLeft, bullets: false, numbered: false })
-    readonly property var availableFonts: Qt.fontFamilies()
+    readonly property var availableFonts: ["sans-serif", "serif", "monospace"].concat(Qt.fontFamilies().filter(family => ["sans-serif", "serif", "monospace"].indexOf(family) < 0))
     readonly property bool accountMatches: !draft.accountId || draft.accountId === mail.currentAccountId
     readonly property bool editable: accountMatches && !mail.sending && !mail.sendPending
     objectName: "composerDialog" // Preserve the public review/test lookup.
@@ -45,6 +45,38 @@ ApplicationWindow {
         accessibleText: text
         focusPolicy: Qt.TabFocus
     }
+    component ComposerIcon: Image {
+        required property string glyph
+        property color ink: AppTheme.text
+        width: 16; height: 16
+        sourceSize: Qt.size(32, 32)
+        fillMode: Image.PreserveAspectFit
+        readonly property var paths: ({
+            undo: "M9 14 4 9l5-5 M4 9h10a6 6 0 0 1 0 12h-3",
+            redo: "m15 14 5-5-5-5 M20 9H10a6 6 0 0 0 0 12h3",
+            format: "m2 19 5-14 5 14 M4 14h6 M21 19v-6a3 3 0 0 0-6 0 M21 15h-3a2 2 0 0 0 0 4h3",
+            emoji: "M21 12a9 9 0 1 0-18 0 9 9 0 0 0 18 0 M8 9h.01 M16 9h.01 M8 14a4 4 0 0 0 8 0",
+            link: "m10 13 4-4 M8 15l-1 1a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0 M16 9l1-1a4 4 0 0 1 6 6l-5 5a4 4 0 0 1-6 0",
+            attach: "m21 11-9 9a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8L15 6",
+            recipients: "M15 7a3 3 0 1 0-6 0 3 3 0 0 0 6 0 M5 21v-3a7 7 0 0 1 14 0v3 M19 4a3 3 0 0 1 0 6 M21 14a5 5 0 0 1 2 4",
+            send: "M12 21V3 M5 10l7-7 7 7"
+        })
+        source: "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="' + ink + '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="' + (paths[glyph] || paths.send) + '"/></svg>')
+    }
+    component HeaderAction: ComposerAction {
+        id: headerAction
+        required property string glyph
+        iconOnly: true
+        implicitWidth: 32; implicitHeight: 28
+        contentItem: Item {
+            ComposerIcon {
+                anchors.centerIn: parent
+                width: 16; height: 16
+                glyph: headerAction.glyph
+                ink: headerAction.textColor
+            }
+        }
+    }
     component FormatAction: ComposerAction {
         implicitWidth: 26
         implicitHeight: 24
@@ -67,21 +99,16 @@ ApplicationWindow {
         }
         Row { id: groupActions; spacing: 0 }
     }
-    component FormatSelect: KosComboBox {
-        id: formatSelect
+    component FormatSelect: LiquidSelect {
         implicitHeight: 24
-        background: KosSurface {
-            radius: 6
-            fillColor: AppTheme.fieldSurface
-            elevation: 0
-            focused: formatSelect.activeFocus
-            hovered: formatSelect.hovered
-        }
-        Binding {
-            target: formatSelect.popup.background
-            property: "radius"
-            value: 6
-        }
+        cornerRadius: 6
+        materialForm: true
+        popupMaterialForm: true
+        compactPopup: true
+        neutralOptionHighlight: true
+        focusRingColor: "transparent"
+        popupFontWeight: Font.Normal
+        appearanceMode: AppTheme.dark ? "dark" : "light"
     }
     component ListAction: FormatAction {
         id: listAction
@@ -230,6 +257,21 @@ ApplicationWindow {
         hide()
         return true
     }
+    function showToolsReview(mode) {
+        if (!mail.demo) return
+        toolsReview.mode = mode
+        toolsReview.restart()
+    }
+    Timer {
+        id: toolsReview
+        property string mode: ""
+        interval: 350
+        onTriggered: {
+            if (!root.mail.demo || !root.visible) return
+            if (mode === "emoji") emojiPicker.open()
+            else if (mode === "font") fontFamilySelect.openMenu()
+        }
+    }
     function refreshParagraphState() {
         richEditor.setSelection(bodyField.selectionStart, bodyField.selectionEnd)
         paragraphState = richEditor.blockState(bodyField.textDocument)
@@ -333,32 +375,24 @@ ApplicationWindow {
                         }
                         Row {
                             id: headerActions
-                            ComposerAction { flat: true; text: qsTr("Undo"); iconOnly: true; iconName: "undo"; enabled: root.editable && bodyField.canUndo; onClicked: bodyField.undo() }
-                            ComposerAction { flat: true; text: qsTr("Redo"); iconOnly: true; iconName: "forward"; enabled: root.editable && bodyField.canRedo; onClicked: bodyField.redo() }
-                            ComposerAction { flat: true; text: "Aa"; accessibleText: qsTr("Formatting options"); checkable: true; checked: root.showFormatting; onClicked: root.showFormatting = !root.showFormatting }
-                            ComposerAction { id: emojiButton; objectName: "composerEmoji"; flat: true; text: "☺"; font.pixelSize: 20; accessibleText: qsTr("Insert emoji"); enabled: root.editable; onClicked: emojiPicker.open() }
-                            ComposerAction { id: linkButton; objectName: "composerLink"; flat: true; text: "↗"; accessibleText: qsTr("Insert link"); enabled: root.editable && bodyField.selectedText.length > 0; onClicked: { linkUrl.text = ""; linkEditor.open() } }
+                            HeaderAction { glyph: "undo"; flat: true; text: qsTr("Undo"); enabled: root.editable && bodyField.canUndo; onClicked: bodyField.undo() }
+                            HeaderAction { glyph: "redo"; flat: true; text: qsTr("Redo"); enabled: root.editable && bodyField.canRedo; onClicked: bodyField.redo() }
+                            HeaderAction { glyph: "format"; objectName: "composerFormattingToggle"; flat: true; accessibleText: qsTr("Formatting options"); onClicked: root.showFormatting = !root.showFormatting }
+                            HeaderAction { id: emojiButton; glyph: "emoji"; objectName: "composerEmoji"; flat: true; accessibleText: qsTr("Insert emoji"); enabled: root.editable; onClicked: emojiPicker.open() }
+                            HeaderAction { id: linkButton; glyph: "link"; objectName: "composerLink"; flat: true; accessibleText: qsTr("Insert link"); enabled: root.editable && bodyField.selectedText.length > 0; onClicked: { linkUrl.text = ""; linkEditor.open() } }
                         }
                     }
-                    ComposerAction {
-                        text: qsTr("Attach file…"); iconOnly: true
+                    HeaderAction {
+                        glyph: "attach"; text: qsTr("Attach file…")
                         floatingAction: true; shellBackdrop: composerBackdrop
                         enabled: root.editable
-                        contentItem: Item {
-                            Image {
-                                anchors.centerIn: parent
-                                width: 19; height: 19
-                                sourceSize: Qt.size(36, 36)
-                                fillMode: Image.PreserveAspectFit
-                                source: "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="' + (root.editable ? AppTheme.text : AppTheme.disabledText) + '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="m21 11-9 9a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8L15 6"/></svg>')
-                            }
-                        }
                         onClicked: attachmentDialog.open()
                     }
-                    ComposerAction { floatingAction: true; shellBackdrop: composerBackdrop; text: qsTr("Bcc"); checkable: true; checked: root.showBcc; enabled: root.editable; onClicked: root.showBcc = !root.showBcc }
+                    HeaderAction { glyph: "recipients"; floatingAction: true; shellBackdrop: composerBackdrop; text: qsTr("Bcc"); enabled: root.editable; onClicked: root.showBcc = !root.showBcc }
                 }
-                ComposerAction {
+                HeaderAction {
                     objectName: "sendDraftButton"
+                    glyph: root.mail.sendPending ? "undo" : "send"
                     // Match the inbox search action: 10px from the visible
                     // first traffic-light circle, rather than its reserved area.
                     x: composerChrome.controlsLeft - width - 10
@@ -369,12 +403,6 @@ ApplicationWindow {
                     enabled: root.mail.sendPending ? true : (root.editable && !root.mail.busy && !root.mail.demo && root.mail.configured
                         && (toField.text.trim().length > 0 || ccField.text.trim().length > 0 || bccField.text.trim().length > 0)
                         && ["unknown", "accepted", "sending"].indexOf(root.draft.state) < 0)
-                    contentItem: Text {
-                        text: root.mail.sendPending ? "↶" : "↑"
-                        font.pixelSize: 21
-                        color: parent.textColor
-                        horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-                    }
                     onClicked: { if (root.mail.sendPending) root.mail.cancelSend(); else if (root.persist()) root.mail.sendDraft(root.currentDraft()) }
                 }
             }
@@ -444,11 +472,12 @@ ApplicationWindow {
                         onActivated: index => root.applyStyle(index)
                     }
                     FormatSelect {
+                        id: fontFamilySelect
                         objectName: "composerFontFamily"
                         implicitWidth: 136; implicitHeight: 24
                         model: root.availableFonts
                         currentIndex: Math.max(0, root.availableFonts.indexOf(bodyField.cursorSelection.font.family))
-                        displayText: bodyField.cursorSelection.font.family || qsTr("System font")
+                        placeholder: qsTr("System font")
                         Accessible.name: qsTr("Font family")
                         onActivated: index => root.format(() => bodyField.cursorSelection.font.family = root.availableFonts[index])
                     }
@@ -468,7 +497,7 @@ ApplicationWindow {
                         implicitWidth: 64; implicitHeight: 24
                         model: ["10", "12", "14", "16", "18", "24", "32"]
                         currentIndex: model.indexOf(String(Math.round(bodyField.cursorSelection.font.pointSize)))
-                        displayText: String(Math.round(bodyField.cursorSelection.font.pointSize > 0 ? bodyField.cursorSelection.font.pointSize : 14))
+                        placeholder: String(Math.round(bodyField.cursorSelection.font.pointSize > 0 ? bodyField.cursorSelection.font.pointSize : 12))
                         Accessible.name: qsTr("Font size")
                         onActivated: index => root.format(() => bodyField.cursorSelection.font.pointSize = Number(model[index]))
                     }
@@ -639,7 +668,18 @@ ApplicationWindow {
                 model: ["😀", "😊", "😉", "😍", "🤔", "😅", "🎉", "👍", "👏", "🙏", "❤️", "✨", "✅", "📌", "📅", "💡", "☕", "🌷"]
                 delegate: ComposerAction {
                     required property string modelData
-                    text: modelData; font.pixelSize: 21; implicitWidth: 32; implicitHeight: 32
+                    text: modelData; implicitWidth: 32; implicitHeight: 32
+                    iconOnly: true
+                    leftPadding: 0; rightPadding: 0; topPadding: 0; bottomPadding: 0
+                    contentItem: Text {
+                        text: parent.text
+                        font.family: "Noto Color Emoji"
+                        font.pixelSize: 22
+                        font.preferShaping: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideNone
+                    }
                     enabled: root.editable
                     onClicked: { root.insertText(modelData); emojiPicker.close() }
                 }
