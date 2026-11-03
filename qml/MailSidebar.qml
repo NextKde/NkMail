@@ -12,6 +12,7 @@ Item {
     property var sidebarAccounts: []
     property bool draftsVisible: false
     property int unreadRevision: 0
+    property string navigationOrigin: "favorite"
     readonly property color muted: AppTheme.mutedText
     property var collapsedAccounts: ({})
     signal editAccountRequested(var account)
@@ -156,10 +157,39 @@ Item {
                 spacing: 0
                 Text {
                     objectName: "favoritesTitle"
-                    visible: (mail.favorites || []).length > 0
-                    text: qsTr("收藏"); color: root.muted
-                    font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.4
-                    topPadding: 0; bottomPadding: 6
+                    text: qsTr("Favorites"); color: root.muted
+                    font.pixelSize: 11; font.weight: Font.DemiBold
+                    topPadding: 8; bottomPadding: 6
+                }
+                Repeater {
+                    model: ["inbox", "flagged", "localDrafts", "sent"]
+                    delegate: MailboxAction {
+                        required property string modelData
+                        readonly property var targetFolder: Navigation.systemFolder(mail.folders || [], modelData)
+                        objectName: modelData === "localDrafts" ? "draftFolderButton" : "favoriteShortcut_" + modelData
+                        text: modelData === "flagged" ? MailLabels.smartMailboxTitle("flagged")
+                            : modelData === "localDrafts" ? qsTr("Local drafts")
+                            : modelData === "inbox" ? qsTr("Inbox") : qsTr("Sent")
+                        iconName: modelData === "flagged" ? "flag" : modelData === "localDrafts" ? "editRounded"
+                            : modelData === "inbox" ? "envelope" : "forward"
+                        enabled: modelData === "flagged" || modelData === "localDrafts" || !!targetFolder
+                        unreadText: {
+                            root.unreadRevision
+                            if (modelData === "localDrafts") return mail.drafts.length > 0 ? String(mail.drafts.length) : ""
+                            const count = targetFolder ? (mail.folderUnread()[targetFolder.id] || 0) : 0
+                            return count > 0 ? String(count) : ""
+                        }
+                        checked: modelData === "localDrafts" ? root.draftsVisible
+                            : !root.draftsVisible && (modelData === "flagged" ? mail.smartMailbox === "flagged"
+                            : root.navigationOrigin === "favorite" && !mail.smartMailbox && !!targetFolder && mail.currentFolder === targetFolder.id)
+                        onClicked: {
+                            root.navigationOrigin = "favorite"
+                            if (modelData === "localDrafts") { root.draftsRequested(); return }
+                            root.mailboxOpened()
+                            if (modelData === "flagged") mail.selectSmartMailbox("flagged")
+                            else if (targetFolder) mail.selectFolder(targetFolder.id)
+                        }
+                    }
                 }
                 Repeater {
                     objectName: "favoritesList"
@@ -173,11 +203,34 @@ Item {
                             const counts = mail.folderUnreadFor(modelData.accountId)
                             return counts[modelData.folderId] > 0 ? String(counts[modelData.folderId]) : ""
                         }
-                        checked: mail.currentAccountId === modelData.accountId && !root.draftsVisible && mail.currentFolder === modelData.folderId
-                        countText: ""
-                        onClicked: mail.openFavorite(modelData.accountId, modelData.folderId)
+                        checked: root.navigationOrigin === "custom" && !mail.smartMailbox && mail.currentAccountId === modelData.accountId && !root.draftsVisible && mail.currentFolder === modelData.folderId
+                        onClicked: { root.navigationOrigin = "custom"; root.mailboxOpened(); mail.openFavorite(modelData.accountId, modelData.folderId) }
                     }
                 }
+                Text {
+                    objectName: "smartMailboxesTitle"
+                    text: qsTr("Smart mailboxes"); color: root.muted
+                    font.pixelSize: 11; font.weight: Font.DemiBold
+                    topPadding: 16; bottomPadding: 4
+                }
+                Text {
+                    text: qsTr("Current account · cached mail")
+                    color: root.muted; font.pixelSize: 9
+                    Layout.fillWidth: true; wrapMode: Text.Wrap
+                    bottomPadding: 6
+                }
+                Repeater {
+                    model: ["unread", "attachments"]
+                    delegate: MailboxAction {
+                        required property string modelData
+                        objectName: "smartMailbox_" + modelData
+                        text: MailLabels.smartMailboxTitle(modelData)
+                        iconName: modelData === "unread" ? "envelope" : "copy"
+                        checked: !root.draftsVisible && mail.smartMailbox === modelData
+                        onClicked: { root.mailboxOpened(); mail.selectSmartMailbox(modelData) }
+                    }
+                }
+                Item { Layout.preferredHeight: 12 }
                 Repeater {
                     model: root.sidebarAccounts
                     delegate: ColumnLayout {
@@ -194,12 +247,13 @@ Item {
                             accountId: accountSection.accountId
                             current: accountSection.current
                             collapsed: accountSection.collapsed
-                            text: accountSection.modelData.name || accountSection.modelData.address
+                            text: accountSection.modelData.address || accountSection.modelData.name
                             Accessible.name: text
                             onClicked: {
                                 if (accountSection.current) {
                                     root.toggleAccountCollapsed(accountSection.accountId)
                                 } else {
+                                    root.navigationOrigin = "account"
                                     root.mail.switchAccount(accountSection.accountId)
                                     if (accountSection.collapsed)
                                         root.toggleAccountCollapsed(accountSection.accountId)
@@ -263,13 +317,14 @@ Item {
                                     const count = counts[modelData.id] || 0
                                     return count > 0 ? String(count) : ""
                                 }
-                                checked: accountSection.current && !root.draftsVisible && root.mail.currentFolder === modelData.id
+                                checked: root.navigationOrigin === "account" && !mail.smartMailbox && accountSection.current && !root.draftsVisible && root.mail.currentFolder === modelData.id
                                 Accessible.name: MailLabels.mailboxTitle(modelData)
                                 onClicked: {
                                     if (!accountSection.current) {
                                         root.mail.switchAccount(accountSection.accountId)
                                         if (root.mail.currentAccountId !== accountSection.accountId) return
                                     }
+                                    root.navigationOrigin = "account"
                                     root.mailboxOpened()
                                     root.mail.selectFolder(modelData.id)
 
@@ -299,15 +354,6 @@ Item {
                             }
                         }
                     }
-                }
-                MailboxAction {
-                    objectName: "draftFolderButton"
-                    text: qsTr("Local drafts")
-                    unreadText: mail.drafts.length > 0 ? String(mail.drafts.length) : ""
-                    iconName: "editRounded"
-                    checked: root.draftsVisible
-                    Accessible.name: qsTr("Local drafts")
-                    onClicked: { root.draftsRequested();  }
                 }
                 Item {
                     id: addAccountRow

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <QCoreApplication>
 #include "MailDatabase.h"
 #include <QDir>
@@ -533,6 +534,41 @@ Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, cons
     }
     page.nextOffset = offset + int(page.messages.size());
     return page;
+}
+Page MailDatabase::smartPage(const QString &kind, int offset, int limit, const QString &search, bool unreadOnly) const
+{
+    Page result;
+    if (!check() || offset < 0 || limit <= 0 || limit > 10000
+        || (kind != "flagged" && kind != "unread" && kind != "attachments")) return result;
+    // Every row retains its source folder and UIDVALIDITY. Account scope stays
+    // bound to this database; no cross-account identity guessing is permitted.
+    QList<Summary> matches;
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("SELECT payload FROM summaries WHERE account=?"));
+    query.addBindValue(m_accountId);
+    if (!query.exec()) { fail(query.lastError().text()); return result; }
+    QMap<QString, QString> validities;
+    while (query.next()) {
+        const auto summary = summaryFromMap(mapFromJson(query.value(0)));
+        if (!validities.contains(summary.folder)) validities.insert(summary.folder, validity(summary.folder));
+        if (validities.value(summary.folder) != summary.uidValidity || (unreadOnly && !summary.unread)) continue;
+        if ((kind == "flagged" && !summary.flagged) || (kind == "unread" && !summary.unread)
+            || (kind == "attachments" && !summary.hasAttachments)) continue;
+        const auto text = summary.sender + '\n' + summary.senderAddress + '\n' + summary.recipients
+            + '\n' + summary.subject + '\n' + summary.preview;
+        if (!search.isEmpty() && !text.contains(search, Qt::CaseInsensitive)) continue;
+        matches.append(summary);
+    }
+    std::stable_sort(matches.begin(), matches.end(), [](const Summary &a, const Summary &b) {
+        const auto ad = QDateTime::fromString(a.date, Qt::ISODate), bd = QDateTime::fromString(b.date, Qt::ISODate);
+        if (ad != bd) return ad > bd;
+        return a.folder + QChar(0x1f) + a.uidValidity + QChar(0x1f) + a.uid
+            < b.folder + QChar(0x1f) + b.uidValidity + QChar(0x1f) + b.uid;
+    });
+    result.messages = matches.mid(offset, limit);
+    result.nextOffset = offset + result.messages.size();
+    result.hasMore = result.nextOffset < matches.size();
+    return result;
 }
 QMap<QString, int> MailDatabase::unreadCounts(const QString &accountId) const
 {

@@ -47,6 +47,29 @@ Page page(QList<Summary> messages, QString generation = QStringLiteral("100"))
 class CoreTests : public QObject {
     Q_OBJECT
 private slots:
+    void smartMailboxesPreserveScopeIdentityAndPagination() {
+        QTemporaryDir dir(temporaryTemplate());
+        MailDatabase db;
+        QVERIFY(db.open(dir.path(), "first"));
+        auto inbox = message("1"); inbox.flagged = true; inbox.unread = true;
+        QVERIFY(db.savePage(page({inbox})));
+        auto archived = message("1", "200", "Archive"); archived.flagged = true; archived.hasAttachments = true;
+        Page archive; archive.folder = "Archive"; archive.uidValidity = "200"; archive.messages = {archived};
+        QVERIFY(db.savePage(archive));
+        auto first = db.smartPage("flagged", 0, 1);
+        auto second = db.smartPage("flagged", 1, 1);
+        QCOMPARE(first.messages.size(), 1); QVERIFY(first.hasMore);
+        QCOMPARE(second.messages.size(), 1); QVERIFY(!second.hasMore);
+        QVERIFY(first.messages.first().folder != second.messages.first().folder);
+        QCOMPARE(db.smartPage("unread", 0, 20).messages.first().folder, QString("INBOX"));
+        QCOMPARE(db.smartPage("attachments", 0, 20).messages.first().uidValidity, QString("200"));
+        QCOMPARE(db.smartPage("flagged", 0, 20, "no-match").messages.size(), 0);
+        QVERIFY(db.open(dir.path(), "second"));
+        QCOMPARE(db.smartPage("flagged", 0, 20).messages.size(), 0);
+        QVERIFY(db.open(dir.path(), "first"));
+        QVERIFY(db.invalidateUidValidity("Archive", "201"));
+        QCOMPARE(db.smartPage("flagged", 0, 20).messages.size(), 1);
+    }
     void unreadCountsStayAccountScoped() {
         QTemporaryDir dir(temporaryTemplate());
         MailDatabase db;

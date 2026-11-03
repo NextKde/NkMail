@@ -50,7 +50,7 @@ Rectangle {
                         Layout.topMargin: 12
                         message: root.message
                         localeName: root.localeName
-                        sourceLabel: (root.mail.account.name || root.mail.account.address || "") + " · " + root.mail.currentFolder
+                        sourceLabel: (root.mail.account.name || root.mail.account.address || "") + " · " + (root.message.folder || root.mail.currentFolder)
                         expanded: root.detailsVisible
                         onToggleDetails: root.detailsVisible ? root.closeDetailsRequested() : root.detailsRequested()
                     }

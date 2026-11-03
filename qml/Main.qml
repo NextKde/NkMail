@@ -94,13 +94,14 @@ ApplicationWindow {
     function value(map, key) { return MailLabels.value(map, key) }
     function selectedIndex() {
         if (!hasMessage) return -1
-        return mail.messages.indexOf(mail.currentFolder, window.value(message, "uidValidity"), mail.selectedUid)
+        return mail.messages.indexOf(window.value(message, "folder") || mail.currentFolder, window.value(message, "uidValidity"), mail.selectedUid)
     }
     function mailboxTitle(folder) { return MailLabels.mailboxTitle(folder) }
     function folderIcon(id) { return MailLabels.folderIcon(id) }
     function draftStateLabel(state) { return MailLabels.draftStateLabel(state) }
     function folderTitle() {
         if (draftsVisible) return qsTr("Drafts")
+        if (mail.smartMailbox) return MailLabels.smartMailboxTitle(mail.smartMailbox)
         const folders = mail.folders || []
         for (let i = 0; i < folders.length; ++i)
             if (folders[i].id === mail.currentFolder) return mailboxTitle(folders[i])
@@ -118,6 +119,7 @@ ApplicationWindow {
         if (composer.visible && !composer.finishEditing()) return
         draftsVisible = false
         if (scenario === "account-add") { accountDialog.addAccount(); return }
+        if (scenario === "flagged") { mail.selectSmartMailbox("flagged"); return }
         if (scenario === "avatars") { window.showAvatars = true; return }
         if (scenario === "message-menu") { messagePane.showReviewMenu(); return }
         if (scenario === "compose") {

@@ -26,6 +26,8 @@ TestCase {
         property int blockedImageCount: 0
         function loadRemoteImages() {}
         property string currentFolder: "INBOX"
+        property string smartMailbox: ""
+        function selectSmartMailbox(kind) { smartMailbox = kind }
         property string status: "Demo"
         property string error: ""
         property bool busy: false
@@ -64,7 +66,7 @@ TestCase {
         property var accountSetup: setupMock
         function configureAccount(config, password, remember) { return !busy }
         function refresh() { refreshCount++ }
-        function selectFolder(folder) { currentFolder = folder }
+        function selectFolder(folder) { smartMailbox = ""; currentFolder = folder }
         function foldersFor(accountId) { return folders }
         property var folderUnreadMap: ({})
         function folderUnread() { return folderUnreadMap }
@@ -123,7 +125,7 @@ TestCase {
         failOnWarning(/.*/)
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
         mock.refreshCount = 0; mock.search = ""
-        mock.sending = false; mock.busy = false; mock.demo = true; mock.error = ""
+        mock.smartMailbox = ""; mock.sending = false; mock.busy = false; mock.demo = true; mock.error = ""
         app = createTemporaryObject(appComponent, testCase, {mail: mock})
         verify(app !== null)
         wait(80)
@@ -252,6 +254,23 @@ TestCase {
         compare(ReaderLayout.fitImages(image, 1600), image)
         const blocked = '<img data-nkmail-src="https://example.invalid/image">'
         compare(ReaderLayout.fitImages(blocked, 300), blocked)
+    }
+    function test_sidebar_sections_and_smart_navigation() {
+        const sidebar = findChild(app, "sidebarBody")
+        verify(findChild(sidebar, "favoritesTitle").visible)
+        verify(findChild(sidebar, "smartMailboxesTitle").visible)
+        const flagged = findChild(sidebar, "favoriteShortcut_flagged")
+        const unread = findChild(sidebar, "smartMailbox_unread")
+        flagged.clicked()
+        compare(mock.smartMailbox, "flagged")
+        verify(flagged.checked)
+        unread.clicked()
+        compare(mock.smartMailbox, "unread")
+        verify(!flagged.checked && unread.checked)
+        findChild(sidebar, "favoriteShortcut_inbox").clicked()
+        compare(mock.smartMailbox, "")
+        findChild(sidebar, "draftFolderButton").clicked()
+        verify(app.draftsVisible)
     }
     function test_views_load_without_shell_context() {
         const reader = createTemporaryObject(readerComponent, testCase, {

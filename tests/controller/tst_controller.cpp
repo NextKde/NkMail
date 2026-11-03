@@ -201,6 +201,34 @@ struct ReleaseOnExit {
 class ControllerTests : public QObject {
     Q_OBJECT
 private slots:
+    void smartMailboxOpensDuplicateUidFromSourceFolder() {
+        QTemporaryDir root(temporaryTemplate());
+        QVERIFY(seed(root.path(), 0, false));
+        {
+            MailDatabase db; QVERIFY(db.open(root.path()));
+            for (const auto &folder : {QString("INBOX"), QString("Archive")}) {
+                Summary summary; summary.folder = folder; summary.uid = "1";
+                summary.uidValidity = folder == "INBOX" ? "100" : "200";
+                summary.flagged = true;
+                Page page; page.folder = folder; page.uidValidity = summary.uidValidity; page.messages = {summary};
+                QVERIFY(db.savePage(page));
+                Content content; content.summary = summary; content.text = folder;
+                QVERIFY(db.saveContent(content));
+            }
+        }
+        MailController controller(false, root.path());
+        QTRY_VERIFY(controller.configured());
+        controller.selectSmartMailbox("flagged");
+        QCOMPARE(messages(controller)->count(), 2);
+        controller.openMessage("1", "200", "Archive");
+        QCOMPARE(controller.selectedMessage().value("text").toString(), QString("Archive"));
+        controller.openMessage("1", "100", "INBOX");
+        QCOMPARE(controller.selectedMessage().value("text").toString(), QString("INBOX"));
+        QCOMPARE(synthetic::contentCalls.load(), 0);
+        controller.selectFolder("INBOX");
+        QVERIFY(controller.smartMailbox().isEmpty());
+        QCOMPARE(messages(controller)->count(), 1);
+    }
     void setupChecksBothServersWithoutSending() {
         class Probe final : public MailTransport {
         public:
@@ -308,6 +336,9 @@ void ControllerTests::commandServiceRejectsInvalidMove()
     auto other = account(); other.id = "other";
     commands.execute(other, {message}, MailboxCommands::Action::Remove);
     QCOMPARE(done.count(), 2); QVERIFY(!done.last().at(2).toString().isEmpty());
+    auto archived = message; archived.folder = "Archive";
+    commands.execute(account(), {message, archived}, MailboxCommands::Action::Remove);
+    QCOMPARE(done.count(), 3); QVERIFY(!done.last().at(2).toString().isEmpty());
     QCOMPARE(backend->removeCalls.load(), 0);
 }
 void ControllerTests::batchCommandsUseFreshValidityAndPersist()

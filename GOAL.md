@@ -1,5 +1,11 @@
 # NkMail local delivery goal
 
+## Sidebar reference hierarchy correction · 2026-11-03
+
+- The earlier completion statement overstated the visual scope: account folder sections alone did not match the reference navigation. Added always-visible Favorites (Inbox, Flagged, Local drafts, Sent), custom pins, Smart mailboxes (Unread, With attachments) and expandable account folders identified by address. Only the actual navigation origin is highlighted.
+- Smart queries include all cached folders of the current account, retaining folder/UIDVALIDITY/UID and pagination/search semantics. This is explicitly not a cross-account unified inbox. Reading routes to the original mailbox; existing command service rejects mixed-folder batches before any mutation.
+- Added account/cache isolation, stale validity, pagination, duplicate-UID source routing, mixed-folder rejection and sidebar interaction regressions. Full host CTest passed 8/8 in 43.80s. Synthetic Wayland navigation and Flagged captures inspected. Shared liquid source/material/radius unchanged.
+
 ## Confirmed first-stage delivery complete · 2026-11-03
 
 - Scope: the user-confirmed three-row table plus reader/details reference. Implemented in PRs #8–#13, with the final wizard busy-save retry fix following #13. Optional local initials, grouped reply/forward and batch targeting, email-first verified setup, account-scoped navigation/roles/status, compact reader and inline details are all implemented.

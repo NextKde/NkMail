@@ -12,3 +12,9 @@ function ordered(folders) {
         return (ar === undefined ? 6 : ar) - (br === undefined ? 6 : br) || a.index - b.index
     }).map(entry => entry.folder)
 }
+
+function systemFolder(folders, wantedRole) {
+    for (let i = 0; i < folders.length; ++i)
+        if (role(folders[i]) === wantedRole) return folders[i]
+    return null
+}

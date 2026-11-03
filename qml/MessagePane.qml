@@ -44,6 +44,7 @@ Rectangle {
                 id: messageRow
                 required property int index
                 required property string uid
+                required property string folder
                 required property string uidValidity
                 required property string sender
                 required property string senderAddress
@@ -62,16 +63,16 @@ Rectangle {
                 height: visible ? MailStyle.messageRowHeight : 0
                 implicitHeight: visible ? MailStyle.messageRowHeight : 0
                 hoverEnabled: true
-                readonly property bool selected: mail.selectedUid === uid
+                readonly property bool selected: mail.selectedUid === uid && (mail.selectedMessage.folder || mail.currentFolder) === folder
                 readonly property color rowInk: selected ? "#ffffff" : root.ink
                 readonly property color rowMuted: selected ? "#ffffff" : root.muted
                 readonly property color rowAccent: selected ? "#ffffff" : AppTheme.accent
                 readonly property bool multiSelected: root.selection.isRowSelected(index)
                 readonly property int messageIndex: (mail.messages && typeof mail.messages.indexOf === "function")
-                    ? mail.messages.indexOf(mail.currentFolder, uidValidity, uid) : -1
+                    ? mail.messages.indexOf(folder, uidValidity, uid) : -1
                 readonly property bool bulkMenu: root.selection.isRowSelected(index) && root.selection.selectionSize > 1
                 readonly property bool canCompose: !bulkMenu && !mail.sending
-                    && mail.selectedMessage.uid === uid && mail.selectedMessage.uidValidity === uidValidity
+                    && (mail.selectedMessage.folder || mail.currentFolder) === folder && mail.selectedMessage.uid === uid && mail.selectedMessage.uidValidity === uidValidity
                 function composeMessage(mode) {
                     if (!canCompose) return
                     rowMenu.close()
@@ -91,7 +92,7 @@ Rectangle {
                     selectRow()
                     rowMenu.openAtAnchor()
                 }
-                function selectRow() { mail.openMessage(uid, uidValidity); root.messageOpened() }
+                function selectRow() { mail.openMessage(uid, uidValidity, folder); root.messageOpened() }
                 function openRow() {
                     selectRow()
                     if (unread) mail.setMessageRead(messageIndex, true)
@@ -138,7 +139,7 @@ Rectangle {
                         objectName: "moveToMenuItem"
                         text: qsTr("移动到…")
                         iconName: "folder"
-                        enabled: mail.folders.filter(f => f.id !== mail.currentFolder).length > 0
+                        enabled: mail.folders.filter(f => f.id !== messageRow.folder).length > 0
                         onTriggered: { rowMenu.close(); messageMoveMenu.openAtAnchor() }
                     }
                     LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; onTriggered: messageRow.contextCommand("archive") }
@@ -151,7 +152,7 @@ Rectangle {
                     anchorItem: messageRow
                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
                     Repeater {
-                        model: mail.folders.filter(f => f.id !== mail.currentFolder)
+                        model: mail.folders.filter(f => f.id !== messageRow.folder)
                         LiquidPopoverItem {
                             text: modelData.title || modelData.id
                             iconName: "folder"

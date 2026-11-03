@@ -3,6 +3,12 @@ import QtQuick
 import Kos.Ui
 import "MailboxNavigation.js" as Navigation
 QtObject {
+    function smartMailboxTitle(kind) {
+        if (kind === "flagged") return qsTr("Flagged")
+        if (kind === "unread") return qsTr("Unread")
+        if (kind === "attachments") return qsTr("With attachments")
+        return ""
+    }
     function value(map, key) { return map && map[key] !== undefined ? String(map[key]) : "" }
     function mailboxTitle(folder) {
         const role = Navigation.role(folder)

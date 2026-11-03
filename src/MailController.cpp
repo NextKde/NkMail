@@ -67,6 +67,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         }
         m_accountUnread.remove(m_account.id); ++m_accountUnreadRevision;
         emit accountUnreadChanged(); emit folderUnreadChanged();
+        if (!m_smartMailbox.isEmpty()) loadCached();
         setStatus(error.isEmpty() ? tr("Messages updated") : tr("Mailbox operation needs attention"), error);
     });
     m_sync = new MailboxSync(m_transport, this);
@@ -348,7 +349,7 @@ void MailController::switchAccount(const QString &id) {
     // Foreground view starts cached-only; background accounts poll inbox statistics.
     m_messages->replace({});
     m_selected.clear(); m_selectedUid.clear(); m_content = {};
-    m_folder = QStringLiteral("INBOX");
+    m_folder = QStringLiteral("INBOX"); m_smartMailbox.clear();
     m_search.clear();
     m_offset = 0; m_hasMore = false; m_uidValidity.clear(); m_cachedOnly = true;
 
@@ -428,6 +429,7 @@ void MailController::removeAccount(const QString &id) {
     setStatus(tr("No accounts left"));
 }
 void MailController::refresh() {
+    if (!m_smartMailbox.isEmpty()) { loadCached(); setStatus(tr("Smart mailbox · current account cached messages")); return; }
     if (m_demo) { setStatus(tr("Preview · synthetic mail · not connected")); return; }
     if (m_busy || sending() || m_commands->busy()) return;
     if (!configured() || m_account.password.isEmpty()) { setStatus(tr("Account needs attention"), tr("Add an account and enter an application password before connecting.")); return; }
@@ -446,14 +448,27 @@ void MailController::refresh() {
 
 void MailController::loadCached(bool append) {
     if (!m_database->isOpen()) return;
-    auto page = m_database->cachedPage(m_folder, append ? m_offset : 0, pageSize, m_search, m_unreadOnly);
+    auto page = m_smartMailbox.isEmpty()
+        ? m_database->cachedPage(m_folder, append ? m_offset : 0, pageSize, m_search, m_unreadOnly)
+        : m_database->smartPage(m_smartMailbox, append ? m_offset : 0, pageSize, m_search, m_unreadOnly);
     m_uidValidity = page.uidValidity;
     if (append) m_messages->append(page.messages); else m_messages->replace(page.messages);
     m_offset = page.nextOffset; m_hasMore = page.hasMore; emit statusChanged();
     emit folderUnreadChanged();
 }
+void MailController::selectSmartMailbox(const QString &kind) {
+    if (kind != "flagged" && kind != "unread" && kind != "attachments") return;
+    if (m_commands->busy()) return;
+    ++m_generation; ++m_selectionGeneration; m_busy = false; m_offset = 0;
+    m_smartMailbox = kind; m_cachedOnly = true; m_search.clear(); m_unreadOnly = false;
+    m_selected.clear(); m_selectedUid.clear(); m_content = {};
+    emit folderChanged(); emit selectionChanged(); emit searchChanged(); emit unreadOnlyChanged();
+    loadCached();
+    setStatus(tr("Smart mailbox · current account cached messages"));
+}
 void MailController::selectFolder(const QString &folder) {
-    if (folder == m_folder) return;
+    if (folder == m_folder && m_smartMailbox.isEmpty()) return;
+    m_smartMailbox.clear();
     ++m_generation; ++m_selectionGeneration; m_busy = false; m_folder = folder; m_offset = 0;
     m_selected.clear(); m_selectedUid.clear(); m_content = {}; emit selectionChanged(); emit folderChanged();
     loadCached();
@@ -463,7 +478,7 @@ void MailController::setSearch(const QString &query) {
     if (m_search == query) return;
     ++m_generation; m_busy = false; m_cachedOnly = true; m_search = query; m_offset = 0;
     emit searchChanged(); loadCached();
-    const bool server = query.size() >= 2 && configured() && !m_demo
+    const bool server = m_smartMailbox.isEmpty() && query.size() >= 2 && configured() && !m_demo
         && !m_account.password.isEmpty() && !m_uidValidity.isEmpty();
     setStatus(server ? tr("Searching server…")
                      : m_demo ? tr("Preview · search synthetic cached messages")
@@ -472,7 +487,7 @@ void MailController::setSearch(const QString &query) {
 }
 void MailController::searchServer() {
     const QString query = m_search;
-    if (query.isEmpty() || !configured() || m_demo || m_account.password.isEmpty() || m_uidValidity.isEmpty()) return;
+    if (!m_smartMailbox.isEmpty() || query.isEmpty() || !configured() || m_demo || m_account.password.isEmpty() || m_uidValidity.isEmpty()) return;
     const auto generation = m_generation; const auto account = m_account;
     const auto folder = m_folder; const auto validity = m_uidValidity;
     m_serverSearching = true; setStatus(tr("Searching server…"));
@@ -558,7 +573,7 @@ void MailController::loadMore() {
 }
 void MailController::fetchPage(bool append, bool quiet) {
     if (m_busy || m_commands->busy() || m_demo || m_account.password.isEmpty()) return;
-    if (!m_search.isEmpty()) { loadCached(append); return; }
+    if (!m_smartMailbox.isEmpty() || !m_search.isEmpty()) { loadCached(append); return; }
     const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
     const auto offset = append ? m_offset : 0;
     m_busy = true; if (!quiet) setStatus(tr("Fetching message headers…"));
@@ -619,13 +634,15 @@ int MailController::blockedImageCount() const {
 void MailController::loadRemoteImages() {
     m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary), m_content.html);
 }
-void MailController::openMessage(const QString &uid, const QString &validity) {
+void MailController::openMessage(const QString &uid, const QString &validity, const QString &sourceFolder) {
+    const auto folder = sourceFolder.isEmpty() ? m_folder : sourceFolder;
+    if (!m_smartMailbox.isEmpty() && m_messages->indexOf(folder, validity, uid) < 0) return;
     if (m_commands->busy()) return;
     const auto selectionGeneration = ++m_selectionGeneration;
-    if (auto cached = m_database->content(m_folder, validity, uid)) { present(*cached); return; }
+    if (auto cached = m_database->content(folder, validity, uid)) { present(*cached); return; }
     m_selectedUid = uid; m_selected.clear(); m_content = {}; emit selectionChanged();
     if (m_demo || m_account.password.isEmpty()) { setStatus(tr("This message is not cached"), tr("Connect to download its content.")); return; }
-    const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
+    const auto generation = m_generation; const auto account = m_account;
     setStatus(tr("Loading message without changing server flags…"));
     m_sync->content(account, folder, validity, uid, [this, generation, selectionGeneration](const Content &content, const QString &error) {
         if (generation != m_generation || selectionGeneration != m_selectionGeneration) return;
@@ -679,7 +696,7 @@ void MailController::archiveMessages(const QVariantList &indices) {
     setStatus(tr("Archive folder unavailable"), tr("This account has no Archive, Archives or All Mail folder."));
 }
 void MailController::moveMessages(const QVariantList &indices, const QString &destination) {
-    if (destination.trimmed().isEmpty() || destination == m_folder) {
+    if (destination.trimmed().isEmpty() || (m_smartMailbox.isEmpty() && destination == m_folder)) {
         setStatus(tr("Choose a different destination folder")); return;
     }
     executeCommand(indices, MailboxCommands::Action::Move, false, destination);
@@ -696,8 +713,10 @@ void MailController::executeCommand(const QVariantList &indices, MailboxCommands
         const auto map = m_messages->get(index.toInt());
         if (map.isEmpty()) continue;
         const auto summary = summaryFromMap(map);
-        if (summary.folder != m_folder || summary.uidValidity != m_uidValidity || seen.contains(summary.uid)) continue;
-        seen.insert(summary.uid); selected.append(summary);
+        if (m_smartMailbox.isEmpty() && (summary.folder != m_folder || summary.uidValidity != m_uidValidity)) continue;
+        const auto identity = MessageListModel::identity(summary);
+        if (seen.contains(identity)) continue;
+        seen.insert(identity); selected.append(summary);
     }
     if (selected.isEmpty()) return;
     ++m_generation; ++m_selectionGeneration; m_serverSearching = false;
