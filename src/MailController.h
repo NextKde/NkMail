@@ -20,6 +20,7 @@ class RemoteImageLoader;
 class MailTransport;
 class MailController : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QObject* accountSetup READ accountSetup CONSTANT)
     Q_PROPERTY(QObject* messages READ messages CONSTANT)
     Q_PROPERTY(QVariantList folders READ folders NOTIFY foldersChanged)
     Q_PROPERTY(QVariantList drafts READ drafts NOTIFY draftsChanged)
@@ -49,6 +50,7 @@ public:
     explicit MailController(bool demo, const QString &dataRoot, QObject *parent = nullptr, std::shared_ptr<MailTransport> transport = {});
     ~MailController() override;
     QObject *messages() const;
+    QObject *accountSetup() const { return m_accountSetup; }
     QVariantList folders() const { return m_folders; }
     QVariantList drafts() const;
     QVariantList favorites() const;
@@ -85,7 +87,7 @@ public:
     void setSendDelay(int seconds);
     bool sendPending() const;
     int accountUnreadRevision() const { return m_accountUnreadRevision; }
-    Q_INVOKABLE void configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
+    Q_INVOKABLE bool configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
     // Foreground account owns browsing/search. Background accounts poll inbox stats.
     Q_INVOKABLE void switchAccount(const QString &id);
     // Read-only cache probe: lists another account's folders without touching the
@@ -182,6 +184,7 @@ private:
     std::unique_ptr<MailDatabase> m_database;
     MessageListModel *m_messages = nullptr;
     AccountSession *m_credentials = nullptr;
+    QObject *m_accountSetup = nullptr;
     MailboxSync *m_sync = nullptr;
 };
 }

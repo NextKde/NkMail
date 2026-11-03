@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Account setup wizard · 2026-11-03
+
+- Email-first setup, iCloud/manual profile choice, collapsed advanced settings, independent IMAP/SMTP verification and explicit save completion. ProviderProfiles and AccountSetup own their respective logic. Failed verification retains fields, clears password, and permits retry. Saving reports success explicitly.
+- Local full suite 8/8 passed in 41.87s; final UI/catalog/protocol checks 3/3 passed in 28.09s. Auth-only loopback checks assert no message submission. Synthetic local screenshot inspected. Continuing navigation and compact reader.
+
 ## Optional sender initials · 2026-11-03
 
 - Added locally generated initials behind a Display option with per-profile persistence, preserving compact row height and selection geometry. Local CLI/UI/catalog checks passed; Wayland synthetic screenshot inspected. Continuing account wizard, navigation and reader header.

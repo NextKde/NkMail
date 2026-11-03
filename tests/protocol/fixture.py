@@ -255,6 +255,11 @@ def main():
                 addresses = reparsed[field].addresses
                 assert len(addresses) == 1 and addresses[0].display_name == name and addresses[0].addr_spec == address, addresses
             passed += 1
+            verified, verification_server = invoke("smtp", good, ca, "verify-smtp", starttls)
+            assert verified["ok"], verified
+            assert not verification_server.envelope and not verification_server.data
+            assert not any(cmd.startswith(("MAIL", "RCPT", "DATA")) for cmd in verification_server.commands)
+            passed += 1
             sent, server = invoke("smtp", good, ca, "send", starttls)
             assert sent["ok"] and sent["state"] == 0, sent
             assert any(b"bcc@fixture.invalid" in rcpt for rcpt in server.envelope), server.envelope

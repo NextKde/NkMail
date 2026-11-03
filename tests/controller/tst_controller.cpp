@@ -3,6 +3,7 @@
 #include "mail/backend.h"
 #include "mail/MailTransport.h"
 #include "services/AccountSession.h"
+#include "services/AccountSetup.h"
 #include "services/RemoteImageLoader.h"
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -128,6 +129,7 @@ void MailioBackend::copyMany(const Account &, const QString &, const QString &, 
 void MailioBackend::expungeMany(const Account &, const QString &, const QString &, const QStringList &, bool *)
 {
 }
+void MailioBackend::verifySmtp(const Account &) {}
 InboxStats MailioBackend::inboxStats(const Account &)
 {
     return {};
@@ -199,6 +201,32 @@ struct ReleaseOnExit {
 class ControllerTests : public QObject {
     Q_OBJECT
 private slots:
+    void setupChecksBothServersWithoutSending() {
+        class Probe final : public MailTransport {
+        public:
+            std::atomic_int imap{0}, smtp{0};
+            bool fail = false;
+            QList<Folder> folders(const Account &) override { ++imap; return {}; }
+            void verifySmtp(const Account &) override { ++smtp; if (fail) throw std::runtime_error("private-server-error"); }
+        };
+        auto transport = std::make_shared<Probe>();
+        AccountSetup setup(transport, true);
+        QSignalSpy finished(&setup, &AccountSetup::finished);
+        setup.verify({}, "synthetic-password");
+        setup.verify({}, "duplicate");
+        QTRY_COMPARE(finished.count(), 1);
+        QVERIFY(finished.at(0).at(0).toBool());
+        QCOMPARE(transport->imap.load(), 1); QCOMPARE(transport->smtp.load(), 1);
+        QCOMPARE(synthetic::sendCalls.load(), 0);
+        QCOMPARE(synthetic::credentialWrites.load(), 0);
+        transport->fail = true;
+        setup.verify({}, "retry");
+        QTRY_COMPARE(finished.count(), 2);
+        QVERIFY(!finished.at(1).at(0).toBool());
+        QVERIFY(!finished.at(1).at(1).toString().contains("private-server-error"));
+        QCOMPARE(setup.stage(), QString("failed"));
+    }
+
     void initTestCase() { QVERIFY(QDir().mkpath(QStringLiteral(NKMAIL_CONTROLLER_TMP_ROOT))); }
     void init() { synthetic::reset(); }
     void demoNeverUsesExternalBoundaries();

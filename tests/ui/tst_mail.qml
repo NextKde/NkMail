@@ -59,7 +59,8 @@ TestCase {
             }
             ListElement { uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false; threadKey: ""; threadCount: 1; threadFirst: true }
         }
-        function configureAccount(config, password, remember) {}
+        property var accountSetup: setupMock
+        function configureAccount(config, password, remember) { return true }
         function refresh() { refreshCount++ }
         function selectFolder(folder) { currentFolder = folder }
         function foldersFor(accountId) { return folders }
@@ -96,6 +97,13 @@ TestCase {
         function cancelSend() { sendPending = false }
         function clearError() { error = "" }
         function disconnectAccount() { configured = false }
+    }
+    QtObject {
+        id: setupMock
+        property bool busy: false
+        property string stage: ""
+        signal finished(bool success, string error)
+        function verify(config, password) { stage = "imap"; busy = true }
     }
     QtObject {
         id: desktopMock
@@ -623,6 +631,34 @@ TestCase {
         app.showReview("compose")
         compare(findChild(app, "composerDialog").visible, false)
     }
+    function test_account_wizard_preserves_config_on_failure() {
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        compare(dialog.step, 0)
+        const address = findChild(dialog, "accountAddress")
+        address.text = "sample@icloud.com"
+        findChild(dialog, "providerChoice").currentIndex = 1
+        dialog.nextStep()
+        compare(dialog.step, 1)
+        compare(dialog.configuration().imapHost, "imap.mail.me.com")
+        compare(dialog.configuration().smtpPort, 587)
+        mock.demo = false
+        findChild(dialog, "accountPassword").text = "test-secret"
+        dialog.validateConnection()
+        verify(dialog.submitting)
+        setupMock.finished(false, "Synthetic connection failure")
+        verify(!dialog.submitting)
+        compare(dialog.step, 1)
+        compare(dialog.configuration().address, "sample@icloud.com")
+        compare(findChild(dialog, "accountPassword").text, "")
+        findChild(dialog, "accountPassword").text = "retry-secret"
+        dialog.validateConnection()
+        setupMock.finished(true, "")
+        compare(dialog.step, 2)
+        compare(findChild(dialog, "accountPassword").text, "")
+        dialog.close()
+    }
+
     function test_account_password_is_not_prefilled() {
         app.showReview("account")
         compare(findChild(app, "accountPassword").text, "")

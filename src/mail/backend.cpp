@@ -507,6 +507,14 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate.")); }
 }
+void MailioBackend::verifySmtp(const Account &a)
+{
+    accountValid(a, true);
+    mailio::smtp smtp(utf8(a.smtpHost), a.smtpPort, Timeout);
+    smtp.ssl_options(tlsOptions(a)); smtp.start_tls(a.smtpStartTls);
+    smtp.source_hostname("nkmail.invalid");
+    smtp.authenticate(utf8(a.username), utf8(a.password), mailio::smtp::auth_method_t::LOGIN);
+}
 SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *raw)
 {
     bool submitting = false;

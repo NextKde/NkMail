@@ -39,6 +39,8 @@ int main(int argc, char **argv)
                 QJsonArray attachments;
                 for (const auto &at : c.attachments) attachments.append(QJsonObject{{"name", at.name}, {"bytes", QString::fromLatin1(at.bytes.toBase64())}, {"path", at.path}});
                 result = {{"uidValidity", c.summary.uidValidity}, {"uid", c.summary.uid}, {"subject", c.summary.subject}, {"text", c.text}, {"attachments", attachments}, {"to", c.to}, {"cc", c.cc}, {"replyTo", c.replyTo}};
+            } else if (operation == QStringLiteral("verify-smtp")) {
+                nkmail::MailioBackend::verifySmtp(a);
             } else if (operation == QStringLiteral("send")) {
                 nkmail::Draft d;
                 d.to = QStringLiteral("收件人 <to@fixture.invalid>"); d.cc = QStringLiteral("cc@fixture.invalid"); d.bcc = QStringLiteral("bcc@fixture.invalid");

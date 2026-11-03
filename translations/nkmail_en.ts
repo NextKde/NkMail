@@ -3,177 +3,222 @@
     <context>
         <name>AccountDialog</name>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="15" />
+            <location filename="../qml/AccountDialog.qml" line="16" />
             <source>Mail account</source>
             <translation>Mail account</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="94" />
+            <location filename="../qml/AccountDialog.qml" line="93" />
+            <source>Account could not be saved. Please retry.</source>
+            <translation>Account could not be saved. Please retry.</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="116" />
             <source>Example account · synthetic data only. Account changes and sending are disabled in demo mode.</source>
             <translation>Example account · synthetic data only. Account changes and sending are disabled in demo mode.</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="95" />
+            <location filename="../qml/AccountDialog.qml" line="117" />
             <source>Connect one account with an application password. TLS certificate verification is always enabled.</source>
             <translation>Connect one account with an application password. TLS certificate verification is always enabled.</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="99" />
+            <location filename="../qml/AccountDialog.qml" line="122" />
             <source>Identity</source>
             <translation>Identity</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="100" />
-            <location filename="../qml/AccountDialog.qml" line="100" />
+            <location filename="../qml/AccountDialog.qml" line="122" />
+            <source>Enter your email address</source>
+            <translation>Enter your email address</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="123" />
+            <location filename="../qml/AccountDialog.qml" line="123" />
             <source>Name</source>
             <translation>Name</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="101" />
-            <location filename="../qml/AccountDialog.qml" line="101" />
+            <location filename="../qml/AccountDialog.qml" line="124" />
+            <location filename="../qml/AccountDialog.qml" line="124" />
             <source>Email</source>
             <translation>Email</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="102" />
-            <location filename="../qml/AccountDialog.qml" line="102" />
+            <location filename="../qml/AccountDialog.qml" line="125" />
+            <location filename="../qml/AccountDialog.qml" line="125" />
             <source>Username</source>
             <translation>Username</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="104" />
+            <location filename="../qml/AccountDialog.qml" line="127" />
             <source>App password</source>
             <translation>App password</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="104" />
+            <location filename="../qml/AccountDialog.qml" line="127" />
             <source>Stored passwords are never displayed.</source>
             <translation>Stored passwords are never displayed.</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="105" />
+            <location filename="../qml/AccountDialog.qml" line="128" />
             <source>Application password</source>
             <translation>Application password</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="105" />
+            <location filename="../qml/AccountDialog.qml" line="128" />
             <source>Enter application password</source>
             <translation>Enter application password</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="108" />
+            <location filename="../qml/AccountDialog.qml" line="131" />
             <source>Remember password</source>
             <translation>Remember password</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="108" />
+            <location filename="../qml/AccountDialog.qml" line="131" />
             <source>Use the system keychain; no plaintext fallback.</source>
             <translation>Use the system keychain; no plaintext fallback.</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="113" />
+            <location filename="../qml/AccountDialog.qml" line="141" />
+            <source>Other · manual IMAP/SMTP</source>
+            <translation>Other · manual IMAP/SMTP</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="146" />
+            <source>Advanced server settings</source>
+            <translation>Advanced server settings</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="153" />
+            <source>Account verified and saved</source>
+            <translation>Account verified and saved</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="159" />
+            <source>Checking outgoing server…</source>
+            <translation>Checking outgoing server…</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="159" />
+            <source>Checking incoming server…</source>
+            <translation>Checking incoming server…</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="165" />
             <source>Incoming · IMAP</source>
             <translation>Incoming · IMAP</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="114" />
-            <location filename="../qml/AccountDialog.qml" line="123" />
+            <location filename="../qml/AccountDialog.qml" line="166" />
+            <location filename="../qml/AccountDialog.qml" line="176" />
             <source>Server</source>
             <translation>Server</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="114" />
+            <location filename="../qml/AccountDialog.qml" line="166" />
             <source>IMAP server</source>
             <translation>IMAP server</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="115" />
-            <location filename="../qml/AccountDialog.qml" line="124" />
+            <location filename="../qml/AccountDialog.qml" line="167" />
+            <location filename="../qml/AccountDialog.qml" line="177" />
             <source>Port</source>
             <translation>Port</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="115" />
+            <location filename="../qml/AccountDialog.qml" line="167" />
             <source>IMAP port</source>
             <translation>IMAP port</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="117" />
-            <location filename="../qml/AccountDialog.qml" line="126" />
+            <location filename="../qml/AccountDialog.qml" line="169" />
+            <location filename="../qml/AccountDialog.qml" line="179" />
             <source>STARTTLS</source>
             <translation>STARTTLS</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="117" />
-            <location filename="../qml/AccountDialog.qml" line="126" />
+            <location filename="../qml/AccountDialog.qml" line="169" />
+            <location filename="../qml/AccountDialog.qml" line="179" />
             <source>Off uses implicit TLS, not plaintext.</source>
             <translation>Off uses implicit TLS, not plaintext.</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="122" />
+            <location filename="../qml/AccountDialog.qml" line="175" />
             <source>Outgoing · SMTP</source>
             <translation>Outgoing · SMTP</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="123" />
+            <location filename="../qml/AccountDialog.qml" line="176" />
             <source>SMTP server</source>
             <translation>SMTP server</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="124" />
+            <location filename="../qml/AccountDialog.qml" line="177" />
             <source>SMTP port</source>
             <translation>SMTP port</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="131" />
+            <location filename="../qml/AccountDialog.qml" line="185" />
             <source>Trust</source>
             <translation>Trust</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="133" />
-            <location filename="../qml/AccountDialog.qml" line="134" />
+            <location filename="../qml/AccountDialog.qml" line="187" />
+            <location filename="../qml/AccountDialog.qml" line="188" />
             <source>CA file</source>
             <translation>CA file</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="133" />
+            <location filename="../qml/AccountDialog.qml" line="187" />
             <source>Optional PEM path; blank uses system trust.</source>
             <translation>Optional PEM path; blank uses system trust.</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="134" />
+            <location filename="../qml/AccountDialog.qml" line="188" />
             <source>System certificates</source>
             <translation>System certificates</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="138" />
+            <location filename="../qml/AccountDialog.qml" line="192" />
             <source>Reading does not change server flags. Explicit mail actions can update or delete messages.</source>
             <translation>Reading does not change server flags. Explicit mail actions can update or delete messages.</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="147" />
+            <location filename="../qml/AccountDialog.qml" line="201" />
             <source>Disconnect</source>
             <translation>Disconnect</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="149" />
+            <location filename="../qml/AccountDialog.qml" line="203" />
             <source>Done</source>
             <translation>Done</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="149" />
+            <location filename="../qml/AccountDialog.qml" line="203" />
             <source>Cancel</source>
             <translation>Cancel</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="153" />
-            <source>Saving…</source>
-            <translation>Saving…</translation>
+            <location filename="../qml/AccountDialog.qml" line="205" />
+            <source>Back</source>
+            <translation>Back</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="153" />
-            <source>Save account</source>
-            <translation>Save account</translation>
+            <location filename="../qml/AccountDialog.qml" line="211" />
+            <source>Continue</source>
+            <translation>Continue</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="219" />
+            <source>Checking…</source>
+            <translation>Checking…</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="219" />
+            <source>Verify and save</source>
+            <translation>Verify and save</translation>
         </message>
     </context>
     <context>
@@ -509,13 +554,13 @@
         <message>
             <location filename="../src/mail/backend.cpp" line="454" />
             <location filename="../src/mail/backend.cpp" line="490" />
-            <location filename="../src/mail/backend.cpp" line="603" />
-            <location filename="../src/mail/backend.cpp" line="625" />
-            <location filename="../src/mail/backend.cpp" line="638" />
-            <location filename="../src/mail/backend.cpp" line="652" />
-            <location filename="../src/mail/backend.cpp" line="676" />
-            <location filename="../src/mail/backend.cpp" line="691" />
-            <location filename="../src/mail/backend.cpp" line="707" />
+            <location filename="../src/mail/backend.cpp" line="611" />
+            <location filename="../src/mail/backend.cpp" line="633" />
+            <location filename="../src/mail/backend.cpp" line="646" />
+            <location filename="../src/mail/backend.cpp" line="660" />
+            <location filename="../src/mail/backend.cpp" line="684" />
+            <location filename="../src/mail/backend.cpp" line="699" />
+            <location filename="../src/mail/backend.cpp" line="715" />
             <source>Folder identity changed. Refresh the message list.</source>
             <translation>Folder identity changed. Refresh the message list.</translation>
         </message>
@@ -540,78 +585,78 @@
             <translation>Unable to read message. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="527" />
+            <location filename="../src/mail/backend.cpp" line="535" />
             <source>SMTP server accepted the message; delivery is not confirmed.</source>
             <translation>SMTP server accepted the message; delivery is not confirmed.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="534" />
-            <location filename="../src/mail/backend.cpp" line="538" />
+            <location filename="../src/mail/backend.cpp" line="542" />
+            <location filename="../src/mail/backend.cpp" line="546" />
             <source>Submission outcome is unknown. Check Sent mail before retrying manually.</source>
             <translation>Submission outcome is unknown. Check Sent mail before retrying manually.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="535" />
+            <location filename="../src/mail/backend.cpp" line="543" />
             <source>SMTP server rejected the operation. The draft has been preserved.</source>
             <translation>SMTP server rejected the operation. The draft has been preserved.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="539" />
+            <location filename="../src/mail/backend.cpp" line="547" />
             <source>Message was not submitted. Check account, connection and trusted TLS certificate.</source>
             <translation>Message was not submitted. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="585" />
+            <location filename="../src/mail/backend.cpp" line="593" />
             <source>Unable to save a copy to the Sent folder. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to save a copy to the Sent folder. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="597" />
+            <location filename="../src/mail/backend.cpp" line="605" />
             <source>Choose a different destination folder.</source>
             <translation>Choose a different destination folder.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="605" />
+            <location filename="../src/mail/backend.cpp" line="613" />
             <source>Safe deletion/move requires UIDPLUS. No messages were changed.</source>
             <translation>Safe deletion/move requires UIDPLUS. No messages were changed.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="612" />
+            <location filename="../src/mail/backend.cpp" line="620" />
             <source>Operation may be partially complete. Refresh both folders before retrying; no automatic retry was made.</source>
             <translation>Operation may be partially complete. Refresh both folders before retrying; no automatic retry was made.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="613" />
+            <location filename="../src/mail/backend.cpp" line="621" />
             <source>Unable to prepare mailbox operation. No messages were changed.</source>
             <translation>Unable to prepare mailbox operation. No messages were changed.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="628" />
-            <location filename="../src/mail/backend.cpp" line="679" />
+            <location filename="../src/mail/backend.cpp" line="636" />
+            <location filename="../src/mail/backend.cpp" line="687" />
             <source>Unable to update message flags. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to update message flags. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="641" />
-            <location filename="../src/mail/backend.cpp" line="694" />
+            <location filename="../src/mail/backend.cpp" line="649" />
+            <location filename="../src/mail/backend.cpp" line="702" />
             <source>Unable to copy message. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to copy message. Check account, connection and trusted TLS certificate.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="659" />
-            <location filename="../src/mail/backend.cpp" line="712" />
+            <location filename="../src/mail/backend.cpp" line="667" />
+            <location filename="../src/mail/backend.cpp" line="720" />
             <source>Safe deletion requires UIDPLUS; no mailbox-wide expunge was performed.</source>
             <translation>Safe deletion requires UIDPLUS; no mailbox-wide expunge was performed.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="661" />
-            <location filename="../src/mail/backend.cpp" line="713" />
+            <location filename="../src/mail/backend.cpp" line="669" />
+            <location filename="../src/mail/backend.cpp" line="721" />
             <source>Safe deletion requires explicit UIDs and UIDPLUS.</source>
             <translation>Safe deletion requires explicit UIDs and UIDPLUS.</translation>
         </message>
         <message>
-            <location filename="../src/mail/backend.cpp" line="663" />
-            <location filename="../src/mail/backend.cpp" line="715" />
+            <location filename="../src/mail/backend.cpp" line="671" />
+            <location filename="../src/mail/backend.cpp" line="723" />
             <source>Unable to expunge deleted messages. Check account, connection and trusted TLS certificate.</source>
             <translation>Unable to expunge deleted messages. Check account, connection and trusted TLS certificate.</translation>
         </message>
@@ -901,12 +946,12 @@
             <translation>Inbox</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="126" />
+            <location filename="../qml/Main.qml" line="127" />
             <source>A few thoughts for Friday</source>
             <translation>A few thoughts for Friday</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="127" />
+            <location filename="../qml/Main.qml" line="128" />
             <source>Hi Maya,
 
 I like the quieter direction. A little more space to read, and fewer things competing for attention.
@@ -931,173 +976,173 @@ Alex
 Synthetic demo draft. Sending is disabled.</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="150" />
+            <location filename="../qml/Main.qml" line="151" />
             <source>邮件正在发送或等待发送，请等待完成或撤销发送后再退出。</source>
             <translation>Mail is sending or waiting to send. Wait for completion or undo sending before quitting.</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="275" />
+            <location filename="../qml/Main.qml" line="276" />
             <source>Mail</source>
             <translation>Mail</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="296" />
+            <location filename="../qml/Main.qml" line="297" />
             <source>%1 · Unread (cached)</source>
             <translation>%1 · Unread (cached)</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="314" />
+            <location filename="../qml/Main.qml" line="315" />
             <source>Show all cached messages</source>
             <translation>Show all cached messages</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="314" />
+            <location filename="../qml/Main.qml" line="315" />
             <source>Show unread cached messages</source>
             <translation>Show unread cached messages</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="384" />
+            <location filename="../qml/Main.qml" line="385" />
             <source>Hide sidebar</source>
             <translation>Hide sidebar</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="384" />
+            <location filename="../qml/Main.qml" line="385" />
             <source>Show sidebar</source>
             <translation>Show sidebar</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="496" />
+            <location filename="../qml/Main.qml" line="497" />
             <source>Mailbox column width</source>
             <translation>Mailbox column width</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="496" />
+            <location filename="../qml/Main.qml" line="497" />
             <source>Message column width</source>
             <translation>Message column width</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="497" />
+            <location filename="../qml/Main.qml" line="498" />
             <source>Drag or use Left and Right to resize. Double-click to reset.</source>
             <translation>Drag or use Left and Right to resize. Double-click to reset.</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="565" />
+            <location filename="../qml/Main.qml" line="566" />
             <source>Dismiss</source>
             <translation>Dismiss</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="606" />
+            <location filename="../qml/Main.qml" line="607" />
             <source>Unread messages only (cached)</source>
             <translation>Unread messages only (cached)</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="613" />
+            <location filename="../qml/Main.qml" line="614" />
             <source>Sender initials</source>
             <translation>Sender initials</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="620" />
+            <location filename="../qml/Main.qml" line="621" />
             <source>按会话聚合</source>
             <translation>Group conversations</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="627" />
+            <location filename="../qml/Main.qml" line="628" />
             <source>新邮件通知</source>
             <translation>New mail notifications</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="634" />
+            <location filename="../qml/Main.qml" line="635" />
             <source>Show message summaries</source>
             <translation>Show message summaries</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="641" />
+            <location filename="../qml/Main.qml" line="642" />
             <source>富文本显示</source>
             <translation>Rich text</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="649" />
+            <location filename="../qml/Main.qml" line="650" />
             <source>Check for mail</source>
             <translation>Check for mail</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="657" />
+            <location filename="../qml/Main.qml" line="658" />
             <source>New message</source>
             <translation>New message</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="668" />
+            <location filename="../qml/Main.qml" line="669" />
             <source>显示</source>
             <translation>View</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="673" />
+            <location filename="../qml/Main.qml" line="674" />
             <source>Language: follow system</source>
             <translation>Language: follow system</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="687" />
+            <location filename="../qml/Main.qml" line="688" />
             <source>Switch light / dark appearance</source>
             <translation>Switch light / dark appearance</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="692" />
+            <location filename="../qml/Main.qml" line="693" />
             <source>Reply</source>
             <translation>Reply</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="693" />
+            <location filename="../qml/Main.qml" line="694" />
             <source>Reply to all</source>
             <translation>Reply to all</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="694" />
+            <location filename="../qml/Main.qml" line="695" />
             <source>Forward</source>
             <translation>Forward</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="695" />
+            <location filename="../qml/Main.qml" line="696" />
             <source>Message details</source>
             <translation>Message details</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="697" />
-            <location filename="../qml/Main.qml" line="739" />
+            <location filename="../qml/Main.qml" line="698" />
+            <location filename="../qml/Main.qml" line="740" />
             <source>删除</source>
             <translation>Delete</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="702" />
+            <location filename="../qml/Main.qml" line="703" />
             <source>归档</source>
             <translation>Archive</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="707" />
+            <location filename="../qml/Main.qml" line="708" />
             <source>取消旗标</source>
             <translation>Remove flag</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="707" />
+            <location filename="../qml/Main.qml" line="708" />
             <source>标为旗标</source>
             <translation>Add flag</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="722" />
+            <location filename="../qml/Main.qml" line="723" />
             <source>删除账号？</source>
             <translation>Remove account?</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="724" />
+            <location filename="../qml/Main.qml" line="725" />
             <source>%1 的本地缓存和记住的口令会被删除，服务器上的邮件不受影响。</source>
             <translation>The local cache and remembered password for %1 will be removed. Mail on the server will not be affected.</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="736" />
+            <location filename="../qml/Main.qml" line="737" />
             <source>取消</source>
             <translation>Cancel</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="753" />
+            <location filename="../qml/Main.qml" line="754" />
             <source>Save attachment</source>
             <translation>Save attachment</translation>
         </message>
@@ -1389,6 +1434,14 @@ Synthetic demo draft. Sending is disabled.</translation>
         </message>
     </context>
     <context>
+        <name>nkmail::AccountSetup</name>
+        <message>
+            <location filename="../src/services/AccountSetup.h" line="31" />
+            <source>Connection failed. Check the server settings, application password and trusted certificate.</source>
+            <translation>Connection failed. Check the server settings, application password and trusted certificate.</translation>
+        </message>
+    </context>
+    <context>
         <name>nkmail::DraftService</name>
         <message>
             <location filename="../src/services/DraftService.cpp" line="89" />
@@ -1489,281 +1542,281 @@ Synthetic demo draft. Sending is disabled.</translation>
     <context>
         <name>nkmail::MailController</name>
         <message>
-            <location filename="../src/MailController.cpp" line="68" />
+            <location filename="../src/MailController.cpp" line="70" />
             <source>Messages updated</source>
             <translation>Messages updated</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="68" />
+            <location filename="../src/MailController.cpp" line="70" />
             <source>Mailbox operation needs attention</source>
             <translation>Mailbox operation needs attention</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="95" />
+            <location filename="../src/MailController.cpp" line="97" />
             <source>New mail available</source>
             <translation>New mail available</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="105" />
+            <location filename="../src/MailController.cpp" line="107" />
             <source>Saved credentials restored. Refresh to connect.</source>
             <translation>Saved credentials restored. Refresh to connect.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="110" />
+            <location filename="../src/MailController.cpp" line="112" />
             <source>Credentials saved in the system keychain.</source>
             <translation>Credentials saved in the system keychain.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="120" />
+            <location filename="../src/MailController.cpp" line="122" />
             <source>Account needs a password</source>
             <translation>Account needs a password</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="120" />
+            <location filename="../src/MailController.cpp" line="122" />
             <source>Enter an application password for this account.</source>
             <translation>Enter an application password for this account.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="123" />
+            <location filename="../src/MailController.cpp" line="125" />
             <source>System keychain needs attention</source>
             <translation>System keychain needs attention</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="123" />
+            <location filename="../src/MailController.cpp" line="125" />
             <source>Credential storage or removal could not be completed. The local restore permission is authoritative; no plaintext fallback is used.</source>
             <translation>Credential storage or removal could not be completed. The local restore permission is authoritative; no plaintext fallback is used.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="217" />
-            <location filename="../src/MailController.cpp" line="218" />
-            <location filename="../src/MailController.cpp" line="223" />
-            <location filename="../src/MailController.cpp" line="341" />
-            <location filename="../src/MailController.cpp" line="414" />
+            <location filename="../src/MailController.cpp" line="219" />
+            <location filename="../src/MailController.cpp" line="220" />
+            <location filename="../src/MailController.cpp" line="225" />
+            <location filename="../src/MailController.cpp" line="344" />
+            <location filename="../src/MailController.cpp" line="417" />
             <source>Storage unavailable</source>
             <translation>Storage unavailable</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="229" />
-            <location filename="../src/MailController.cpp" line="373" />
-            <location filename="../src/MailController.cpp" line="429" />
-            <location filename="../src/MailController.cpp" line="560" />
+            <location filename="../src/MailController.cpp" line="231" />
+            <location filename="../src/MailController.cpp" line="376" />
+            <location filename="../src/MailController.cpp" line="432" />
+            <location filename="../src/MailController.cpp" line="563" />
             <source>Offline · cached mail</source>
             <translation>Offline · cached mail</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="229" />
-            <location filename="../src/MailController.cpp" line="373" />
+            <location filename="../src/MailController.cpp" line="231" />
+            <location filename="../src/MailController.cpp" line="376" />
             <source>Add your email account to get started</source>
             <translation>Add your email account to get started</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="265" />
-            <location filename="../src/MailController.cpp" line="421" />
+            <location filename="../src/MailController.cpp" line="267" />
+            <location filename="../src/MailController.cpp" line="424" />
             <source>Preview · synthetic mail · not connected</source>
             <translation>Preview · synthetic mail · not connected</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="269" />
-            <location filename="../src/MailController.cpp" line="398" />
+            <location filename="../src/MailController.cpp" line="271" />
+            <location filename="../src/MailController.cpp" line="401" />
             <source>Preview mode</source>
             <translation>Preview mode</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="269" />
-            <location filename="../src/MailController.cpp" line="398" />
+            <location filename="../src/MailController.cpp" line="271" />
+            <location filename="../src/MailController.cpp" line="401" />
             <source>Account changes are disabled in this synthetic preview.</source>
             <translation>Account changes are disabled in this synthetic preview.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="275" />
+            <location filename="../src/MailController.cpp" line="277" />
             <source>Check account settings</source>
             <translation>Check account settings</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="275" />
+            <location filename="../src/MailController.cpp" line="277" />
             <source>Enter an email address, username, valid server names and ports.</source>
             <translation>Enter an email address, username, valid server names and ports.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="290" />
+            <location filename="../src/MailController.cpp" line="292" />
             <source>Account change requires a separate data directory</source>
             <translation>Account change requires a separate data directory</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="290" />
+            <location filename="../src/MailController.cpp" line="292" />
             <source>Remove and re-add the account to change its email address, username or IMAP host.</source>
             <translation>Remove and re-add the account to change its email address, username or IMAP host.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="294" />
+            <location filename="../src/MailController.cpp" line="296" />
             <source>Could not save account</source>
             <translation>Could not save account</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="302" />
+            <location filename="../src/MailController.cpp" line="304" />
             <source>Account saved.</source>
             <translation>Account saved.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="323" />
+            <location filename="../src/MailController.cpp" line="325" />
             <source>Account saved. Refresh to connect.</source>
             <translation>Account saved. Refresh to connect.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="327" />
-            <location filename="../src/MailController.cpp" line="399" />
+            <location filename="../src/MailController.cpp" line="330" />
+            <location filename="../src/MailController.cpp" line="402" />
             <source>Finish the current operation before switching accounts</source>
             <translation>Finish the current operation before switching accounts</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="406" />
+            <location filename="../src/MailController.cpp" line="409" />
             <source>Could not remove account</source>
             <translation>Could not remove account</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="418" />
+            <location filename="../src/MailController.cpp" line="421" />
             <source>No accounts left</source>
             <translation>No accounts left</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="423" />
-            <location filename="../src/MailController.cpp" line="681" />
+            <location filename="../src/MailController.cpp" line="426" />
+            <location filename="../src/MailController.cpp" line="684" />
             <source>Account needs attention</source>
             <translation>Account needs attention</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="423" />
+            <location filename="../src/MailController.cpp" line="426" />
             <source>Add an account and enter an application password before connecting.</source>
             <translation>Add an account and enter an application password before connecting.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="425" />
+            <location filename="../src/MailController.cpp" line="428" />
             <source>Connecting securely…</source>
             <translation>Connecting securely…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="458" />
-            <location filename="../src/MailController.cpp" line="468" />
+            <location filename="../src/MailController.cpp" line="461" />
+            <location filename="../src/MailController.cpp" line="471" />
             <source>Searching server…</source>
             <translation>Searching server…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="459" />
+            <location filename="../src/MailController.cpp" line="462" />
             <source>Preview · search synthetic cached messages</source>
             <translation>Preview · search synthetic cached messages</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="460" />
+            <location filename="../src/MailController.cpp" line="463" />
             <source>Search · cached messages only</source>
             <translation>Search · cached messages only</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="472" />
+            <location filename="../src/MailController.cpp" line="475" />
             <source>Search · server unavailable</source>
             <translation>Search · server unavailable</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="485" />
+            <location filename="../src/MailController.cpp" line="488" />
             <source>Search · cached + server</source>
             <translation>Search · cached + server</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="493" />
+            <location filename="../src/MailController.cpp" line="496" />
             <source>Preview · synthetic cached messages</source>
             <translation>Preview · synthetic cached messages</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="494" />
+            <location filename="../src/MailController.cpp" line="497" />
             <source>Unread · cached messages only</source>
             <translation>Unread · cached messages only</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="494" />
+            <location filename="../src/MailController.cpp" line="497" />
             <source>Cached messages only</source>
             <translation>Cached messages only</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="541" />
+            <location filename="../src/MailController.cpp" line="544" />
             <source>%1 封新邮件</source>
             <translation>%1 new messages</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="554" />
+            <location filename="../src/MailController.cpp" line="557" />
             <source>Fetching message headers…</source>
             <translation>Fetching message headers…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="565" />
+            <location filename="../src/MailController.cpp" line="568" />
             <source>Could not cache messages</source>
             <translation>Could not cache messages</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="596" />
+            <location filename="../src/MailController.cpp" line="599" />
             <source>Up to date · headers cached</source>
             <translation>Up to date · headers cached</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="617" />
+            <location filename="../src/MailController.cpp" line="620" />
             <source>This message is not cached</source>
             <translation>This message is not cached</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="617" />
+            <location filename="../src/MailController.cpp" line="620" />
             <source>Connect to download its content.</source>
             <translation>Connect to download its content.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="619" />
+            <location filename="../src/MailController.cpp" line="622" />
             <source>Loading message without changing server flags…</source>
             <translation>Loading message without changing server flags…</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="622" />
+            <location filename="../src/MailController.cpp" line="625" />
             <source>Could not load message</source>
             <translation>Could not load message</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="623" />
+            <location filename="../src/MailController.cpp" line="626" />
             <source>Could not cache content</source>
             <translation>Could not cache content</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="624" />
+            <location filename="../src/MailController.cpp" line="627" />
             <source>Message cached · remote content blocked</source>
             <translation>Message cached · remote content blocked</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="652" />
+            <location filename="../src/MailController.cpp" line="655" />
             <source>Disconnected · cached mail available</source>
             <translation>Disconnected · cached mail available</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="669" />
+            <location filename="../src/MailController.cpp" line="672" />
             <source>Archive folder unavailable</source>
             <translation>Archive folder unavailable</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="669" />
+            <location filename="../src/MailController.cpp" line="672" />
             <source>This account has no Archive, Archives or All Mail folder.</source>
             <translation>This account has no Archive, Archives or All Mail folder.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="673" />
+            <location filename="../src/MailController.cpp" line="676" />
             <source>Choose a different destination folder</source>
             <translation>Choose a different destination folder</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="679" />
+            <location filename="../src/MailController.cpp" line="682" />
             <source>Another mail operation is in progress</source>
             <translation>Another mail operation is in progress</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="681" />
+            <location filename="../src/MailController.cpp" line="684" />
             <source>Enter an application password before changing messages.</source>
             <translation>Enter an application password before changing messages.</translation>
         </message>
         <message>
-            <location filename="../src/MailController.cpp" line="694" />
+            <location filename="../src/MailController.cpp" line="697" />
             <source>Updating messages…</source>
             <translation>Updating messages…</translation>
         </message>

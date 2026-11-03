@@ -117,6 +117,7 @@ ApplicationWindow {
         moreMenu.close(); listOptions.close(); window.detailsVisible = false; accountDialog.close()
         if (composer.visible && !composer.finishEditing()) return
         draftsVisible = false
+        if (scenario === "account-add") { accountDialog.addAccount(); return }
         if (scenario === "avatars") { window.showAvatars = true; return }
         if (scenario === "message-menu") { messagePane.showReviewMenu(); return }
         if (scenario === "compose") {

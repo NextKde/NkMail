@@ -1,4 +1,5 @@
 #include "MailController.h"
+#include "services/AccountSetup.h"
 #include "MessageListModel.h"
 #include "NotificationService.h"
 #include "storage/MailDatabase.h"
@@ -36,6 +37,7 @@ bool isArchiveFolder(const QVariantList &folders, const QString &destination) {
 MailController::MailController(bool demo, const QString &dataRoot, QObject *parent, std::shared_ptr<MailTransport> transport)
     : QObject(parent), m_transport(transport ? std::move(transport) : std::make_shared<MailTransport>()), m_demo(demo), m_root(dataRoot), m_database(std::make_unique<MailDatabase>()),
       m_messages(new MessageListModel(this)), m_credentials(new AccountSession(dataRoot, this)) {
+    m_accountSetup = new AccountSetup(m_transport, !demo, this);
     m_drafts = new DraftService(*m_database, dataRoot, this);
     connect(m_drafts, &DraftService::draftsChanged, this, &MailController::draftsChanged);
     connect(m_drafts, &DraftService::status, this, &MailController::setStatus);
@@ -265,14 +267,14 @@ void MailController::seedDemo() {
     setStatus(tr("Preview · synthetic mail · not connected"));
     if (!page.messages.isEmpty()) openMessage(page.messages.first().uid, page.uidValidity);
 }
-void MailController::configureAccount(const QVariantMap &configuration, const QString &password, bool remember) {
-    if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return; }
-    if (m_busy || sending() || m_commands->busy()) return;
+bool MailController::configureAccount(const QVariantMap &configuration, const QString &password, bool remember) {
+    if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return false; }
+    if (m_busy || sending() || m_commands->busy()) return false;
     Account next = accountFromMap(configuration);
     const auto validHost = [](const QString &host) { return !host.trimmed().isEmpty() && !host.contains('/') && !host.contains('\n') && !host.contains('\r'); };
     if (!next.address.contains('@') || next.username.trimmed().isEmpty() || !validHost(next.imapHost) || !validHost(next.smtpHost)
         || next.imapPort < 1 || next.imapPort > 65535 || next.smtpPort < 1 || next.smtpPort > 65535) {
-        setStatus(tr("Check account settings"), tr("Enter an email address, username, valid server names and ports.")); return;
+        setStatus(tr("Check account settings"), tr("Enter an email address, username, valid server names and ports.")); return false;
     }
     // An explicit id selects an existing account to edit; otherwise the address
     // (case-folded, whitespace trimmed) is the stable identity, and a random id is
@@ -287,11 +289,11 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
     // are independent records and may differ freely.
     if (editingCurrent && configured() && (next.address.compare(m_account.address, Qt::CaseInsensitive) != 0
         || next.imapHost != m_account.imapHost || next.username != m_account.username)) {
-        setStatus(tr("Account change requires a separate data directory"), tr("Remove and re-add the account to change its email address, username or IMAP host.")); return;
+        setStatus(tr("Account change requires a separate data directory"), tr("Remove and re-add the account to change its email address, username or IMAP host.")); return false;
     }
     // Only the live account may reuse the session-only password held in memory.
     next.password = password.isEmpty() ? (editingCurrent ? m_account.password : QString{}) : password;
-    if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return; }
+    if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return false; }
     m_credentials->setPassword(next);
     if (!editingCurrent) {
         // Adding or editing a background account must not disturb the live mailbox.
@@ -300,7 +302,7 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
         emit accountsChanged();
         if (!configured()) switchAccount(next.id);
         setStatus(tr("Account saved."));
-        return;
+        return true;
     }
     const bool changedMailbox = m_account.address != next.address
         || m_account.username != next.username || m_account.imapHost != next.imapHost
@@ -321,6 +323,7 @@ void MailController::configureAccount(const QVariantMap &configuration, const QS
     else m_credentials->remove(credentialKey());
     startRefreshTimer();
     setStatus(tr("Account saved. Refresh to connect."));
+    return true;
 }
 void MailController::switchAccount(const QString &id) {
     const QString accountId = id.trimmed();
