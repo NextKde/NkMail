@@ -255,6 +255,21 @@ TestCase {
         const blocked = '<img data-nkmail-src="https://example.invalid/image">'
         compare(ReaderLayout.fitImages(blocked, 300), blocked)
     }
+    function test_smart_loading_does_not_select_same_uid_in_other_folder() {
+        const original = mock.selectedMessage
+        mock.smartMailbox = "flagged"
+        mock.selectedMessage = ({})
+        wait(30)
+        const pane = findChild(app, "messagePane")
+        const row = findChild(pane, "messageList").itemAtIndex(0)
+        verify(row !== null)
+        verify(!row.selected)
+        verify(!row.canCompose)
+        mock.selectedMessage = Object.assign({}, original, {folder: "INBOX"})
+        wait(30)
+        verify(row.selected)
+        mock.selectedMessage = original
+    }
     function test_sidebar_sections_and_smart_navigation() {
         const sidebar = findChild(app, "sidebarBody")
         verify(findChild(sidebar, "favoritesTitle").visible)

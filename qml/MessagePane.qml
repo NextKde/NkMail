@@ -63,7 +63,7 @@ Rectangle {
                 height: visible ? MailStyle.messageRowHeight : 0
                 implicitHeight: visible ? MailStyle.messageRowHeight : 0
                 hoverEnabled: true
-                readonly property bool selected: mail.selectedUid === uid && (mail.selectedMessage.folder || mail.currentFolder) === folder
+                readonly property bool selected: mail.selectedUid === uid && (mail.selectedMessage.folder || (mail.smartMailbox ? "" : mail.currentFolder)) === folder
                 readonly property color rowInk: selected ? "#ffffff" : root.ink
                 readonly property color rowMuted: selected ? "#ffffff" : root.muted
                 readonly property color rowAccent: selected ? "#ffffff" : AppTheme.accent
@@ -72,7 +72,7 @@ Rectangle {
                     ? mail.messages.indexOf(folder, uidValidity, uid) : -1
                 readonly property bool bulkMenu: root.selection.isRowSelected(index) && root.selection.selectionSize > 1
                 readonly property bool canCompose: !bulkMenu && !mail.sending
-                    && (mail.selectedMessage.folder || mail.currentFolder) === folder && mail.selectedMessage.uid === uid && mail.selectedMessage.uidValidity === uidValidity
+                    && (mail.selectedMessage.folder || (mail.smartMailbox ? "" : mail.currentFolder)) === folder && mail.selectedMessage.uid === uid && mail.selectedMessage.uidValidity === uidValidity
                 function composeMessage(mode) {
                     if (!canCompose) return
                     rowMenu.close()
