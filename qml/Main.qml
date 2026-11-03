@@ -121,6 +121,7 @@ ApplicationWindow {
         if (scenario === "account-add") { accountDialog.addAccount(); return }
         if (scenario === "flagged") { mail.selectSmartMailbox("flagged"); return }
         if (scenario === "avatars") { window.showAvatars = true; return }
+        if (scenario === "more-menu") { moreMenu.openAtAnchor(); return }
         if (scenario === "message-menu") { messagePane.showReviewMenu(); return }
         if (scenario === "compose") {
             const sample = mail.newDraft("new")
@@ -667,7 +668,11 @@ ApplicationWindow {
         id: moreMenu
         objectName: "moreMessageMenu"
         LiquidPopoverItem {
+            objectName: "moreDisplayOptions"
             visible: readerHeader.compactOptions
+            // Menu's ListView retains invisible delegates; collapse the row too.
+            implicitHeight: readerHeader.compactOptions ? 30 : 0
+            height: implicitHeight
             text: qsTr("显示"); iconName: "sliders"
             onTriggered: { moreMenu.close(); listOptions.openAtAnchor() }
         }

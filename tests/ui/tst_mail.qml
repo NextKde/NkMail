@@ -140,6 +140,21 @@ TestCase {
         app.requestActivate()
         wait(40)
     }
+    function test_more_menu_hidden_row_does_not_leave_gap() {
+        const menu = findChild(app, "moreMessageMenu")
+        const overflow = findChild(app, "moreDisplayOptions")
+        const language = findChild(app, "languageSystem")
+        for (const width of [1480, 580, 1480]) {
+            app.width = width
+            wait(100)
+            menu.openAtAnchor()
+            tryCompare(menu, "opened", true)
+            compare(overflow.height, overflow.visible ? 30 : 0)
+            tryCompare(language, "y", overflow.visible ? 30 : 0)
+            menu.close()
+        }
+    }
+
     function test_context_delete_preserves_selected_rows() {
         const pane = findChild(app, "messagePane")
         const list = findChild(app, "messageList")

@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## More menu empty first row · 2026-11-03
+
+- The compact-only Display item was invisible on wide windows but retained its 30px MenuItem height. Explicitly collapse its height with the compact-options condition. Shared Kos.Ui stays unchanged.
+- Wide/narrow/wide regression checks the first visible row position after the ListView layout settles. UI suite passed (12.25s); isolated Wayland More-menu screenshot inspected.
+
 ## Editable demo email address · 2026-11-03
 
 - Removed demo-only readOnly from the email field so the interactive preview accepts typing and detects providers. Submission lock remains; demo credentials/network/send restrictions remain in place.
