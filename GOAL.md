@@ -1,5 +1,12 @@
 # NkMail local delivery goal
 
+## Composer editing tools · 2026-11-03
+
+- Continued from the supplied macOS Mail reference while retaining the NextKde window/material contract. Added text presets, installed font families and faces, selection-aware formatting state, paragraph alignment, numbered lists and block indentation. Added anchored emoji/link editors and body-only formatting shortcuts. Selection replacement is one undo operation.
+- Added UI regressions for selected-block operations, saved HTML, indentation undo, unsafe link scheme rejection, selected-text links and emoji replacement/undo. Chinese and English catalogs updated.
+- VM source directory: `/home/amao/nextkde-validation/nkmail-composer-20261103` on `kos-vm-dev`. VM build and UI/i18n/catalog checks passed (3/3, 30.21s; 46 UI cases). Chinese light/dark software-fallback captures reviewed. Wayland screenshot capture failed because the preview was not exposed; compositor rendering/liquid refraction are not visually accepted by these exports. No host build, test or GUI run performed for this iteration.
+
+
 ## Restore composer NextKde ownership contract · 2026-11-03
 
 - Corrected the reference-driven composer implementation: removed application-owned 22px window corners and border, the leading custom decoration layout and disabled platform adapter. The composer now reuses the inbox WindowChrome/MailWindowControls cooperative path over flush rectangular content planes. Window shape and decoration stay with NextKde/compositor ownership.

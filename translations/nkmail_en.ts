@@ -422,12 +422,68 @@
             <translation>System font</translation>
         </message>
         <message>
-            <source>Serif</source>
-            <translation>Serif</translation>
+            <source>Align center</source>
+            <translation>Align center</translation>
         </message>
         <message>
-            <source>Monospace</source>
-            <translation>Monospace</translation>
+            <source>Align left</source>
+            <translation>Align left</translation>
+        </message>
+        <message>
+            <source>Align right</source>
+            <translation>Align right</translation>
+        </message>
+        <message>
+            <source>Body</source>
+            <translation>Body</translation>
+        </message>
+        <message>
+            <source>Bold italic</source>
+            <translation>Bold italic</translation>
+        </message>
+        <message>
+            <source>Decrease indent</source>
+            <translation>Decrease indent</translation>
+        </message>
+        <message>
+            <source>Font style</source>
+            <translation>Font style</translation>
+        </message>
+        <message>
+            <source>Heading</source>
+            <translation>Heading</translation>
+        </message>
+        <message>
+            <source>Increase indent</source>
+            <translation>Increase indent</translation>
+        </message>
+        <message>
+            <source>Insert emoji</source>
+            <translation>Insert emoji</translation>
+        </message>
+        <message>
+            <source>Insert link</source>
+            <translation>Insert link</translation>
+        </message>
+        <message>
+            <source>Link address</source>
+            <translation>Link address</translation>
+        </message>
+        <message>
+            <source>Numbered list</source>
+            <translation>Numbered list</translation>
+        </message>
+        <message>
+            <source>Paragraph style</source>
+            <translation>Paragraph style</translation>
+        </message>
+        <message>
+            <source>Regular</source>
+            <translation>Regular</translation>
+        </message>
+        <message>
+            <source>Title</source>
+            <translation>Title</translation>
         </message>
     </context>
     <context>

@@ -18,10 +18,12 @@ ApplicationWindow {
     property bool showBcc: false
     property bool showFormatting: true
     property string fromAddress: ""
+    property var paragraphState: ({ alignment: Qt.AlignLeft, bullets: false, numbered: false })
+    readonly property var availableFonts: Qt.fontFamilies()
     readonly property bool accountMatches: !draft.accountId || draft.accountId === mail.currentAccountId
     readonly property bool editable: accountMatches && !mail.sending && !mail.sendPending
     objectName: "composerDialog" // Preserve the public review/test lookup.
-    width: 920; height: 740
+    width: 1040; height: 740
     minimumWidth: 640; minimumHeight: 500
     visible: false
     modality: Qt.NonModal
@@ -41,6 +43,51 @@ ApplicationWindow {
         implicitHeight: 28
         implicitWidth: iconOnly ? 32 : Math.max(44, contentItem.implicitWidth + leftPadding + rightPadding)
         accessibleText: text
+        focusPolicy: Qt.TabFocus
+    }
+    component FormatAction: ComposerAction {
+        implicitWidth: 28
+        implicitHeight: 28
+    }
+    component ListAction: FormatAction {
+        id: listAction
+        property bool numbered: false
+        contentItem: Item {
+            Column {
+                anchors.centerIn: parent
+                Repeater {
+                    model: 3
+                    delegate: Item {
+                        required property int index
+                        width: 19; height: 5
+                        Text { width: 7; height: 5; text: listAction.numbered ? String(index + 1) : "•"; font.pixelSize: 7; color: AppTheme.text; verticalAlignment: Text.AlignVCenter }
+                        Rectangle { x: 8; y: 2; width: 11; height: 1; color: AppTheme.text }
+                    }
+                }
+            }
+        }
+    }
+    component AlignmentAction: FormatAction {
+        id: alignmentAction
+        required property int paragraphAlignment
+        checkable: true
+        checked: !!(root.paragraphState.alignment & paragraphAlignment)
+        contentItem: Item {
+            Column {
+                anchors.centerIn: parent; spacing: 3; width: 16
+                Repeater {
+                    model: [16, 10, 16, 12]
+                    delegate: Rectangle {
+                        required property int modelData
+                        width: modelData; height: 1
+                        x: alignmentAction.paragraphAlignment === Qt.AlignHCenter ? (16 - width) / 2
+                            : alignmentAction.paragraphAlignment === Qt.AlignRight ? 16 - width : 0
+                        color: AppTheme.text
+                    }
+                }
+            }
+        }
+        onClicked: root.format(() => richEditor.setAlignment(bodyField.textDocument, paragraphAlignment))
     }
     component AddressField: TextField {
         Layout.fillWidth: true
@@ -149,10 +196,32 @@ ApplicationWindow {
         hide()
         return true
     }
+    function refreshParagraphState() {
+        richEditor.setSelection(bodyField.selectionStart, bodyField.selectionEnd)
+        paragraphState = richEditor.blockState(bodyField.textDocument)
+    }
+    function insertText(value) {
+        if (!editable) return
+        richEditor.setSelection(bodyField.selectionStart, bodyField.selectionEnd)
+        bodyField.cursorPosition = richEditor.insertText(bodyField.textDocument, value)
+        bodyField.forceActiveFocus()
+    }
+    function applyStyle(index) {
+        format(() => {
+            const selection = bodyField.cursorSelection
+            selection.font.bold = index > 0
+            selection.font.italic = false
+            selection.font.underline = false
+            selection.font.strikeout = false
+            selection.font.pointSize = [12, 24, 18][index]
+            selection.font.family = "sans-serif"
+        })
+    }
     function format(action) {
         if (!editable) return
         richEditor.setSelection(bodyField.selectionStart, bodyField.selectionEnd)
         action()
+        refreshParagraphState()
         changed()
         bodyField.forceActiveFocus()
     }
@@ -181,6 +250,10 @@ ApplicationWindow {
     Shortcut { sequence: "Escape"; enabled: root.active && !closeDecision.visible; onActivated: root.requestClose() }
     Shortcut { sequence: "Ctrl+W"; enabled: root.active && !closeDecision.visible; onActivated: root.requestClose() }
     Shortcut { sequence: "Ctrl+S"; enabled: root.active && root.editable && !closeDecision.visible; onActivated: root.persist() }
+    Shortcut { sequence: "Ctrl+B"; enabled: root.active && bodyField.activeFocus && root.editable && !closeDecision.visible; onActivated: root.format(() => bodyField.cursorSelection.font.bold = !bodyField.cursorSelection.font.bold) }
+    Shortcut { sequence: "Ctrl+I"; enabled: root.active && bodyField.activeFocus && root.editable && !closeDecision.visible; onActivated: root.format(() => bodyField.cursorSelection.font.italic = !bodyField.cursorSelection.font.italic) }
+    Shortcut { sequence: "Ctrl+U"; enabled: root.active && bodyField.activeFocus && root.editable && !closeDecision.visible; onActivated: root.format(() => bodyField.cursorSelection.font.underline = !bodyField.cursorSelection.font.underline) }
+    Shortcut { sequence: "Ctrl+K"; enabled: root.active && bodyField.activeFocus && root.editable && bodyField.selectedText.length > 0 && !closeDecision.visible; onActivated: { linkUrl.text = ""; linkEditor.open() } }
 
     Item {
         id: composeScene
@@ -228,7 +301,9 @@ ApplicationWindow {
                             id: headerActions
                             ComposerAction { flat: true; text: qsTr("Undo"); iconOnly: true; iconName: "undo"; enabled: root.editable && bodyField.canUndo; onClicked: bodyField.undo() }
                             ComposerAction { flat: true; text: qsTr("Redo"); iconOnly: true; iconName: "forward"; enabled: root.editable && bodyField.canRedo; onClicked: bodyField.redo() }
-                            ComposerAction { flat: true; text: "Aa"; Accessible.name: qsTr("Formatting options"); onClicked: root.showFormatting = !root.showFormatting }
+                            ComposerAction { flat: true; text: "Aa"; accessibleText: qsTr("Formatting options"); checkable: true; checked: root.showFormatting; onClicked: root.showFormatting = !root.showFormatting }
+                            ComposerAction { id: emojiButton; objectName: "composerEmoji"; flat: true; text: "☺"; font.pixelSize: 20; accessibleText: qsTr("Insert emoji"); enabled: root.editable; onClicked: emojiPicker.open() }
+                            ComposerAction { id: linkButton; objectName: "composerLink"; flat: true; text: "↗"; accessibleText: qsTr("Insert link"); enabled: root.editable && bodyField.selectedText.length > 0; onClicked: { linkUrl.text = ""; linkEditor.open() } }
                         }
                     }
                     ComposerAction {
@@ -318,32 +393,56 @@ ApplicationWindow {
                 contentHeight: height
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
                 RowLayout {
                     id: formatRow
                     height: parent.height
                     spacing: 7
                     enabled: root.editable
                     KosComboBox {
+                        objectName: "composerParagraphStyle"
+                        implicitWidth: 104; implicitHeight: 28
+                        model: [qsTr("Body"), qsTr("Title"), qsTr("Heading")]
+                        currentIndex: bodyField.cursorSelection.font.bold && bodyField.cursorSelection.font.pointSize === 24 ? 1
+                            : bodyField.cursorSelection.font.bold && bodyField.cursorSelection.font.pointSize === 18 ? 2 : 0
+                        Accessible.name: qsTr("Paragraph style")
+                        onActivated: index => root.applyStyle(index)
+                    }
+                    KosComboBox {
                         objectName: "composerFontFamily"
-                        implicitWidth: 150; implicitHeight: 30
-                        model: [qsTr("System font"), qsTr("Serif"), qsTr("Monospace")]
+                        implicitWidth: 136; implicitHeight: 28
+                        model: root.availableFonts
+                        currentIndex: Math.max(0, root.availableFonts.indexOf(bodyField.cursorSelection.font.family))
+                        displayText: bodyField.cursorSelection.font.family || qsTr("System font")
                         Accessible.name: qsTr("Font family")
-                        onActivated: index => root.format(() => bodyField.cursorSelection.font.family = ["sans-serif", "serif", "monospace"][index])
+                        onActivated: index => root.format(() => bodyField.cursorSelection.font.family = root.availableFonts[index])
+                    }
+                    KosComboBox {
+                        objectName: "composerFontStyle"
+                        implicitWidth: 104; implicitHeight: 28
+                        model: [qsTr("Regular"), qsTr("Bold"), qsTr("Italic"), qsTr("Bold italic")]
+                        currentIndex: (bodyField.cursorSelection.font.bold ? 1 : 0) + (bodyField.cursorSelection.font.italic ? 2 : 0)
+                        Accessible.name: qsTr("Font style")
+                        onActivated: index => root.format(() => {
+                            bodyField.cursorSelection.font.bold = (index & 1) !== 0
+                            bodyField.cursorSelection.font.italic = (index & 2) !== 0
+                        })
                     }
                     KosComboBox {
                         objectName: "composerFontSize"
-                        implicitWidth: 72; implicitHeight: 30
+                        implicitWidth: 64; implicitHeight: 30
                         model: ["10", "12", "14", "16", "18", "24", "32"]
-                        currentIndex: 2
+                        currentIndex: model.indexOf(String(Math.round(bodyField.cursorSelection.font.pointSize)))
+                        displayText: String(Math.round(bodyField.cursorSelection.font.pointSize > 0 ? bodyField.cursorSelection.font.pointSize : 14))
                         Accessible.name: qsTr("Font size")
-                        onActivated: root.format(() => bodyField.cursorSelection.font.pointSize = Number(currentText))
+                        onActivated: index => root.format(() => bodyField.cursorSelection.font.pointSize = Number(model[index]))
                     }
-                    ComposerAction {
+                    FormatAction {
                         text: qsTr("Text color"); implicitWidth: 30; implicitHeight: 30
                         contentItem: Item {
-                            Rectangle { anchors.centerIn: parent; width: 22; height: 22; color: colorDialog.selectedColor; radius: 6; border.width: 1; border.color: AppTheme.border }
+                            Rectangle { anchors.centerIn: parent; width: 22; height: 22; color: bodyField.cursorSelection.color; radius: 6; border.width: 1; border.color: AppTheme.border }
                         }
-                        onClicked: colorDialog.open()
+                        onClicked: { colorDialog.selectedColor = bodyField.cursorSelection.color; colorDialog.open() }
                     }
                     Item {
                         implicitWidth: styleActions.implicitWidth; implicitHeight: 32
@@ -351,13 +450,19 @@ ApplicationWindow {
                         Row {
                             id: styleActions
                             spacing: 1
-                            ComposerAction { objectName: "composerBold"; flat: true; text: "B"; Accessible.name: qsTr("Bold"); font.bold: true; onClicked: root.format(() => bodyField.cursorSelection.font.bold = !bodyField.cursorSelection.font.bold) }
-                            ComposerAction { flat: true; text: "I"; Accessible.name: qsTr("Italic"); font.italic: true; onClicked: root.format(() => bodyField.cursorSelection.font.italic = !bodyField.cursorSelection.font.italic) }
-                            ComposerAction { flat: true; text: "U"; Accessible.name: qsTr("Underline"); font.underline: true; onClicked: root.format(() => bodyField.cursorSelection.font.underline = !bodyField.cursorSelection.font.underline) }
-                            ComposerAction { flat: true; text: "S"; Accessible.name: qsTr("Strikethrough"); font.strikeout: true; onClicked: root.format(() => bodyField.cursorSelection.font.strikeout = !bodyField.cursorSelection.font.strikeout) }
+                            FormatAction { objectName: "composerBold"; flat: true; text: "B"; accessibleText: qsTr("Bold"); checkable: true; checked: bodyField.cursorSelection.font.bold; font.bold: true; onClicked: root.format(() => bodyField.cursorSelection.font.bold = !bodyField.cursorSelection.font.bold) }
+                            FormatAction { flat: true; text: "I"; accessibleText: qsTr("Italic"); checkable: true; checked: bodyField.cursorSelection.font.italic; font.italic: true; onClicked: root.format(() => bodyField.cursorSelection.font.italic = !bodyField.cursorSelection.font.italic) }
+                            FormatAction { flat: true; text: "U"; accessibleText: qsTr("Underline"); checkable: true; checked: bodyField.cursorSelection.font.underline; font.underline: true; onClicked: root.format(() => bodyField.cursorSelection.font.underline = !bodyField.cursorSelection.font.underline) }
+                            FormatAction { flat: true; text: "S"; accessibleText: qsTr("Strikethrough"); checkable: true; checked: bodyField.cursorSelection.font.strikeout; font.strikeout: true; onClicked: root.format(() => bodyField.cursorSelection.font.strikeout = !bodyField.cursorSelection.font.strikeout) }
                         }
                     }
-                    ComposerAction { text: "• ≡"; Accessible.name: qsTr("Bullet list"); onClicked: root.format(() => richEditor.toggleBulletList(bodyField.textDocument)) }
+                    AlignmentAction { objectName: "composerAlign0"; paragraphAlignment: Qt.AlignLeft; accessibleText: qsTr("Align left") }
+                    AlignmentAction { objectName: "composerAlign1"; paragraphAlignment: Qt.AlignHCenter; accessibleText: qsTr("Align center") }
+                    AlignmentAction { objectName: "composerAlign2"; paragraphAlignment: Qt.AlignRight; accessibleText: qsTr("Align right") }
+                    ListAction { objectName: "composerBullets"; accessibleText: qsTr("Bullet list"); checkable: true; checked: root.paragraphState.bullets; onClicked: root.format(() => richEditor.toggleBulletList(bodyField.textDocument)) }
+                    ListAction { objectName: "composerNumbers"; numbered: true; accessibleText: qsTr("Numbered list"); checkable: true; checked: root.paragraphState.numbered; onClicked: root.format(() => richEditor.toggleNumberedList(bodyField.textDocument)) }
+                    FormatAction { objectName: "composerOutdent"; text: "⇤"; accessibleText: qsTr("Decrease indent"); onClicked: root.format(() => richEditor.changeIndent(bodyField.textDocument, -1)) }
+                    FormatAction { objectName: "composerIndent"; text: "⇥"; accessibleText: qsTr("Increase indent"); onClicked: root.format(() => richEditor.changeIndent(bodyField.textDocument, 1)) }
                 }
             }
             ScrollView {
@@ -374,7 +479,7 @@ ApplicationWindow {
                     selectionColor: AppTheme.accent; selectedTextColor: AppTheme.accentText
                     placeholderText: qsTr("Write something thoughtful…")
                     placeholderTextColor: AppTheme.mutedText
-                    font.pixelSize: 14
+                    font.pointSize: 12
                     wrapMode: TextEdit.Wrap
                     textFormat: TextEdit.RichText
                     selectByMouse: true
@@ -382,7 +487,10 @@ ApplicationWindow {
                     Accessible.name: qsTr("Message body")
                     padding: 0
                     background: null
-                    onTextChanged: root.changed()
+                    onTextChanged: { root.changed(); root.refreshParagraphState() }
+                    onCursorPositionChanged: root.refreshParagraphState()
+                    onSelectionStartChanged: root.refreshParagraphState()
+                    onSelectionEndChanged: root.refreshParagraphState()
                 }
             }
             Repeater {
@@ -481,6 +589,57 @@ ApplicationWindow {
         }
         footer: Item {}
         Shortcut { sequence: "Escape"; enabled: closeDecision.visible; onActivated: { closeDecision.close(); if (root.dirty) autosave.restart() } }
+    }
+    LiquidContentPopover {
+        id: emojiPicker
+        objectName: "composerEmojiPicker"
+        anchorItem: emojiButton; sourceItem: composeScene; preferredSide: "bottom"
+        width: 250
+        implicitHeight: emojiGrid.implicitHeight + topPadding + bottomPadding
+        contentItem: GridLayout {
+            id: emojiGrid
+            columns: 6; rowSpacing: 4; columnSpacing: 4
+            Repeater {
+                objectName: "composerEmojiChoices"
+                model: ["😀", "😊", "😉", "😍", "🤔", "😅", "🎉", "👍", "👏", "🙏", "❤️", "✨", "✅", "📌", "📅", "💡", "☕", "🌷"]
+                delegate: ComposerAction {
+                    required property string modelData
+                    text: modelData; font.pixelSize: 21; implicitWidth: 32; implicitHeight: 32
+                    enabled: root.editable
+                    onClicked: { root.insertText(modelData); emojiPicker.close() }
+                }
+            }
+        }
+    }
+    LiquidContentPopover {
+        id: linkEditor
+        objectName: "composerLinkEditor"
+        anchorItem: linkButton; sourceItem: composeScene; preferredSide: "bottom"
+        width: Math.min(340, root.width - 16)
+        implicitHeight: linkColumn.implicitHeight + topPadding + bottomPadding
+        onOpened: linkUrl.forceActiveFocus()
+        contentItem: ColumnLayout {
+            id: linkColumn
+            Text { text: qsTr("Link address"); color: AppTheme.text }
+            TextField {
+                id: linkUrl
+                objectName: "composerLinkUrl"
+                Layout.fillWidth: true
+                placeholderText: "https://example.com"
+                Accessible.name: qsTr("Link address")
+                selectByMouse: true
+                background: Rectangle { color: AppTheme.fieldSurface; radius: AppTheme.smallRadius }
+            }
+            ComposerAction {
+                objectName: "composerInsertLink"
+                text: qsTr("Insert link")
+                enabled: root.editable && /^(https?:\/\/[^\s]+|mailto:[^\s@]+@[^\s@]+)$/i.test(linkUrl.text.trim())
+                onClicked: {
+                    root.format(() => richEditor.insertLink(bodyField.textDocument, linkUrl.text.trim()))
+                    linkEditor.close()
+                }
+            }
+        }
     }
     ColorDialog {
         id: colorDialog

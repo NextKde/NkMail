@@ -422,12 +422,68 @@
             <translation>系统字体</translation>
         </message>
         <message>
-            <source>Serif</source>
-            <translation>衬线字体</translation>
+            <source>Align center</source>
+            <translation>居中对齐</translation>
         </message>
         <message>
-            <source>Monospace</source>
-            <translation>等宽字体</translation>
+            <source>Align left</source>
+            <translation>左对齐</translation>
+        </message>
+        <message>
+            <source>Align right</source>
+            <translation>右对齐</translation>
+        </message>
+        <message>
+            <source>Body</source>
+            <translation>正文</translation>
+        </message>
+        <message>
+            <source>Bold italic</source>
+            <translation>粗斜体</translation>
+        </message>
+        <message>
+            <source>Decrease indent</source>
+            <translation>减少缩进</translation>
+        </message>
+        <message>
+            <source>Font style</source>
+            <translation>字体样式</translation>
+        </message>
+        <message>
+            <source>Heading</source>
+            <translation>小标题</translation>
+        </message>
+        <message>
+            <source>Increase indent</source>
+            <translation>增加缩进</translation>
+        </message>
+        <message>
+            <source>Insert emoji</source>
+            <translation>插入表情</translation>
+        </message>
+        <message>
+            <source>Insert link</source>
+            <translation>插入链接</translation>
+        </message>
+        <message>
+            <source>Link address</source>
+            <translation>链接地址</translation>
+        </message>
+        <message>
+            <source>Numbered list</source>
+            <translation>编号列表</translation>
+        </message>
+        <message>
+            <source>Paragraph style</source>
+            <translation>段落样式</translation>
+        </message>
+        <message>
+            <source>Regular</source>
+            <translation>常规</translation>
+        </message>
+        <message>
+            <source>Title</source>
+            <translation>标题</translation>
         </message>
     </context>
     <context>
