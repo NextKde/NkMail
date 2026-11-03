@@ -1,5 +1,13 @@
 # NkMail local delivery goal
 
+## Confirmed first-stage delivery complete · 2026-11-03
+
+- Scope: the user-confirmed three-row table plus reader/details reference. Implemented in PRs #8–#13, with the final wizard busy-save retry fix following #13. Optional local initials, grouped reply/forward and batch targeting, email-first verified setup, account-scoped navigation/roles/status, compact reader and inline details are all implemented.
+- Final audit: save rejection now always releases wizard submission state, preserves non-sensitive configuration and supports retry. Its regression passed in the final host UI run (9.84s). Full suite before this focused QML fix passed 8/8 in 43.20s; dependency gate and 32 guard tests passed. Foundation PR #7 remote release-gate passed. Stacked PRs are pending review/merge, not represented as merged or independently CI-approved.
+- Screenshots are synthetic application captures from the host. They preserve liquid controls, shared pinned source and compact geometry; compositor-owned traffic lights are not captured. No live provider authentication or real mailbox mutations were performed.
+- Later-phase product ideas below (OAuth/Exchange, unified inbox, copy/attachment-forward, colored flags/reminders/rules) remain explicitly deferred, not delivered by this first-stage work. Current provider preset is iCloud; other providers use manual IMAP/SMTP.
+- Per-feature matrix and screenshots: docs/progress/2026-11-03-completion/README.md.
+
 ## Compact reader · 2026-11-03
 
 - Independent MailMessageHeader presents sender, subject, recipient, source, time and inline details. Narrow layouts stack safely; long subjects wrap. ReaderLayout scales explicitly loaded data images using dimensions provided by RemoteImageLoader, preserving aspect ratio and blocked remote placeholders. Existing sanitizer and attachment behavior remain.
@@ -34,7 +42,7 @@
 
 ## 下一阶段产品目标：邮件操作、账户接入与导航一致性 · 2026-11-02
 
-本轮完成参考图与代码差距评估并制定目标，尚未开始本节功能实现。参考图只作为信息层级与交互参考；不复制截图内真实邮件、地址或密钥片段。
+以下是最初的差距评估与分阶段规划；阶段一现已完成，最新交付状态见本文顶部。参考图只作为信息层级与交互参考；不复制截图内真实邮件、地址或密钥片段。
 
 目标：在保留紧凑三栏布局、液态按钮组、6px 选中圆角、中英文和单实例托盘行为的前提下，让用户能够清楚地添加账户、定位邮件、执行常用操作，并确保每个可见入口对应真实能力。保留已确认的标题栏居中、4px 下移和搜索距交通灯10px布局。
 

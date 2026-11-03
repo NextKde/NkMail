@@ -62,7 +62,7 @@ TestCase {
             ListElement { uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false; threadKey: ""; threadCount: 1; threadFirst: true }
         }
         property var accountSetup: setupMock
-        function configureAccount(config, password, remember) { return true }
+        function configureAccount(config, password, remember) { return !busy }
         function refresh() { refreshCount++ }
         function selectFolder(folder) { currentFolder = folder }
         function foldersFor(accountId) { return folders }
@@ -123,7 +123,7 @@ TestCase {
         failOnWarning(/.*/)
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
         mock.refreshCount = 0; mock.search = ""
-        mock.sending = false; mock.demo = true; mock.error = ""
+        mock.sending = false; mock.busy = false; mock.demo = true; mock.error = ""
         app = createTemporaryObject(appComponent, testCase, {mail: mock})
         verify(app !== null)
         wait(80)
@@ -700,6 +700,30 @@ TestCase {
         setupMock.finished(true, "")
         compare(dialog.step, 2)
         compare(findChild(dialog, "accountPassword").text, "")
+        dialog.close()
+    }
+
+    function test_account_wizard_save_rejection_unlocks_retry() {
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        findChild(dialog, "accountAddress").text = "retry@icloud.com"
+        findChild(dialog, "providerChoice").currentIndex = 1
+        dialog.nextStep()
+        mock.demo = false
+        findChild(dialog, "accountPassword").text = "synthetic-secret"
+        dialog.validateConnection()
+        mock.busy = true // Background work started while verification was running.
+        setupMock.finished(true, "")
+        verify(!dialog.submitting)
+        compare(dialog.step, 1)
+        verify(dialog.setupError.length > 0)
+        compare(dialog.configuration().address, "retry@icloud.com")
+        compare(findChild(dialog, "accountPassword").text, "")
+        mock.busy = false
+        findChild(dialog, "accountPassword").text = "synthetic-retry"
+        dialog.validateConnection()
+        setupMock.finished(true, "")
+        compare(dialog.step, 2)
         dialog.close()
     }
 

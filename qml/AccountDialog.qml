@@ -86,12 +86,11 @@ LiquidDialog {
         submitting = true
         const saved = mail.configureAccount(configuration(), passwordField.text, rememberPassword.checked)
         passwordField.text = ""
-        // Configuration may finish synchronously or asynchronously. Never claim authentication here.
-        if (!mail.busy) {
-            submitting = false
-            if (saved) step = 2
-            else setupError = mail.error || qsTr("Account could not be saved. Please retry.")
-        }
+        // configureAccount returns its persistence result synchronously. A busy
+        // mailbox can reject it; unrelated sync must never leave this dialog locked.
+        submitting = false
+        if (saved) step = 2
+        else setupError = mail.error || qsTr("Account could not be saved. Please retry.")
     }
     onClosed: { passwordField.text = ""; submitting = false }
     Connections {
