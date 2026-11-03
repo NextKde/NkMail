@@ -359,9 +359,10 @@ ApplicationWindow {
                 }
                 ComposerAction {
                     objectName: "sendDraftButton"
-                    anchors.right: parent.right
-                    anchors.rightMargin: composerChrome.controlsReservedWidth + 12
-                    anchors.verticalCenter: parent.verticalCenter
+                    // Match the inbox search action: 10px from the visible
+                    // first traffic-light circle, rather than its reserved area.
+                    x: composerChrome.controlsLeft - width - 10
+                    y: composerChrome.controlsCenterY - height / 2
                     implicitWidth: 28; implicitHeight: 28
                     floatingAction: true; shellBackdrop: composerBackdrop
                     text: root.mail.sendPending ? qsTr("撤销发送") : root.mail.sending ? qsTr("Sending…") : qsTr("Send")

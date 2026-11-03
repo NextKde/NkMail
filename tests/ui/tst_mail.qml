@@ -772,6 +772,16 @@ TestCase {
         compare(findChild(editor, "sendDraftButton").shellBackdrop, backdrop)
         compare(findChild(editor, "sendDraftButton").floatingAction, true)
         compare(findChild(editor, "composerActionGroupSurface").materialForm, !editor.liquidControls)
+        const send = findChild(editor, "sendDraftButton")
+        for (const width of [640, 800, 1040, 1400]) {
+            editor.width = width
+            wait(30)
+            const circle = controls.buttonLayout[0]
+            const circleLeft = controls.mapToItem(editor.contentItem, circle.x, circle.y)
+            const sendRight = send.mapToItem(editor.contentItem, send.width, send.height / 2)
+            fuzzyCompare(circleLeft.x - sendRight.x, 10, 0.5)
+            fuzzyCompare(circleLeft.y + circle.height / 2, sendRight.y, 0.5)
+        }
         editor.width = 1000; editor.height = 800
         compare(editor.width, 1000)
         compare(editor.height, 800)

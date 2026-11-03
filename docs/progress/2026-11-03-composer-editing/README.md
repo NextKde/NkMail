@@ -20,3 +20,9 @@ Chinese light/dark client captures were inspected using the VM's offscreen softw
 The formatting strip uses 24px-high ordinary controls with 6px small corners throughout. Emphasis, alignment, lists and indentation each share a small-corner group surface. The body-style, font-family, font-face and font-size select triggers and their popup panels use the same 6px corner radius, as does the color control. This corrects the earlier mistaken interpretation of small corners as square corners. The app composes existing shared action controls without changing the pinned UI library. Header floating controls retain their existing material and shape.
 
 VM build and existing UI/i18n/catalog checks passed 3/3 in 30.79s (46 UI cases). Refreshed light/dark software-fallback exports were inspected. No host build, test or GUI execution was performed.
+
+## Send action spacing
+
+The send button now sits 10px to the left of the first visible traffic-light circle and shares its vertical center, matching the inbox search action. Position follows the actual control geometry rather than the wider reserved-control region. The existing independent-composer regression measures this gap and alignment at widths 640, 800, 1040 and 1400.
+
+VM build/UI/i18n/catalog checks passed 3/3 in 31.10s (46 UI cases). Refreshed light/dark software-fallback captures were inspected. No host build, test or GUI execution was performed.

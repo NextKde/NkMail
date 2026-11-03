@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Send action beside window controls · 2026-11-03
+
+- Composer send action now follows the inbox search placement: 10px from its right edge to the visible first traffic-light circle, with matching vertical center. It no longer offsets from the oversized reserved-control region.
+- Extended the independent-composer regression to measure the actual circle and send-action geometry at widths 640, 800, 1040 and 1400. VM build/UI/i18n/catalog checks passed (3/3, 31.10s; 46 UI cases); refreshed light/dark software-fallback screenshots inspected. No host validation performed.
+
 ## Compact small-corner formatting controls · 2026-11-03
 
 - Corrected the misunderstanding of small corners as square corners: the entire formatting strip uses 24px-high ordinary controls with 6px corners. Emphasis, alignment, lists and indentation are grouped; all four select triggers, their popup panels and the color control share the small-corner treatment.
