@@ -877,6 +877,27 @@ TestCase {
         dialog.close()
     }
 
+    function test_provider_list_scrolls_to_last_choice() {
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        tryCompare(dialog, "opened", true)
+        const picker = findChild(dialog, "providerChoice")
+        const scroll = findChild(picker, "providerScroll")
+        const bar = findChild(picker, "providerScrollBar")
+        verify(dialog.height < 560)
+        verify(bar.visible && bar.size < 1)
+        verify(bar.x > scroll.width / 2)
+        mouseDrag(bar, bar.width / 2, bar.height * bar.size / 2,
+                  0, bar.height * (1 - bar.size), Qt.LeftButton)
+        tryVerify(() => scroll.contentItem.contentY > 0)
+        const manual = findChild(picker, "provider_manual")
+        const point = manual.mapToItem(scroll, manual.width / 2, manual.height / 2)
+        verify(point.y >= 0 && point.y <= scroll.height)
+        picker.currentIndex = 1
+        mouseClick(manual)
+        compare(picker.currentIndex, 0)
+        dialog.close()
+    }
     function test_provider_presets_and_no_false_oauth_support() {
         const expected = {icloud:"imap.mail.me.com",google:"imap.gmail.com",qq:"imap.qq.com",exmail:"imap.exmail.qq.com",
             "163":"imap.163.com","126":"imap.126.com",yahoo:"imap.mail.yahoo.com",aol:"imap.aol.com"}

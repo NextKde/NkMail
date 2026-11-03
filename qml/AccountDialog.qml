@@ -11,10 +11,20 @@ LiquidDialog {
     objectName: "accountDialog"
     parent: Overlay.overlay
     width: Math.min(580, hostWindow.width - 32)
-    height: Math.min(step === 0 ? 700 : step === 2 ? 300 : 730, hostWindow.height - 32)
+    height: Math.min(header.implicitHeight + footer.implicitHeight
+        + topPadding + bottomPadding + accountFields.implicitHeight, hostWindow.height - 32)
     anchors.centerIn: parent
     title: qsTr("Mail account")
-    padding: 24
+    padding: 20
+    topPadding: 4
+    bottomPadding: 4
+    header: Label {
+        text: root.title
+        leftPadding: 20; rightPadding: 20; topPadding: 16; bottomPadding: 12
+        color: AppTheme.text
+        font.pixelSize: 17
+        font.weight: Font.DemiBold
+    }
     materialOpacity: 0.99
     closePolicy: root.submitting ? Popup.NoAutoClose : Popup.CloseOnEscape
     property var original: ({})
@@ -114,8 +124,9 @@ LiquidDialog {
         ScrollBar.vertical.policy: ScrollBar.AsNeeded
         ScrollBar.vertical.interactive: true
         ColumnLayout {
+            id: accountFields
             width: accountScroll.availableWidth
-            spacing: AppTheme.spacing
+            spacing: 10
             Text {
                 text: root.mail.demo ? qsTr("Example account · synthetic data only. Account changes and sending are disabled in demo mode.")
                     : qsTr("Connect one account with an application password. TLS certificate verification is always enabled.")
@@ -227,10 +238,10 @@ LiquidDialog {
         }
     }
     footer: Item {
-        implicitHeight: MailStyle.footerHeight
+        implicitHeight: 54
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 12; anchors.bottomMargin: 20
+            anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 8; anchors.bottomMargin: 16
             spacing: 8
             LiquidDialogButton { text: qsTr("Disconnect"); destructive: true; visible: root.mail.configured && !root.mail.demo; enabled: !root.submitting && !root.mail.sending; onClicked: { root.mail.disconnectAccount(); root.close() } }
             Item { Layout.fillWidth: true }

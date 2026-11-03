@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Compact account setup and provider scrolling · 2026-11-03
+
+- Account-dialog height now follows visible content up to the host-window limit, removing fixed-height blank space. Reduced header/content/footer padding and field spacing. Provider selection shows six rows with a persistent interactive scrollbar on the right.
+- Host build and UI/i18n/catalog checks passed (3/3, 16.21s; 43 UI cases). Pointer-drag regression reaches and selects the last provider; compact height and right-side scrollbar placement are checked. Synthetic Chinese Wayland capture inspected with no runtime warnings. Host testing remains authorized for these NkMail iterations.
+
 ## Independent Mail-style composer · 2026-11-03
 
 - Replaced the inbox modal composer with an independent, nonmodal, resizable ApplicationWindow. Reused canonical window controls/resize handles and solid capsule actions; added a leading window-control cluster, centered toolbar, circular send action, full-width address rows, horizontal formatting strip and unboxed expanding editor.
