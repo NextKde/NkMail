@@ -89,6 +89,7 @@ class Server:
 
     def imap(self):
         self.write(b"* OK fixture IMAP ready\r\n")
+        identified = False
         while line := self.line():
             self.commands.append(line.decode(errors="replace"))
             tag, cmd = line.split(b" ", 1)
@@ -97,8 +98,13 @@ class Server:
                 if self.scenario == "refuse-starttls": self.write(tag + b" NO unavailable\r\n"); continue
                 self.write(tag + b" OK begin TLS\r\n"); self.upgrade(); continue
             if upper.startswith(b"LOGIN "): self.write(tag + b" OK logged in\r\n")
+            elif upper.startswith(b"ID "):
+                assert cmd == b'ID ("name" "NkMail")', cmd
+                identified = True
+                self.write(b"* ID NIL\r\n" + tag + (b" BAD optional ID refused\r\n" if self.scenario == "reject-id" else b" OK identified\r\n"))
             elif upper == b"CAPABILITY":
                 capabilities = b"IMAP4rev1" if self.scenario == "no-uidplus" else b"IMAP4rev1 UIDPLUS"
+                if self.scenario in ("require-id", "reject-id"): capabilities += b" ID"
                 self.write(b"* CAPABILITY " + capabilities + b"\r\n" + tag + b" OK capabilities\r\n")
             elif upper.startswith(b"SELECT "):
                 self.write(b"* 2 EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n" + tag + b" OK [READ-WRITE] selected\r\n")
@@ -110,6 +116,7 @@ class Server:
                 assert b"102" in upper
                 self.write(b"* 2 EXPUNGE\r\n" + tag + b" OK expunged\r\n")
             elif upper.startswith(b"EXAMINE "):
+                if self.scenario == "require-id": assert identified
                 self.write(b"* 2 EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n* OK [UIDNEXT 103] next\r\n" + tag + b" OK [READ-ONLY] examined\r\n")
             elif upper.startswith(b"UID SEARCH "):
                 assert upper == b"UID SEARCH 2:2", upper
@@ -128,7 +135,13 @@ class Server:
             elif upper == b'LIST "" ""':
                 self.write(b'* LIST (\\Noselect) "/" ""\r\n' + tag + b" OK delimiter\r\n")
             elif upper.startswith(b"LIST "):
-                self.write(b'* LIST (\\HasNoChildren) "/" "INBOX"\r\n* LIST (\\Noselect) "/" "Archive"\r\n* LIST () "/" "Archive/&bUuL1Q-"\r\n' + tag + b" OK listed\r\n")
+                if self.scenario == "special-all":
+                    self.write(b'* LIST (\\All) "/" "AllMessages"\r\n' + tag + b" OK listed\r\n")
+                    continue
+                if self.scenario == "special-sent":
+                    self.write(b'* LIST (\\Sent) "/" "CustomOutbox"\r\n' + tag + b" OK listed\r\n")
+                    continue
+                self.write(b'* LIST (\\HasNoChildren) "/" "INBOX"\r\n* LIST (\\Noselect) "/" "Archive"\r\n* LIST (\\Archive) "/" "Archive/&bUuL1Q-"\r\n' + tag + b" OK listed\r\n")
             elif upper.startswith(b"STATUS "):
                 self.write(b'* STATUS "INBOX" (MESSAGES 2 RECENT 0)\r\n' + tag + b" OK status\r\n")
             elif upper == b"LOGOUT": self.write(b"* BYE goodbye\r\n" + tag + b" OK logout\r\n"); return
@@ -225,10 +238,22 @@ def main():
         assert sum("UID COPY" in cmd for cmd in server.commands) == 1
         assert not any("EXPUNGE" in cmd for cmd in server.commands)
         passed += 1
+        for scenario in ("require-id", "reject-id", "normal"):
+            result, server = invoke("imap", good, ca, "page", scenario=scenario)
+            assert result["ok"], result
+            assert any('ID ("name" "NkMail")' in cmd for cmd in server.commands) == (scenario != "normal")
+            passed += 1
+        result, server = invoke("imap", good, ca, "folders", scenario="special-all")
+        assert result["ok"] and result["folders"][0]["role"] == "all", result
+        passed += 1
+        result, server = invoke("imap", good, ca, "sent-folder", scenario="special-sent")
+        assert result["ok"] and result["folder"] == "CustomOutbox", result
+        passed += 1
         for starttls in (False, True):
             folders, server = invoke("imap", good, ca, "folders", starttls)
             assert folders["ok"] and len(folders["folders"]) == 2, folders
             assert folders["folders"][0]["title"] == "Archive/测试", folders
+            assert folders["folders"][0]["role"] == "archive", folders
             passed += 1
             page, server = invoke("imap", good, ca, "page", starttls)
             assert page["ok"] and page["uidValidity"] == "42", page
@@ -254,6 +279,11 @@ def main():
                 assert not reparsed[field].defects, reparsed[field].defects
                 addresses = reparsed[field].addresses
                 assert len(addresses) == 1 and addresses[0].display_name == name and addresses[0].addr_spec == address, addresses
+            passed += 1
+            verified, verification_server = invoke("smtp", good, ca, "verify-smtp", starttls)
+            assert verified["ok"], verified
+            assert not verification_server.envelope and not verification_server.data
+            assert not any(cmd.startswith(("MAIL", "RCPT", "DATA")) for cmd in verification_server.commands)
             passed += 1
             sent, server = invoke("smtp", good, ca, "send", starttls)
             assert sent["ok"] and sent["state"] == 0, sent

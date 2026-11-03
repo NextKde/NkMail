@@ -18,7 +18,7 @@ QVariantMap accountMap(const Account &a)
             {"username", a.username}, {"imapHost", a.imapHost}, {"smtpHost", a.smtpHost},
             {"imapPort", a.imapPort}, {"smtpPort", a.smtpPort},
             {"imapStartTls", a.imapStartTls}, {"smtpStartTls", a.smtpStartTls},
-            {"caFile", a.caFile}};
+            {"serverSavesSent", a.serverSavesSent}, {"caFile", a.caFile}};
 }
 Account accountFromMap(const QVariantMap &m)
 {
@@ -35,6 +35,7 @@ Account accountFromMap(const QVariantMap &m)
     a.smtpPort = m.value("smtpPort", a.smtpPort).toInt();
     a.imapStartTls = m.value("imapStartTls", false).toBool();
     a.smtpStartTls = m.value("smtpStartTls", false).toBool();
+    a.serverSavesSent = m.value("serverSavesSent", false).toBool();
     a.caFile = m.value("caFile").toString();
     return a;
 }

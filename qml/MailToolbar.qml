@@ -194,14 +194,13 @@ Item {
             objectName: "messageOptionsGroup"
             Layout.rightMargin: 14
             visible: !readerHeader.draftsVisible && !readerHeader.searching
-            icons: readerHeader.compactOptions ? ["more"] : readerHeader.extendedOptions ? ["sliders", "info", "more"] : ["sliders", "more"]
-            labels: readerHeader.compactOptions ? [qsTr("更多")] : readerHeader.extendedOptions ? [qsTr("显示"), qsTr("详情"), qsTr("更多")] : [qsTr("显示"), qsTr("更多")]
-            objectNames: readerHeader.compactOptions ? ["moreButton"] : readerHeader.extendedOptions ? ["listOptionsButton", "detailsButton", "moreButton"] : ["listOptionsButton", "moreButton"]
-            enabledActions: readerHeader.compactOptions ? [true] : readerHeader.extendedOptions ? [true, readerHeader.hasMessage, true] : [true, true]
+            icons: readerHeader.compactOptions ? ["more"] : ["sliders", "more"]
+            labels: readerHeader.compactOptions ? [qsTr("更多")] : [qsTr("显示"), qsTr("更多")]
+            objectNames: readerHeader.compactOptions ? ["moreButton"] : ["listOptionsButton", "moreButton"]
+            enabledActions: readerHeader.compactOptions ? [true] : [true, true]
             onTriggered: index => {
                 if (readerHeader.compactOptions) readerHeader.moreRequested()
                 else if (index === 0) readerHeader.optionsRequested()
-                else if (readerHeader.extendedOptions && index === 1) readerHeader.detailsRequested()
                 else readerHeader.moreRequested()
             }
         }

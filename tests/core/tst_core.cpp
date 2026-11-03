@@ -47,6 +47,42 @@ Page page(QList<Summary> messages, QString generation = QStringLiteral("100"))
 class CoreTests : public QObject {
     Q_OBJECT
 private slots:
+    void smartMailboxesPreserveScopeIdentityAndPagination() {
+        QTemporaryDir dir(temporaryTemplate());
+        MailDatabase db;
+        QVERIFY(db.open(dir.path(), "first"));
+        auto inbox = message("1"); inbox.flagged = true; inbox.unread = true;
+        QVERIFY(db.savePage(page({inbox})));
+        auto archived = message("1", "200", "Archive"); archived.flagged = true; archived.hasAttachments = true;
+        Page archive; archive.folder = "Archive"; archive.uidValidity = "200"; archive.messages = {archived};
+        QVERIFY(db.savePage(archive));
+        auto first = db.smartPage("flagged", 0, 1);
+        auto second = db.smartPage("flagged", 1, 1);
+        QCOMPARE(first.messages.size(), 1); QVERIFY(first.hasMore);
+        QCOMPARE(second.messages.size(), 1); QVERIFY(!second.hasMore);
+        QVERIFY(first.messages.first().folder != second.messages.first().folder);
+        QCOMPARE(db.smartPage("unread", 0, 20).messages.first().folder, QString("INBOX"));
+        QCOMPARE(db.smartPage("attachments", 0, 20).messages.first().uidValidity, QString("200"));
+        QCOMPARE(db.smartPage("flagged", 0, 20, "no-match").messages.size(), 0);
+        QVERIFY(db.open(dir.path(), "second"));
+        QCOMPARE(db.smartPage("flagged", 0, 20).messages.size(), 0);
+        QVERIFY(db.open(dir.path(), "first"));
+        QVERIFY(db.invalidateUidValidity("Archive", "201"));
+        QCOMPARE(db.smartPage("flagged", 0, 20).messages.size(), 1);
+    }
+    void unreadCountsStayAccountScoped() {
+        QTemporaryDir dir(temporaryTemplate());
+        MailDatabase db;
+        QVERIFY(db.open(dir.path(), "first"));
+        auto first = message("1"); first.unread = true;
+        QVERIFY(db.savePage(page({first})));
+        QVERIFY(db.open(dir.path(), "second"));
+        auto second = message("2"); second.unread = true;
+        QVERIFY(db.savePage(page({second, message("3")})));
+        QCOMPARE(db.unreadCounts("first").value("INBOX"), 1);
+        QCOMPARE(db.unreadCounts("second").value("INBOX"), 1);
+        QCOMPARE(db.accountId(), QString("second"));
+    }
     void initTestCase();
     void mapRoundTrips();
     void cacheProbesDoNotRecoverLiveSends();
@@ -125,7 +161,7 @@ void CoreTests::mapRoundTrips()
     a.address = QStringLiteral("test@example.invalid");
     a.password = QStringLiteral("NEVER-SERIALIZE-THIS-SYNTHETIC-SECRET");
     a.caFile = QStringLiteral("/isolated/test-ca.pem");
-    a.imapStartTls = true;
+    a.imapStartTls = true; a.serverSavesSent = true;
     const auto accountValues = accountMap(a);
     QVERIFY(!accountValues.contains("password"));
     QVERIFY(!QJsonDocument::fromVariant(accountValues).toJson().contains(a.password.toUtf8()));
@@ -135,6 +171,8 @@ void CoreTests::mapRoundTrips()
     QCOMPARE(restored.smtpPort, 465);
     QCOMPARE(restored.caFile, a.caFile);
     QVERIFY(restored.imapStartTls);
+    QVERIFY(restored.serverSavesSent);
+    QVERIFY(!accountFromMap({}).serverSavesSent);
     QVERIFY(restored.password.isEmpty());
     QCOMPARE(accountFromMap({{"password", a.password}}).password, a.password);
     Draft d;
@@ -187,7 +225,7 @@ void CoreTests::accountAndFolderPersistence()
     a.imapHost = QStringLiteral("imap.example.invalid");
     a.smtpHost = QStringLiteral("smtp.example.invalid");
     a.password = QStringLiteral("SYNTHETIC-SECRET-MUST-NOT-REACH-SQLITE");
-    const QList<Folder> folders = {{"INBOX", "Inbox", 5}, {"Sent", "Sent mail", 2}};
+    const QList<Folder> folders = {{"INBOX", "Inbox", 5}, {"Sent", "Sent mail", 2, "sent"}};
     {
         MailDatabase db;
         QVERIFY2(db.open(dir.path()), qPrintable(db.error()));
@@ -206,6 +244,7 @@ void CoreTests::accountAndFolderPersistence()
         QCOMPARE(restored.smtpHost, a.smtpHost);
         const auto restoredFolders = db.folders();
         QCOMPARE(restoredFolders.size(), folders.size());
+        QCOMPARE(restoredFolders.at(1).role, QString("sent"));
         for (int i = 0; i < folders.size(); ++i) {
             QCOMPARE(restoredFolders[i].id, folders[i].id);
             QCOMPARE(restoredFolders[i].title, folders[i].title);
@@ -576,7 +615,8 @@ void CoreTests::folderModelIdentity()
     QVERIFY(!sent.isValid());
     QVERIFY(!model.update({"missing", "", 0}));
     QVERIFY(model.get(50).isEmpty());
-    QCOMPARE(model.roleNames().size(), 3);
+    QCOMPARE(model.roleNames().size(), 4);
+    QCOMPARE(model.roleNames().value(FolderListModel::SpecialUseRole), QByteArray("role"));
     model.clear();
     QCOMPARE(model.count(), 0);
 }

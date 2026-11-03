@@ -57,6 +57,11 @@ void SendService::submitDraft(const Draft &draft) {
             emit self->draftsChanged();
             if (result.state == SendResult::Accepted) {
                 self->setStatus(SendService::tr("SMTP server accepted this message · delivery not confirmed")); emit self->draftAccepted(id);
+                if (account.serverSavesSent) {
+                    self->m_sending = false;
+                    self->setStatus(SendService::tr("SMTP server accepted this message · server manages the Sent copy"));
+                    return;
+                }
                 self->m_tasks.run([transport = self->m_transport, self, account, raw] {
                     const auto folder = transport->sentFolder(account);
                     if (folder.isEmpty()) {

@@ -33,6 +33,7 @@ ApplicationWindow {
     property bool readerVisible: false
     property bool draftsVisible: false
     property bool showSummary: true
+    property bool showAvatars: false
     property bool groupThreads: true
     property bool showRichText: true
     MailSelection { id: mailSelection }
@@ -93,13 +94,14 @@ ApplicationWindow {
     function value(map, key) { return MailLabels.value(map, key) }
     function selectedIndex() {
         if (!hasMessage) return -1
-        return mail.messages.indexOf(mail.currentFolder, window.value(message, "uidValidity"), mail.selectedUid)
+        return mail.messages.indexOf(window.value(message, "folder") || mail.currentFolder, window.value(message, "uidValidity"), mail.selectedUid)
     }
     function mailboxTitle(folder) { return MailLabels.mailboxTitle(folder) }
     function folderIcon(id) { return MailLabels.folderIcon(id) }
     function draftStateLabel(state) { return MailLabels.draftStateLabel(state) }
     function folderTitle() {
         if (draftsVisible) return qsTr("Drafts")
+        if (mail.smartMailbox) return MailLabels.smartMailboxTitle(mail.smartMailbox)
         const folders = mail.folders || []
         for (let i = 0; i < folders.length; ++i)
             if (folders[i].id === mail.currentFolder) return mailboxTitle(folders[i])
@@ -116,13 +118,21 @@ ApplicationWindow {
         moreMenu.close(); listOptions.close(); window.detailsVisible = false; accountDialog.close()
         if (composer.visible && !composer.finishEditing()) return
         draftsVisible = false
-        if (scenario === "compose") {
+        if (scenario === "account-add") { accountDialog.addAccount(); return }
+        if (scenario === "flagged") { mail.selectSmartMailbox("flagged"); return }
+        if (scenario === "avatars") { window.showAvatars = true; return }
+        if (scenario === "more-menu") { moreMenu.openAtAnchor(); return }
+        if (scenario === "message-menu") { messagePane.showReviewMenu(); return }
+        if (["compose", "compose-close", "compose-emoji", "compose-font"].indexOf(scenario) >= 0) {
             const sample = mail.newDraft("new")
             if (!sample || !sample.id) return
             sample.to = "studio@example.invalid"
             sample.subject = qsTr("A few thoughts for Friday")
             sample.body = qsTr("Hi Maya,\n\nI like the quieter direction. A little more space to read, and fewer things competing for attention.\n\nLet's bring these ideas to our next review.\n\nTalk soon,\nAlex\n\n—\nSynthetic demo draft. Sending is disabled.")
             composer.editDraft(mail.saveDraft(sample))
+            if (scenario === "compose-close") Qt.callLater(() => composer.requestClose())
+            if (scenario === "compose-emoji") Qt.callLater(() => composer.showToolsReview("emoji"))
+            if (scenario === "compose-font") Qt.callLater(() => composer.showToolsReview("font"))
         }
         else if (scenario === "account") accountDialog.editAccount()
         else if (scenario === "details" && hasMessage) window.detailsVisible = true
@@ -148,7 +158,7 @@ ApplicationWindow {
             return false
         }
         if (composer.visible && !composer.persist()) {
-            composer.forceActiveFocus()
+            composer.requestActivate()
             return false
         }
         lifecycleNotice = ""
@@ -157,7 +167,7 @@ ApplicationWindow {
     onClosing: close => {
         if (composer.visible && !composer.persist()) {
             close.accepted = false
-            composer.forceActiveFocus()
+            composer.requestActivate()
             return
         }
         if (desktop && desktop.hideToTray()) {
@@ -432,6 +442,7 @@ ApplicationWindow {
                 draftsVisible: window.draftsVisible
                 groupThreads: window.groupThreads
                 showSummary: window.showSummary
+                showAvatars: window.showAvatars
                 visible: !window.narrow || !window.readerVisible
                 Layout.preferredWidth: window.listWidth
                 Layout.minimumWidth: window.narrow ? 260 : window.listWidth
@@ -439,6 +450,7 @@ ApplicationWindow {
                 Layout.fillWidth: window.narrow
                 Layout.fillHeight: true
                 onMessageOpened: window.readerVisible = true
+                onComposeRequested: function(mode) { window.compose(mode) }
                 onAddAccountRequested: accountDialog.editAccount()
                 onEditDraftRequested: function(draftId) { composer.editDraft(mail.loadDraft(draftId)) }
             }
@@ -455,6 +467,7 @@ ApplicationWindow {
                 compact: window.width < 1100
                 visible: !window.narrow || window.readerVisible
                 Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumWidth: 0
+                onDetailsRequested: window.detailsVisible = !window.detailsVisible
                 onCloseDetailsRequested: window.detailsVisible = false
                 onSaveAttachmentRequested: function(index) { saveAttachmentDialog.attachmentIndex = index; saveAttachmentDialog.open() }
                 onAddAccountRequested: accountDialog.editAccount()
@@ -603,6 +616,13 @@ ApplicationWindow {
                 onToggled: mail.unreadOnly = checked
             }
             LiquidCheckBox {
+                objectName: "senderInitialsCheck"
+                Layout.fillWidth: true
+                text: qsTr("Sender initials")
+                checked: window.showAvatars
+                onToggled: window.showAvatars = checked
+            }
+            LiquidCheckBox {
                 objectName: "groupThreadsCheck"
                 Layout.fillWidth: true
                 text: qsTr("按会话聚合")
@@ -652,7 +672,11 @@ ApplicationWindow {
         id: moreMenu
         objectName: "moreMessageMenu"
         LiquidPopoverItem {
+            objectName: "moreDisplayOptions"
             visible: readerHeader.compactOptions
+            // Menu's ListView retains invisible delegates; collapse the row too.
+            implicitHeight: readerHeader.compactOptions ? 30 : 0
+            height: implicitHeight
             text: qsTr("显示"); iconName: "sliders"
             onTriggered: { moreMenu.close(); listOptions.openAtAnchor() }
         }
@@ -697,7 +721,7 @@ ApplicationWindow {
             onTriggered: mail.toggleFlagged(window.selectedIndex())
         }
     }
-    MailComposer { id: composer; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
+    MailComposer { id: composer; mail: window.mail; hostWindow: window }
     AccountDialog { id: accountDialog; mail: window.mail; sourceItem: chromePlanes; hostWindow: window }
     LiquidDialog {
         id: deleteAccountDialog

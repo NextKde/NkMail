@@ -7,7 +7,7 @@ class FolderListModel final : public QAbstractListModel {
     Q_OBJECT
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 public:
-    enum Role { IdRole = Qt::UserRole + 1, TitleRole, TotalRole };
+    enum Role { IdRole = Qt::UserRole + 1, TitleRole, TotalRole, SpecialUseRole };
     Q_ENUM(Role)
     explicit FolderListModel(QObject *parent = nullptr);
     int rowCount(const QModelIndex &parent = {}) const override;

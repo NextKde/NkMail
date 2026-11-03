@@ -5,6 +5,7 @@ namespace nkmail {
 class MailTransport {
 public:
     virtual ~MailTransport() = default;
+    virtual void verifySmtp(const Account &account) { MailioBackend::verifySmtp(account); }
     virtual InboxStats inboxStats(const Account &account) { return MailioBackend::inboxStats(account); }
     virtual QList<Folder> folders(const Account &account) { return MailioBackend::folders(account); }
     virtual Page page(const Account &account, const QString &folder,

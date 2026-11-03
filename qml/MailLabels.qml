@@ -1,9 +1,19 @@
 pragma Singleton
 import QtQuick
 import Kos.Ui
+import "MailboxNavigation.js" as Navigation
 QtObject {
+    function smartMailboxTitle(kind) {
+        if (kind === "flagged") return qsTr("Flagged")
+        if (kind === "unread") return qsTr("Unread")
+        if (kind === "attachments") return qsTr("With attachments")
+        return ""
+    }
     function value(map, key) { return map && map[key] !== undefined ? String(map[key]) : "" }
     function mailboxTitle(folder) {
+        const role = Navigation.role(folder)
+        const labels = {all: qsTr("All mail"), inbox: qsTr("Inbox"), sent: qsTr("Sent"), drafts: qsTr("Server drafts"), archive: qsTr("Archive"), junk: qsTr("Junk"), trash: qsTr("Trash")}
+        if (labels[role]) return labels[role]
         if (String(folder.id).toUpperCase() === "INBOX") return qsTr("Inbox")
         const title = String(folder.title || folder.id || "")
         if (title === "Sent") return qsTr("Sent")
@@ -11,6 +21,10 @@ QtObject {
         if (title === "Junk") return qsTr("Junk")
         if (title === "Trash") return qsTr("Trash")
         return title
+    }
+    function mailboxIcon(folder) {
+        const icons = {all:"archive",inbox:"envelope",sent:"forward",drafts:"editRounded",archive:"archive",junk:"flag",trash:"trash"}
+        return icons[Navigation.role(folder)] || "folder"
     }
     function folderIcon(id) {
         const name = String(id || "").split(/[\/\\]/).pop().toLowerCase()

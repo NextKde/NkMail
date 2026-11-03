@@ -20,6 +20,7 @@ class RemoteImageLoader;
 class MailTransport;
 class MailController : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QObject* accountSetup READ accountSetup CONSTANT)
     Q_PROPERTY(QObject* messages READ messages CONSTANT)
     Q_PROPERTY(QVariantList folders READ folders NOTIFY foldersChanged)
     Q_PROPERTY(QVariantList drafts READ drafts NOTIFY draftsChanged)
@@ -39,6 +40,7 @@ class MailController : public QObject {
     Q_PROPERTY(bool demo READ demo CONSTANT)
     Q_PROPERTY(bool hasMore READ hasMore NOTIFY statusChanged)
     Q_PROPERTY(QString search READ search WRITE setSearch NOTIFY searchChanged)
+    Q_PROPERTY(QString smartMailbox READ smartMailbox NOTIFY folderChanged)
     Q_PROPERTY(bool unreadOnly READ unreadOnly WRITE setUnreadOnly NOTIFY unreadOnlyChanged)
     Q_PROPERTY(bool notifyEnabled READ notifyEnabled WRITE setNotifyEnabled NOTIFY notifyEnabledChanged)
     Q_PROPERTY(int refreshInterval READ refreshInterval WRITE setRefreshInterval NOTIFY refreshIntervalChanged)
@@ -49,6 +51,7 @@ public:
     explicit MailController(bool demo, const QString &dataRoot, QObject *parent = nullptr, std::shared_ptr<MailTransport> transport = {});
     ~MailController() override;
     QObject *messages() const;
+    QObject *accountSetup() const { return m_accountSetup; }
     QVariantList folders() const { return m_folders; }
     QVariantList drafts() const;
     QVariantList favorites() const;
@@ -65,6 +68,8 @@ public:
     // replacing each placeholder inline. Never touches the status bar; failures
     // become a local placeholder text.
     Q_INVOKABLE void loadRemoteImages();
+    QString smartMailbox() const { return m_smartMailbox; }
+    Q_INVOKABLE void selectSmartMailbox(const QString &kind);
     QString currentFolder() const { return m_folder; }
     QString status() const { return m_status; }
     QString error() const { return m_error; }
@@ -85,7 +90,7 @@ public:
     void setSendDelay(int seconds);
     bool sendPending() const;
     int accountUnreadRevision() const { return m_accountUnreadRevision; }
-    Q_INVOKABLE void configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
+    Q_INVOKABLE bool configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
     // Foreground account owns browsing/search. Background accounts poll inbox stats.
     Q_INVOKABLE void switchAccount(const QString &id);
     // Read-only cache probe: lists another account's folders without touching the
@@ -96,12 +101,13 @@ public:
     // account binding. folderUnread() reports the bound account; accountUnread()
     // reads another account's cache in place.
     Q_INVOKABLE QVariantMap folderUnread() const;
+    Q_INVOKABLE QVariantMap folderUnreadFor(const QString &accountId) const;
     Q_INVOKABLE int accountUnread(const QString &accountId) const;
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void searchServer();
     Q_INVOKABLE void selectFolder(const QString &folder);
     Q_INVOKABLE void loadMore();
-    Q_INVOKABLE void openMessage(const QString &uid, const QString &uidValidity);
+    Q_INVOKABLE void openMessage(const QString &uid, const QString &uidValidity, const QString &folder = {});
     Q_INVOKABLE QVariantMap newDraft(const QString &mode = QStringLiteral("new"));
     Q_INVOKABLE QVariantMap loadDraft(const QString &id);
     Q_INVOKABLE QVariantMap saveDraft(const QVariantMap &draft);
@@ -162,6 +168,7 @@ private:
     bool m_serverSearching = false; // Server search is in flight, but must not block paging.
     MailboxCommands *m_commands = nullptr;
     bool m_cachedOnly = true; // Query offsets stay local until a successful unfiltered header fetch.
+    QString m_smartMailbox;
     bool m_unreadOnly = false;
     bool m_notifyEnabled = true;
     int m_refreshInterval = 300; // Seconds, clamped to at least 60.
@@ -182,6 +189,7 @@ private:
     std::unique_ptr<MailDatabase> m_database;
     MessageListModel *m_messages = nullptr;
     AccountSession *m_credentials = nullptr;
+    QObject *m_accountSetup = nullptr;
     MailboxSync *m_sync = nullptr;
 };
 }

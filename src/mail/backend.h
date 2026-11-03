@@ -22,6 +22,7 @@ struct InboxStats {
 // the GUI thread. TLS verification is mandatory; no plaintext fallback/retry.
 class MailioBackend final {
 public:
+    static void verifySmtp(const Account &account);
     static InboxStats inboxStats(const Account &account);
     static QList<Folder> folders(const Account &account);
     static Page page(const Account &account, const QString &folder,
