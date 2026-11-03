@@ -138,7 +138,7 @@ LiquidDialog {
                 cornerRadius: height / 2
                 specificationForm: true
                 enabled: !root.submitting
-                readOnly: root.mail.demo || root.submitting
+                readOnly: root.submitting
                 Accessible.name: qsTr("Email")
                 placeholderText: qsTr("Enter you@example.com")
                 onTextEdited: providerChoice.currentIndex = Profiles.indexForAddress(text)

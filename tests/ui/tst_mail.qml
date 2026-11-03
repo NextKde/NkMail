@@ -710,6 +710,18 @@ TestCase {
         compare(App.MailLabels.mailboxIcon(sorted[2]), "folder")
     }
 
+    function test_demo_address_can_be_typed_and_detects_provider() {
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        const address = findChild(dialog, "accountAddress")
+        address.forceActiveFocus()
+        tryCompare(address, "activeFocus", true)
+        for (const character of "preview@gmail.com") keyClick(character)
+        compare(address.text, "preview@gmail.com")
+        compare(findChild(dialog, "providerChoice").provider, "google")
+        dialog.close()
+    }
+
     function test_provider_presets_and_no_false_oauth_support() {
         const expected = {icloud:"imap.mail.me.com",google:"imap.gmail.com",qq:"imap.qq.com",exmail:"imap.exmail.qq.com",
             "163":"imap.163.com","126":"imap.126.com",yahoo:"imap.mail.yahoo.com",aol:"imap.aol.com"}

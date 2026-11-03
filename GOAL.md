@@ -1,5 +1,10 @@
 # NkMail local delivery goal
 
+## Editable demo email address · 2026-11-03
+
+- Removed demo-only readOnly from the email field so the interactive preview accepts typing and detects providers. Submission lock remains; demo credentials/network/send restrictions remain in place.
+- Keyboard-entry regression verifies typed Gmail address and automatic preset selection. UI suite passed (11.46s); rebuilt interactive preview replaced.
+
 ## Account address input layout · 2026-11-03
 
 - Removed the indented SettingsGroup label/row for email. A left-aligned heading now sits over one full-width shared text field, with Chinese placeholder `请输入you@example.com`. The same address field continues to drive provider selection and saved configuration.
