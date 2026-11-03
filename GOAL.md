@@ -4,7 +4,8 @@
 
 - Created a single integration branch from current main (27c884a), folding in the full provider-presets stack through 2240831 as one change. The existing main sidebar-heading correction is retained. Original branches and PRs remain intact until integration is accepted.
 - UI gitlink/lock remain e2592b2742c58c1bd797a8bcfa2a3ae7da4affd8. No component upgrade or real mailbox operation.
-- Pending: dependency guard and full validation in the VM, main-targeted integration PR and required remote release-gate. No host compilation, GUI execution or tests for this integration.
+- Fresh default-source Release build in the VM succeeded. Dependency gate and all 32 dependency-guard tests passed; full CTest passed 8/8 in 76.23s (CLI, UI, i18n, catalogs, tray, core, controller and synthetic loopback protocol). No host compilation, GUI execution or tests for this integration.
+- Integration PR: https://github.com/NextKde/NkMail/pull/17 targets main. Required remote release-gate remains the merge gate; do not close original PRs #7–#16 until this integration is merged.
 
 ## Composer public controls and glyph correction · 2026-11-03
 
