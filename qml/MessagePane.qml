@@ -12,6 +12,7 @@ Rectangle {
     property bool draftsVisible: false
     property bool groupThreads: true
     property bool showSummary: true
+    property bool showAvatars: false
     readonly property color ink: AppTheme.text
     readonly property color muted: AppTheme.mutedText
     readonly property color rule: AppTheme.border
@@ -182,9 +183,21 @@ Rectangle {
                     }
                 }
                 contentItem: Item {
+                    Rectangle {
+                        visible: root.showAvatars
+                        x: 24; y: 12; width: 28; height: 28; radius: 14
+                        color: messageRow.selected ? Qt.rgba(1, 1, 1, 0.22) : MailStyle.avatar
+                        Text {
+                            anchors.centerIn: parent
+                            text: (messageRow.sender || messageRow.senderAddress || "?").trim().slice(0, 1).toUpperCase()
+                            color: messageRow.selected ? "white" : AppTheme.accent
+                            font.pixelSize: 13; font.weight: Font.DemiBold
+                            textFormat: Text.PlainText
+                        }
+                    }
                     Rectangle { x: 12; y: 14; width: 6; height: 6; radius: 3; color: messageRow.rowAccent; visible: messageRow.unread }
                     ColumnLayout {
-                        anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; anchors.topMargin: 7; anchors.bottomMargin: 7
+                        anchors.fill: parent; anchors.leftMargin: root.showAvatars ? 60 : 24; anchors.rightMargin: 24; anchors.topMargin: 7; anchors.bottomMargin: 7
                         spacing: 3
                         RowLayout {
                             Layout.fillWidth: true

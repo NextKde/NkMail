@@ -1,5 +1,9 @@
 # NkMail local delivery goal
 
+## Optional sender initials · 2026-11-03
+
+- Added locally generated initials behind a Display option with per-profile persistence, preserving compact row height and selection geometry. Local CLI/UI/catalog checks passed; Wayland synthetic screenshot inspected. Continuing account wizard, navigation and reader header.
+
 ## Message context actions · 2026-11-03
 
 - Added reply/reply-all/forward group to the existing liquid context menu. Compose actions require matching loaded UID and UIDVALIDITY and are unavailable during sending or multi-selection. Existing command service handles single/batch read, flag, move, archive and delete through the same bulk entry points. Right-click outside the selection clears stale batch targets.

@@ -140,6 +140,7 @@ int main(int argc, char **argv) {
         restored.moveLeft(qBound(available.left(), restored.x(), available.right() - restored.width() + 1));
         restored.moveTop(qBound(available.top(), restored.y(), available.bottom() - restored.height() + 1));
         window->setGeometry(restored);
+        window->setProperty("showAvatars", windowSettings->value("showAvatars", false));
         normalGeometry = restored;
         maximized = windowSettings->value("maximized", false).toBool();
         if (maximized) window->showMaximized();
@@ -149,6 +150,7 @@ int main(int argc, char **argv) {
             windowSettings->setValue("maximized", maximized);
             windowSettings->setValue("sidebarWidth", window->property("sidebarPreferredWidth"));
             windowSettings->setValue("listWidth", window->property("listPreferredWidth"));
+            windowSettings->setValue("showAvatars", window->property("showAvatars"));
             windowSettings->sync();
             QFile::setPermissions(windowSettings->fileName(), QFileDevice::ReadOwner | QFileDevice::WriteOwner);
         };
@@ -167,6 +169,7 @@ int main(int argc, char **argv) {
             else if (visibility == QWindow::Windowed) maximized = false;
             preferenceSave.start();
         });
+        QQmlProperty(window, "showAvatars").connectNotifySignal(&preferenceSave, SLOT(start()));
         // QQmlProperty bridges QML-generated notify signals to the debounce timer.
         QQmlProperty(window, "sidebarPreferredWidth").connectNotifySignal(&preferenceSave, SLOT(start()));
         QQmlProperty(window, "listPreferredWidth").connectNotifySignal(&preferenceSave, SLOT(start()));

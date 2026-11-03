@@ -33,6 +33,7 @@ ApplicationWindow {
     property bool readerVisible: false
     property bool draftsVisible: false
     property bool showSummary: true
+    property bool showAvatars: false
     property bool groupThreads: true
     property bool showRichText: true
     MailSelection { id: mailSelection }
@@ -116,6 +117,7 @@ ApplicationWindow {
         moreMenu.close(); listOptions.close(); window.detailsVisible = false; accountDialog.close()
         if (composer.visible && !composer.finishEditing()) return
         draftsVisible = false
+        if (scenario === "avatars") { window.showAvatars = true; return }
         if (scenario === "message-menu") { messagePane.showReviewMenu(); return }
         if (scenario === "compose") {
             const sample = mail.newDraft("new")
@@ -432,6 +434,7 @@ ApplicationWindow {
                 draftsVisible: window.draftsVisible
                 groupThreads: window.groupThreads
                 showSummary: window.showSummary
+                showAvatars: window.showAvatars
                 visible: !window.narrow || !window.readerVisible
                 Layout.preferredWidth: window.listWidth
                 Layout.minimumWidth: window.narrow ? 260 : window.listWidth
@@ -603,6 +606,13 @@ ApplicationWindow {
                 text: qsTr("Unread messages only (cached)")
                 checked: mail.unreadOnly
                 onToggled: mail.unreadOnly = checked
+            }
+            LiquidCheckBox {
+                objectName: "senderInitialsCheck"
+                Layout.fillWidth: true
+                text: qsTr("Sender initials")
+                checked: window.showAvatars
+                onToggled: window.showAvatars = checked
             }
             LiquidCheckBox {
                 objectName: "groupThreadsCheck"
