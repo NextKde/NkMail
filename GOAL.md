@@ -1,5 +1,9 @@
 # NkMail local delivery goal
 
+## iCloud logo clarity · 2026-11-03
+
+- Replaced the low-resolution ICO with Apple’s 180×180 touch icon, resolving its URL against the iCloud page’s HTML base. Display geometry stays unchanged; the bundled asset remains offline. Host build and UI regression passed (11.19s); updated screenshot inspected.
+
 ## Provider icon sizing correction · 2026-11-03
 
 - Unified the icon column to 28px and enlarged Other's envelope to 28px. NetEase wordmarks now show only the numeric brand portion within a 24px square tile, removing long taglines and domain names.

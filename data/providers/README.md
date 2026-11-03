@@ -4,7 +4,7 @@ Bundled for offline provider identification in account setup, retrieved 2026-11-
 
 | File | Source |
 |---|---|
-| icloud.ico | https://www.icloud.com/favicon.ico |
+| icloud.png | https://www.icloud.com/system/icloud.com/2640Build24/favicons/default-favicon-light-180x180.png (180px apple-touch-icon linked by https://www.icloud.com, resolved against its HTML base URL) |
 | google.svg | https://www.gstatic.com/images/branding/productlogos/gmail_2026/v2/web/192px.svg (linked by https://workspace.google.com/intl/en-US/gmail/) |
 | qq.png | https://res.wx.qq.com/t/webmail/webmail/res/images/qqmail_favicon_96h.8d124a7.png (linked by https://mail.qq.com) |
 | exmail.ico | https://exmail.qq.com/exmail_logo.ico |

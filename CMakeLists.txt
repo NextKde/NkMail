@@ -37,7 +37,7 @@ qt_add_lrelease(nkmail
 qt_add_resources(nkmail nkmail_translations PREFIX "/i18n"
     BASE "${CMAKE_CURRENT_BINARY_DIR}" FILES ${NKMAIL_QM_FILES})
 set(NKMAIL_PROVIDER_LOGOS
-    data/providers/icloud.ico data/providers/google.svg data/providers/qq.png
+    data/providers/icloud.png data/providers/google.svg data/providers/qq.png
     data/providers/exmail.ico data/providers/163.png data/providers/126.png
     data/providers/yahoo.png data/providers/aol.png data/providers/microsoft.ico)
 qt_add_resources(nkmail nkmail_provider_logos PREFIX "/" FILES ${NKMAIL_PROVIDER_LOGOS})
