@@ -90,6 +90,7 @@ public:
     void setSendDelay(int seconds);
     bool sendPending() const;
     int accountUnreadRevision() const { return m_accountUnreadRevision; }
+    Q_INVOKABLE bool configureGoogleAccount(const QString &existingId = {});
     Q_INVOKABLE bool configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
     // Foreground account owns browsing/search. Background accounts poll inbox stats.
     Q_INVOKABLE void switchAccount(const QString &id);
@@ -147,6 +148,7 @@ signals:
     void accountUnreadChanged();
     void draftAccepted(const QString &id);
 private:
+    bool configureAccountImpl(const QVariantMap &configuration, const QString &credential, bool remember);
     void initialize();
     void seedDemo();
     void loadCached(bool append = false);

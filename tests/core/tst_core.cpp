@@ -48,6 +48,19 @@ Page page(QList<Summary> messages, QString generation = QStringLiteral("100"))
 class CoreTests : public QObject {
     Q_OBJECT
 private slots:
+    void oauthAccountMetadataNeverSerializesRefreshCredentials() {
+        Account account; account.authMethod = "google_oauth";
+        account.address = account.username = "reader@example.invalid";
+        account.password = R"({"type":"google_oauth","refresh_token":"SYNTHETIC-REFRESH-MUST-NOT-REACH-SQLITE"})";
+        const auto serialized = accountMap(account);
+        QCOMPARE(serialized.value("authMethod").toString(), "google_oauth");
+        QVERIFY(!QJsonDocument::fromVariant(serialized).toJson().contains("SYNTHETIC-REFRESH"));
+        const auto restored = accountFromMap(serialized);
+        QVERIFY(restored.password.isEmpty()); QCOMPARE(restored.authMethod, account.authMethod);
+        QTemporaryDir root(temporaryTemplate()); MailDatabase db; QVERIFY(db.open(root.path()));
+        QVERIFY(db.saveAccount(account)); QCOMPARE(db.account().authMethod, account.authMethod);
+        QVERIFY(db.account().password.isEmpty());
+    }
     void browserHtmlPreservesLayoutButNotActiveContent() {
         const auto html = sanitizeBrowserMailHtml(QStringLiteral(
             "<style>.card{padding:24px;background:#f5f5f5}</style>"

@@ -32,6 +32,12 @@ LiquidDialog {
     property int step: 0
     property bool advanced: false
     property string setupError: ""
+    property bool googleMode: false
+    property bool useAppPassword: false
+    property string googleIdentity: ""
+    readonly property bool googleProvider: providerChoice.provider === "google"
+    readonly property bool googleAvailable: !!setup && setup.googleConfigured === true
+    readonly property bool googleSavePending: googleMode && !!setup && setup.googleAuthorized === true
     readonly property var setup: mail.accountSetup || null
     function nextStep() {
         if (!providerChoice.available) return
@@ -44,7 +50,14 @@ LiquidDialog {
         serverSavesSent.checked = preset.serverSavesSent
         step = 1
     }
+    function beginGoogleSignIn() {
+        if (!root.googleAvailable || root.mail.demo || root.submitting) return
+        if (root.googleSavePending) { root.save(); return }
+        setupError = ""; googleMode = true; useAppPassword = false; submitting = true
+        setup.beginGoogleSignIn(addressField.text.trim())
+    }
     function validateConnection() {
+        googleMode = false
         if (!setup || submitting || !valid()) return
         setupError = ""; submitting = true
         setup.verify(configuration(), passwordField.text)
@@ -55,6 +68,7 @@ LiquidDialog {
         return map[key] !== undefined ? String(map[key]) : fallback || ""
     }
     function editAccount(account) {
+        googleMode = false; useAppPassword = false; googleIdentity = ""
         // No argument keeps the historical behaviour (edit the active account or
         // start a new one). A passed account map pre-fills those fields and keeps
         // its id in `original`, so save() edits that record instead of creating one.
@@ -70,11 +84,12 @@ LiquidDialog {
         smtpTls.checked = !!original.smtpStartTls
         caField.text = field(original, "caFile")
         passwordField.text = ""
-        providerChoice.currentIndex = Profiles.indexForAddress(addressField.text)
+        providerChoice.currentIndex = original.authMethod === "google_oauth" ? Profiles.ids.indexOf("google") : Profiles.indexForAddress(addressField.text)
         serverSavesSent.checked = !!original.serverSavesSent
         rememberPassword.checked = false
         submitting = false
-        setupError = ""; advanced = false; step = 1
+        setupError = ""; advanced = false
+        step = !root.mail.demo && (original.authMethod === "google_oauth" || Profiles.forAddress(addressField.text) === "google") ? 0 : 1
         open()
     }
     function addAccount() {
@@ -99,7 +114,8 @@ LiquidDialog {
     }
     function save() {
         submitting = true
-        const saved = mail.configureAccount(configuration(), passwordField.text, rememberPassword.checked)
+        const saved = googleMode ? mail.configureGoogleAccount(original.id || "")
+            : mail.configureAccount(configuration(), passwordField.text, rememberPassword.checked)
         passwordField.text = ""
         // configureAccount returns its persistence result synchronously. A busy
         // mailbox can reject it; unrelated sync must never leave this dialog locked.
@@ -107,12 +123,18 @@ LiquidDialog {
         if (saved) step = 2
         else setupError = mail.error || qsTr("Account could not be saved. Please retry.")
     }
-    onClosed: { passwordField.text = ""; submitting = false }
+    onClosed: {
+        passwordField.text = ""; submitting = false
+        if (setup && typeof setup.cancelGoogleSignIn === "function") setup.cancelGoogleSignIn()
+    }
     Connections {
         target: root.setup
         function onFinished(success, error) {
             if (!root.submitting) return
-            if (success) root.save()
+            if (success) {
+                if (root.googleMode) root.googleIdentity = root.setup.googleAccount.address || ""
+                root.save()
+            }
             else { root.submitting = false; root.setupError = error; passwordField.text = "" }
         }
     }
@@ -128,12 +150,13 @@ LiquidDialog {
             width: accountScroll.availableWidth
             spacing: 10
             Text {
+                visible: root.mail.demo || !root.googleProvider || root.step === 1
                 text: root.mail.demo ? qsTr("Example account · synthetic data only. Account changes and sending are disabled in demo mode.")
                     : qsTr("Use the password or app password required by your email provider.")
                 color: AppTheme.mutedText; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap
             }
             Text {
-                visible: root.step < 2
+                visible: root.step < 2 && (root.step !== 0 || !root.googleProvider)
                 text: root.step === 0 ? qsTr("Enter your email address") : qsTr("Email")
                 Layout.fillWidth: true
                 color: AppTheme.text
@@ -143,7 +166,7 @@ LiquidDialog {
             KosTextField {
                 id: addressField
                 objectName: "accountAddress"
-                visible: root.step < 2
+                visible: root.step < 2 && (root.step !== 0 || !root.googleProvider)
                 Layout.fillWidth: true
                 implicitHeight: MailStyle.fieldHeight
                 cornerRadius: height / 2
@@ -177,8 +200,27 @@ LiquidDialog {
             }
             Text {
                 visible: root.step === 1
-                text: providerChoice.guidance
+                text: root.useAppPassword && root.googleProvider
+                    ? qsTr("Use a Google app password generated after enabling two-step verification.") : providerChoice.guidance
                 Layout.fillWidth: true; wrapMode: Text.Wrap; font.pixelSize: 11; color: AppTheme.mutedText
+            }
+            Text {
+                objectName: "googleUnavailableHint"
+                visible: root.step === 0 && root.googleProvider && !root.googleAvailable
+                text: qsTranslate("GoogleOAuth", "Google sign-in is unavailable in this build. Contact the application distributor.")
+                Layout.fillWidth: true; wrapMode: Text.Wrap; font.pixelSize: 11; color: AppTheme.mutedText
+            }
+            KosButton {
+                objectName: "googleAppPasswordOption"
+                visible: root.step === 0 && root.googleProvider && !root.submitting
+                text: qsTr("Use an app password instead")
+                flat: true
+                onClicked: { root.googleMode = false; root.useAppPassword = true; root.nextStep() }
+            }
+            Text {
+                visible: root.step === 2 && root.googleIdentity.length > 0
+                text: qsTr("Signed in as %1").arg(root.googleIdentity)
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: AppTheme.mutedText
             }
             LiquidCheckBox {
                 id: serverSavesSent
@@ -201,7 +243,8 @@ LiquidDialog {
             }
             Text {
                 visible: root.submitting
-                text: root.setup && root.setup.stage === "smtp" ? qsTr("Checking outgoing server…") : qsTr("Checking incoming server…")
+                text: root.setup && root.setup.stage === "google" ? qsTr("Finish signing in with Google in your browser…")
+                    : root.setup && root.setup.stage === "smtp" ? qsTr("Checking outgoing server…") : qsTr("Checking incoming server…")
                 color: AppTheme.mutedText; Layout.fillWidth: true
             }
             Text { visible: root.setupError.length > 0; text: root.setupError; color: AppTheme.destructive; Layout.fillWidth: true; wrapMode: Text.Wrap }
@@ -245,7 +288,7 @@ LiquidDialog {
             spacing: 8
             LiquidDialogButton { text: qsTr("Disconnect"); destructive: true; visible: root.mail.configured && !root.mail.demo; enabled: !root.submitting && !root.mail.sending; onClicked: { root.mail.disconnectAccount(); root.close() } }
             Item { Layout.fillWidth: true }
-            LiquidDialogButton { text: root.mail.demo || root.step === 2 ? qsTr("Done") : qsTr("Cancel"); enabled: !root.submitting; onClicked: root.close() }
+            LiquidDialogButton { text: root.mail.demo || root.step === 2 ? qsTr("Done") : qsTr("Cancel"); enabled: !root.submitting || (root.googleMode && root.setup && root.setup.stage === "google"); onClicked: root.close() }
             LiquidDialogButton {
                 text: qsTr("Back")
                 visible: root.step === 1 && !root.original.id
@@ -253,10 +296,12 @@ LiquidDialog {
                 onClicked: root.step = 0
             }
             LiquidDialogButton {
-                text: qsTr("Continue")
+                objectName: "googleSignInButton"
+                text: root.googleProvider ? (root.googleSavePending ? qsTr("Save account") : qsTr("Sign in with Google")) : qsTr("Continue")
                 visible: root.step === 0
-                enabled: providerChoice.available && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addressField.text.trim())
-                onClicked: root.nextStep()
+                enabled: !root.submitting && !root.mail.busy && !root.mail.sending && (root.googleProvider ? (root.googleAvailable && !root.mail.demo)
+                    : providerChoice.available && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addressField.text.trim()))
+                onClicked: root.googleProvider ? root.beginGoogleSignIn() : root.nextStep()
             }
             LiquidDialogButton {
                 objectName: "connectAccountButton"

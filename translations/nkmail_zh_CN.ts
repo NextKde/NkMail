@@ -224,6 +224,30 @@
             <source>Verify and save</source>
             <translation>验证并保存</translation>
         </message>
+        <message>
+            <source>Finish signing in with Google in your browser…</source>
+            <translation>请在浏览器中完成 Google 登录…</translation>
+        </message>
+        <message>
+            <source>Sign in with Google</source>
+            <translation>使用 Google 账号登录</translation>
+        </message>
+        <message>
+            <source>Signed in as %1</source>
+            <translation>已登录：%1</translation>
+        </message>
+        <message>
+            <source>Use a Google app password generated after enabling two-step verification.</source>
+            <translation>请使用开启两步验证后生成的 Google 应用专用密码。</translation>
+        </message>
+        <message>
+            <source>Use an app password instead</source>
+            <translation>改用应用专用密码</translation>
+        </message>
+        <message>
+            <source>Save account</source>
+            <translation>保存账号</translation>
+        </message>
     </context>
     <context>
         <name>MailComposer</name>
@@ -828,6 +852,18 @@
             <location filename="../src/storage/MailDatabase.cpp" line="753" />
             <source>Draft not found or send state transition is unsafe</source>
             <translation>未找到草稿，或发送状态转换不安全</translation>
+        </message>
+        <message>
+            <source>Google authorization needs attention. Sign in with Google again.</source>
+            <translation>Google 授权需要处理，请重新使用 Google 账号登录。</translation>
+        </message>
+        <message>
+            <source>Google authorization requires the standard secure Gmail servers.</source>
+            <translation>Google 授权必须使用标准的 Gmail 安全服务器。</translation>
+        </message>
+        <message>
+            <source>Unsupported account authentication method.</source>
+            <translation>不支持此账号的认证方式。</translation>
         </message>
     </context>
     <context>
@@ -1591,11 +1627,6 @@ Alex
             <translation>暂未提供 Microsoft OAuth 和原生 Exchange 接入，浏览器登录需要先注册应用。</translation>
         </message>
         <message>
-            <location filename="../qml/ProviderPicker.qml" line="14" />
-            <source>Gmail uses IMAP here. Enable two-step verification and use a Google app password; your normal Google password is not accepted. Google browser sign-in and POP are not supported yet.</source>
-            <translation>此处通过 IMAP 连接 Gmail。请开启两步验证并使用 Google 应用专用密码，普通 Google 密码无法用于此连接。目前尚不支持 Google 网页授权登录和 POP。</translation>
-        </message>
-        <message>
             <location filename="../qml/ProviderPicker.qml" line="16" />
             <source>Enable IMAP/SMTP in your webmail settings and use the client authorization code when required.</source>
             <translation>请在网页版邮箱设置中开启 IMAP/SMTP，按服务商要求使用客户端授权码。</translation>
@@ -1619,6 +1650,10 @@ Alex
             <location filename="../qml/ProviderPicker.qml" line="40" />
             <source> · Not available yet</source>
             <translation> · 暂未支持</translation>
+        </message>
+        <message>
+            <source>Sign in with Google in your system browser. NkMail does not receive your Google password.</source>
+            <translation>请在系统浏览器中使用 Google 账号登录。NkMail 不会接收你的 Google 密码。</translation>
         </message>
     </context>
     <context>
@@ -2037,6 +2072,10 @@ Alex
             <source>Updating messages…</source>
             <translation>正在更新邮件…</translation>
         </message>
+        <message>
+            <source>Sign in with Google to reconnect this account.</source>
+            <translation>请使用 Google 账号登录以重新连接此邮箱。</translation>
+        </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
@@ -2184,6 +2223,65 @@ Alex
             <location filename="../src/services/SendService.cpp" line="93" />
             <source>Send cancelled</source>
             <translation>已撤销发送</translation>
+        </message>
+    </context>
+    <context>
+        <name>GoogleOAuth</name>
+        <message>
+            <source>Authorization received. You may return to NkMail.</source>
+            <translation>已收到授权，请返回 NkMail。</translation>
+        </message>
+        <message>
+            <source>Could not contact Google securely. Check your connection and try again.</source>
+            <translation>无法安全连接 Google，请检查网络后重试。</translation>
+        </message>
+        <message>
+            <source>Could not open the local Google sign-in callback.</source>
+            <translation>无法启动本地 Google 登录回调。</translation>
+        </message>
+        <message>
+            <source>Could not open the system browser for Google sign-in.</source>
+            <translation>无法打开系统浏览器进行 Google 登录。</translation>
+        </message>
+        <message>
+            <source>Google authorization has expired or was revoked. Sign in with Google again.</source>
+            <translation>Google 授权已过期或被撤销，请重新使用 Google 账号登录。</translation>
+        </message>
+        <message>
+            <source>Google did not authorize this account. Check the account or organization policy and try again.</source>
+            <translation>Google 未授权此账号，请检查账号或组织政策后重试。</translation>
+        </message>
+        <message>
+            <source>Google did not grant the required mail permission and offline access. Try signing in again.</source>
+            <translation>Google 未授予所需的邮件权限和离线访问权限，请重新登录授权。</translation>
+        </message>
+        <message>
+            <source>Google did not return a verified email address.</source>
+            <translation>Google 未返回已验证的邮箱地址。</translation>
+        </message>
+        <message>
+            <source>Google rejected this application's sign-in configuration. Contact the application distributor.</source>
+            <translation>Google 拒绝了此应用的登录配置，请联系应用发布者。</translation>
+        </message>
+        <message>
+            <source>Google returned an invalid authorization response.</source>
+            <translation>Google 返回的授权响应无效。</translation>
+        </message>
+        <message>
+            <source>Google sign-in is unavailable in this build. Contact the application distributor.</source>
+            <translation>此版本尚未配置 Google 登录，请联系应用发布者。</translation>
+        </message>
+        <message>
+            <source>Google sign-in timed out. Try again.</source>
+            <translation>Google 登录已超时，请重试。</translation>
+        </message>
+        <message>
+            <source>Google sign-in was cancelled.</source>
+            <translation>已取消 Google 登录。</translation>
+        </message>
+        <message>
+            <source>This sign-in response could not be accepted.</source>
+            <translation>无法接受此登录响应。</translation>
         </message>
     </context>
 </TS>

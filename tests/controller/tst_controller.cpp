@@ -4,6 +4,7 @@
 #include "mail/MailTransport.h"
 #include "services/AccountSession.h"
 #include "services/AccountSetup.h"
+#include "auth/GoogleOAuth.h"
 #include "services/RemoteImageLoader.h"
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -273,6 +274,29 @@ private slots:
         QCOMPARE(setup.stage(), QString("failed"));
     }
 
+    void googleAuthorizationUsesSharedSetupAndKeychainWithoutSerializingTokens() {
+        QTemporaryDir root(temporaryTemplate());
+        MailController controller(false, root.path());
+        QTRY_COMPARE(controller.status(), QString("Add your email account to get started"));
+        auto *setup = qobject_cast<AccountSetup *>(controller.accountSetup()); QVERIFY(setup);
+        auto *flow = setup->findChild<GoogleOAuthFlow *>(); QVERIFY(flow);
+        const auto credential = GoogleTokens::credential("oauth-user@example.invalid", "SYNTHETIC-REFRESH-NOT-IN-DATABASE", "fixture.apps.googleusercontent.com");
+        flow->granted("oauth-user@example.invalid", credential);
+        QVERIFY(setup->googleAuthorized());
+        QCOMPARE(synthetic::folderCalls.load(), 0); QCOMPARE(synthetic::sendCalls.load(), 0);
+        QVERIFY(controller.configureGoogleAccount());
+        QCOMPARE(controller.accounts().size(), 1);
+        const auto metadata = controller.accounts().first().toMap();
+        QCOMPARE(metadata.value("authMethod").toString(), QString("google_oauth"));
+        QVERIFY(!QJsonDocument::fromVariant(metadata).toJson().contains("SYNTHETIC-REFRESH"));
+        QTRY_COMPARE(synthetic::credentialWrites.load(), 1);
+        QVERIFY(synthetic::credentialWriteKeys.last().contains(":google-oauth:profile-"));
+        QVERIFY(!setup->googleAuthorized());
+        QCOMPARE(synthetic::sendCalls.load(), 0);
+        MailDatabase db; QVERIFY(db.open(root.path(), "oauth-user@example.invalid"));
+        const auto saved = db.account(); QCOMPARE(saved.authMethod, QString("google_oauth"));
+        QVERIFY(saved.password.isEmpty());
+    }
     void selectedLegacyCacheUpgradesOnceWithoutDiscardingFallback() {
         QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
         {

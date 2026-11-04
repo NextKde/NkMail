@@ -9,7 +9,7 @@
 | 提供商 | IMAP（隐式 TLS，993） | SMTP | 认证范围 |
 |---|---|---|---|
 | iCloud | imap.mail.me.com | smtp.mail.me.com:587 STARTTLS | 应用专用密码 |
-| Google / Gmail | imap.gmail.com | smtp.gmail.com:465 隐式 TLS | 允许应用密码的账户；受组织政策限制的账户可能必须 OAuth |
+| Google / Gmail | imap.gmail.com | smtp.gmail.com:465 隐式 TLS | 项目统一的 Google OAuth；账户允许时也可选应用密码 |
 | QQ | imap.qq.com | smtp.qq.com:465 隐式 TLS | 开启 IMAP/SMTP，使用授权码 |
 | 腾讯企业邮箱 | imap.exmail.qq.com | smtp.exmail.qq.com:465 隐式 TLS | 管理员允许客户端协议；按账户策略使用客户端密码/授权码 |
 | 163 | imap.163.com | smtp.163.com:465 隐式 TLS | 开启客户端协议及授权码 |
@@ -18,11 +18,11 @@
 | AOL | imap.aol.com | smtp.aol.com:465 隐式 TLS | 应用专用密码 |
 | 其他邮箱 | 用户填写 | 用户填写 | 当前支持的 IMAP/SMTP 密码认证 |
 
-Microsoft / Exchange 入口明确标为尚未支持，禁止进入密码验证。用户已选择先完成不依赖 OAuth 注册的部分。
+Microsoft / Exchange 入口明确标为尚未支持，禁止进入密码验证。Microsoft OAuth 尚未实现。
 
 ## 不止是填服务器
 
-- 保存之前分别验证 IMAP 与 SMTP 登录，不通过发送邮件来验证 SMTP。
+- 密码接入保存前分别验证 IMAP 与 SMTP 登录，不通过发送邮件来验证 SMTP。Google OAuth 在浏览器确认身份后保存，邮件协议连接由后续同步处理。
 - 所有接入复用同一接收/正文净化/附件/回复转发/SMTP 发送服务；提供商预设不另建一套发送逻辑。
 - 能力协商：仅服务器声明 ID 时发送 RFC 2971 客户端标识，仅包含静态 NkMail 名称，不发送用户/设备标识。可选 ID 被服务器拒绝不阻断后续标准协议。
 - 服务器 `\Sent` 优先于文件夹名字，用于本地化/自定义已发送文件夹；`\All` 显示为所有邮件，可作为归档目的地。
@@ -36,11 +36,10 @@ Microsoft / Exchange 入口明确标为尚未支持，禁止进入密码验证�
 
 未使用真实提供商账户验证登录、接收或实际送达；不能把 loopback 通过标为每家服务商实测通过。服务商账户策略、授权码有效性、组织限制需要后续专用测试账户验证。
 
-## 后续 OAuth / Exchange 配置
+## OAuth / Exchange 配置
 
-- Google：项目所有者创建桌面 OAuth 客户端，配置同意屏幕、测试用户及适用的发布验证；后续实现系统浏览器 + PKCE + loopback 回调、令牌更新和钥匙串存储，再接入 SASL XOAUTH2。需要 NkMail 自己的公开客户端 ID，不借用其他客户端身份。
-- Microsoft：项目所有者注册 Entra 公共客户端，确定个人/组织账户及租户范围；配置委托 IMAP.AccessAsUser.All、SMTP.Send 与 offline_access，按租户策略完成授权。后续实现令牌生命周期和 XOAUTH2。该通路是 Exchange Online IMAP/SMTP，并不等同于完整原生 Exchange 接口；自建 Exchange 仍需明确版本和协议。
-- 当前代码没有 OAuth 登录或刷新令牌实现，不将“待配置客户端 ID”包装为已经完成 OAuth。
+- Google：已实现系统浏览器、PKCE、loopback 回调、刷新令牌及钥匙串存储，IMAP/SMTP 使用 SASL XOAUTH2。客户端身份由项目构建统一提供，不借用其他邮件客户端身份。普通用户只需登录并授权。项目配置、测试模式和发布审核见 [Google OAuth](GOOGLE_OAUTH.md)。
+- Microsoft：仍需 Entra 公共客户端、委托 IMAP.AccessAsUser.All、SMTP.Send 与 offline_access，以及对应令牌生命周期实现。该通路不等同于完整原生 Exchange 接口。
 
 ## 参数与行为来源
 
@@ -54,7 +53,7 @@ Microsoft / Exchange 入口明确标为尚未支持，禁止进入密码验证�
 
 ## Gmail 登录诊断 · 2026-11-04
 
-Gmail 同时提供 IMAP 和 POP；启用 POP 不会让账户变成只能使用 POP。当前 NkMail 的接收协议为 IMAP，没有 POP 客户端实现，也没有 Google OAuth / 网页授权登录。Google 预设使用 imap.gmail.com:993 和 smtp.gmail.com:465。
+Gmail 同时提供 IMAP 和 POP；启用 POP 不会让账户变成只能使用 POP。当前 NkMail 的接收协议为 IMAP，没有 POP 客户端实现；现已补上 Google OAuth / 网页授权登录。Google 预设使用 imap.gmail.com:993 和 smtp.gmail.com:465。
 
 Google 当前的客户端接入说明要求使用“使用 Google 账号登录”，或在账户允许时，开启两步验证并生成应用专用密码。普通 Google 账户密码不能直接替代应用专用密码。其他邮箱能否使用普通密码取决于服务商政策，因此通用表单使用“密码 / 授权码”，提供商说明再明确具体要求。
 

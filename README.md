@@ -6,15 +6,29 @@ A native Qt Quick mail client for NextKde. The interface takes cues from macOS M
 
 ## Current scope
 
-Multiple accounts with application-password authentication, folders, paginated headers,
+Multiple accounts with Google OAuth or application-password authentication, folders, paginated headers,
 on-demand sanitized reading, opt-in remote images, cached/server search, attachments,
 durable drafts, compose/reply/reply-all/forward, delayed SMTP submission and Sent copies.
 Flag changes and targeted delete/move commands are supported. Delete/move requires
 UIDPLUS; unsupported servers are rejected before any write. A partial server operation
-is reported for reconciliation, never automatically retried. No OAuth, IDLE or background
+is reported for reconciliation, never automatically retried. No IDLE or background
 daemon. Server acceptance is not delivery; uncertain sends remain non-resendable.
 
 Mailio is a protocol/MIME library, not a complete application backend. NkMail supplies the application state, cache, credentials, UI and workflows. The vendored dependency includes the documented [TLS verification and PEEK patch](patches/mailio/0001-verified-tls-peek-timeouts.patch); its loopback acceptance tests do not by themselves prove real-provider compatibility.
+
+## Google sign-in
+
+Choose Google and click **Sign in with Google**. Authorization opens in the system browser;
+NkMail receives a verified email identity and tokens, never the Google password. The refresh
+credential is stored through the existing system keychain. Google mail uses IMAP/SMTP
+XOAUTH2; POP is not implemented. Account creation does not require the mail ports to be
+reachable during browser authorization; subsequent synchronization reports network errors.
+
+Distributors configure one project-owned Desktop OAuth client at build time, shared by
+all users. Users never register Google Cloud projects or enter client IDs. See
+[project setup and release requirements](docs/GOOGLE_OAUTH.md). A build without project
+configuration clearly disables Google sign-in. Google testing mode and public verification
+remain separate from the implemented client flow.
 
 ## Languages
 

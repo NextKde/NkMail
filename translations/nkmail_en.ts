@@ -224,6 +224,30 @@
             <source>Verify and save</source>
             <translation>Verify and save</translation>
         </message>
+        <message>
+            <source>Finish signing in with Google in your browser…</source>
+            <translation>Finish signing in with Google in your browser…</translation>
+        </message>
+        <message>
+            <source>Sign in with Google</source>
+            <translation>Sign in with Google</translation>
+        </message>
+        <message>
+            <source>Signed in as %1</source>
+            <translation>Signed in as %1</translation>
+        </message>
+        <message>
+            <source>Use a Google app password generated after enabling two-step verification.</source>
+            <translation>Use a Google app password generated after enabling two-step verification.</translation>
+        </message>
+        <message>
+            <source>Use an app password instead</source>
+            <translation>Use an app password instead</translation>
+        </message>
+        <message>
+            <source>Save account</source>
+            <translation>Save account</translation>
+        </message>
     </context>
     <context>
         <name>MailComposer</name>
@@ -828,6 +852,18 @@
             <location filename="../src/storage/MailDatabase.cpp" line="753" />
             <source>Draft not found or send state transition is unsafe</source>
             <translation>Draft not found or send state transition is unsafe</translation>
+        </message>
+        <message>
+            <source>Google authorization needs attention. Sign in with Google again.</source>
+            <translation>Google authorization needs attention. Sign in with Google again.</translation>
+        </message>
+        <message>
+            <source>Google authorization requires the standard secure Gmail servers.</source>
+            <translation>Google authorization requires the standard secure Gmail servers.</translation>
+        </message>
+        <message>
+            <source>Unsupported account authentication method.</source>
+            <translation>Unsupported account authentication method.</translation>
         </message>
     </context>
     <context>
@@ -1591,11 +1627,6 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation>Microsoft OAuth and native Exchange are not available yet. Browser sign-in requires an application registration.</translation>
         </message>
         <message>
-            <location filename="../qml/ProviderPicker.qml" line="14" />
-            <source>Gmail uses IMAP here. Enable two-step verification and use a Google app password; your normal Google password is not accepted. Google browser sign-in and POP are not supported yet.</source>
-            <translation>Gmail uses IMAP here. Enable two-step verification and use a Google app password; your normal Google password is not accepted. Google browser sign-in and POP are not supported yet.</translation>
-        </message>
-        <message>
             <location filename="../qml/ProviderPicker.qml" line="16" />
             <source>Enable IMAP/SMTP in your webmail settings and use the client authorization code when required.</source>
             <translation>Enable IMAP/SMTP in your webmail settings and use the client authorization code when required.</translation>
@@ -1619,6 +1650,10 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../qml/ProviderPicker.qml" line="40" />
             <source> · Not available yet</source>
             <translation> · Not available yet</translation>
+        </message>
+        <message>
+            <source>Sign in with Google in your system browser. NkMail does not receive your Google password.</source>
+            <translation>Sign in with Google in your system browser. NkMail does not receive your Google password.</translation>
         </message>
     </context>
     <context>
@@ -2037,6 +2072,10 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Updating messages…</source>
             <translation>Updating messages…</translation>
         </message>
+        <message>
+            <source>Sign in with Google to reconnect this account.</source>
+            <translation>Sign in with Google to reconnect this account.</translation>
+        </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
@@ -2184,6 +2223,65 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../src/services/SendService.cpp" line="93" />
             <source>Send cancelled</source>
             <translation>Send cancelled</translation>
+        </message>
+    </context>
+    <context>
+        <name>GoogleOAuth</name>
+        <message>
+            <source>Authorization received. You may return to NkMail.</source>
+            <translation>Authorization received. You may return to NkMail.</translation>
+        </message>
+        <message>
+            <source>Could not contact Google securely. Check your connection and try again.</source>
+            <translation>Could not contact Google securely. Check your connection and try again.</translation>
+        </message>
+        <message>
+            <source>Could not open the local Google sign-in callback.</source>
+            <translation>Could not open the local Google sign-in callback.</translation>
+        </message>
+        <message>
+            <source>Could not open the system browser for Google sign-in.</source>
+            <translation>Could not open the system browser for Google sign-in.</translation>
+        </message>
+        <message>
+            <source>Google authorization has expired or was revoked. Sign in with Google again.</source>
+            <translation>Google authorization has expired or was revoked. Sign in with Google again.</translation>
+        </message>
+        <message>
+            <source>Google did not authorize this account. Check the account or organization policy and try again.</source>
+            <translation>Google did not authorize this account. Check the account or organization policy and try again.</translation>
+        </message>
+        <message>
+            <source>Google did not grant the required mail permission and offline access. Try signing in again.</source>
+            <translation>Google did not grant the required mail permission and offline access. Try signing in again.</translation>
+        </message>
+        <message>
+            <source>Google did not return a verified email address.</source>
+            <translation>Google did not return a verified email address.</translation>
+        </message>
+        <message>
+            <source>Google rejected this application's sign-in configuration. Contact the application distributor.</source>
+            <translation>Google rejected this application's sign-in configuration. Contact the application distributor.</translation>
+        </message>
+        <message>
+            <source>Google returned an invalid authorization response.</source>
+            <translation>Google returned an invalid authorization response.</translation>
+        </message>
+        <message>
+            <source>Google sign-in is unavailable in this build. Contact the application distributor.</source>
+            <translation>Google sign-in is unavailable in this build. Contact the application distributor.</translation>
+        </message>
+        <message>
+            <source>Google sign-in timed out. Try again.</source>
+            <translation>Google sign-in timed out. Try again.</translation>
+        </message>
+        <message>
+            <source>Google sign-in was cancelled.</source>
+            <translation>Google sign-in was cancelled.</translation>
+        </message>
+        <message>
+            <source>This sign-in response could not be accepted.</source>
+            <translation>This sign-in response could not be accepted.</translation>
         </message>
     </context>
 </TS>

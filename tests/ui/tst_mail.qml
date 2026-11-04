@@ -67,6 +67,8 @@ TestCase {
         }
         property var accountSetup: setupMock
         function configureAccount(config, password, remember) { return !busy }
+        property int googleSaveCount: 0
+        function configureGoogleAccount(existingId) { googleSaveCount++; if (busy) return false; setupMock.googleAuthorized = false; return true }
         function refresh() { refreshCount++ }
         function selectFolder(folder) { smartMailbox = ""; currentFolder = folder }
         function foldersFor(accountId) { return folders }
@@ -110,6 +112,13 @@ TestCase {
         id: setupMock
         property bool busy: false
         property string stage: ""
+        property bool googleConfigured: false
+        property bool googleAuthorized: false
+        property var googleAccount: ({address: "google-user@example.invalid"})
+        property int googleStarts: 0
+        property int googleCancels: 0
+        function beginGoogleSignIn(hint) { googleStarts++; stage = "google"; busy = true }
+        function cancelGoogleSignIn() { googleCancels++; busy = false; stage = ""; googleAuthorized = false }
         signal finished(bool success, string error)
         function verify(config, password) { stage = "imap"; busy = true }
     }
@@ -127,6 +136,7 @@ TestCase {
         AppTheme.appearanceMode = "light"
         failOnWarning(/.*/)
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
+        mock.googleSaveCount = 0; setupMock.googleConfigured = false; setupMock.googleStarts = 0; setupMock.googleCancels = 0; setupMock.googleAuthorized = false; setupMock.busy = false; setupMock.stage = ""
         mock.refreshCount = 0; mock.search = ""
         mock.drafts = []; mock.sendPending = false
         mock.configured = true; mock.smartMailbox = ""; mock.sending = false; mock.busy = false; mock.demo = true; mock.error = ""
@@ -1109,6 +1119,58 @@ TestCase {
         picker.currentIndex = 1
         mouseClick(manual)
         compare(picker.currentIndex, 0)
+        dialog.close()
+    }
+    function test_google_sign_in_needs_only_project_configuration_and_browser_authorization() {
+        mock.demo = false
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("google")
+        const signIn = findChild(dialog, "googleSignInButton")
+        compare(signIn.enabled, false)
+        verify(findChild(dialog, "googleUnavailableHint").visible)
+        setupMock.googleConfigured = true
+        tryCompare(signIn, "enabled", true) // No email or password required to open Google.
+        signIn.clicked()
+        compare(setupMock.googleStarts, 1)
+        verify(dialog.submitting)
+        setupMock.googleAuthorized = true
+        setupMock.busy = false
+        setupMock.finished(true, "")
+        compare(mock.googleSaveCount, 1)
+        compare(dialog.step, 2)
+        compare(dialog.googleIdentity, "google-user@example.invalid")
+        dialog.close()
+        dialog.addAccount()
+        findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("google")
+        signIn.clicked()
+        const cancellations = setupMock.googleCancels
+        dialog.close()
+        tryVerify(() => setupMock.googleCancels > cancellations)
+        verify(!dialog.submitting)
+    }
+    function test_google_authorization_can_retry_save_without_reopening_browser() {
+        mock.demo = false
+        setupMock.googleConfigured = true
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("google")
+        const signIn = findChild(dialog, "googleSignInButton")
+        signIn.clicked()
+        mock.busy = true
+        setupMock.busy = false
+        setupMock.googleAuthorized = true
+        setupMock.finished(true, "")
+        compare(dialog.step, 0)
+        verify(dialog.googleSavePending)
+        verify(!signIn.enabled)
+        mock.busy = false
+        tryCompare(signIn, "enabled", true)
+        signIn.clicked()
+        compare(setupMock.googleStarts, 1)
+        compare(mock.googleSaveCount, 2)
+        compare(dialog.step, 2)
+        verify(!setupMock.googleAuthorized)
         dialog.close()
     }
     function test_provider_presets_and_no_false_oauth_support() {

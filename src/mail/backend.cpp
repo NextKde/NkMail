@@ -2,6 +2,7 @@
 #include "backend.h"
 
 #include "HtmlSanitizer.h"
+#include "auth/GoogleOAuth.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -53,6 +54,12 @@ void singleLine(const QString &s)
 void accountValid(const Account &a, bool smtp)
 {
     workerOnly();
+    if (a.authMethod != "password" && a.authMethod != "google_oauth")
+        throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unsupported account authentication method."));
+    if (a.authMethod == "google_oauth" && (!a.caFile.isEmpty()
+        || a.imapHost != "imap.gmail.com" || a.imapPort != 993 || a.imapStartTls
+        || a.smtpHost != "smtp.gmail.com" || !((a.smtpPort == 465 && !a.smtpStartTls) || (a.smtpPort == 587 && a.smtpStartTls))))
+        throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization requires the standard secure Gmail servers."));
     const QString host = smtp ? a.smtpHost : a.imapHost;
     const int port = smtp ? a.smtpPort : a.imapPort;
     singleLine(host); singleLine(a.username); singleLine(a.password);
@@ -100,11 +107,23 @@ mailio::dialog_ssl::ssl_options_t tlsOptions(const Account &a)
 {
     return {boost::asio::ssl::context::tls_client, boost::asio::ssl::verify_peer, utf8(a.caFile)};
 }
+void smtpLogin(mailio::smtp &smtp, const Account &a)
+{
+    if (a.authMethod == "google_oauth") {
+        try { smtp.authenticate(utf8(a.username), utf8(GoogleTokens::accessToken(a.password, a.username)), mailio::smtp::auth_method_t::XOAUTH2); }
+        catch (const GoogleOAuthError &) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Sign in with Google again.")); }
+        catch (const mailio::smtp_error &) { GoogleTokens::invalidateAccess(a.password); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Sign in with Google again.")); }
+    } else smtp.authenticate(utf8(a.username), utf8(a.password), mailio::smtp::auth_method_t::LOGIN);
+}
 void login(Imap &imap, const Account &a)
 {
     imap.ssl_options(tlsOptions(a));
     imap.start_tls(a.imapStartTls);
-    imap.authenticate(utf8(a.username), utf8(a.password), Imap::auth_method_t::LOGIN);
+    if (a.authMethod == "google_oauth") {
+        try { imap.authenticate(utf8(a.username), utf8(GoogleTokens::accessToken(a.password, a.username)), Imap::auth_method_t::XOAUTH2); }
+        catch (const GoogleOAuthError &) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Sign in with Google again.")); }
+        catch (const mailio::imap_error &) { GoogleTokens::invalidateAccess(a.password); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Sign in with Google again.")); }
+    } else imap.authenticate(utf8(a.username), utf8(a.password), Imap::auth_method_t::LOGIN);
     if (imap.capabilities().count("ID")) imap.client_id("NkMail");
 }
 Imap::fetch_options_t options(bool headers)
@@ -523,7 +542,7 @@ void MailioBackend::verifySmtp(const Account &a)
     mailio::smtp smtp(utf8(a.smtpHost), a.smtpPort, Timeout);
     smtp.ssl_options(tlsOptions(a)); smtp.start_tls(a.smtpStartTls);
     smtp.source_hostname("nkmail.invalid");
-    smtp.authenticate(utf8(a.username), utf8(a.password), mailio::smtp::auth_method_t::LOGIN);
+    smtpLogin(smtp, a);
 }
 SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *raw)
 {
@@ -539,7 +558,7 @@ SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *raw
         mailio::smtp smtp(utf8(a.smtpHost), a.smtpPort, Timeout);
         smtp.ssl_options(tlsOptions(a)); smtp.start_tls(a.smtpStartTls);
         smtp.source_hostname("nkmail.invalid");
-        smtp.authenticate(utf8(a.username), utf8(a.password), mailio::smtp::auth_method_t::LOGIN);
+        smtpLogin(smtp, a);
         submitting = true;
         smtp.submit(m);
         return {SendResult::Accepted, QCoreApplication::translate("MailErrors", "SMTP server accepted the message; delivery is not confirmed.")};

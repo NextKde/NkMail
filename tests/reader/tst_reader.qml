@@ -58,7 +58,8 @@ TestCase {
             + '<p id="large">' + '测试'.repeat(150000) + '</p>'})
         verify(view !== null)
         tryVerify(() => inspect(view, "!!document.getElementById('large')") === true, 20000)
-        compare(inspect(view, "document.getElementById('large').textContent.length"), 300000)
+        // The element exists before Chromium has finished parsing its large text node.
+        tryVerify(() => inspect(view, "document.getElementById('large').textContent.length") === 300000, 20000)
         tryVerify(() => inspect(view, "document.getElementById('inline').naturalWidth") === 1)
     }
     function inspect(view, code) {

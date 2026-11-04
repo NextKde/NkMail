@@ -12,7 +12,7 @@ ColumnLayout {
     readonly property var labels: [qsTr("Other mail account"), "iCloud", "Google / Gmail", "QQ Mail", qsTr("Tencent Exmail"), "163", "126", "Yahoo", "AOL", "Microsoft / Exchange"]
     readonly property string guidance: provider === "microsoft"
         ? qsTr("Microsoft OAuth and native Exchange are not available yet. Browser sign-in requires an application registration.")
-        : provider === "google" ? qsTr("Gmail uses IMAP here. Enable two-step verification and use a Google app password; your normal Google password is not accepted. Google browser sign-in and POP are not supported yet.")
+        : provider === "google" ? qsTr("Sign in with Google in your system browser. NkMail does not receive your Google password.")
         : ['qq','exmail','163','126'].indexOf(provider) >= 0
             ? qsTr("Enable IMAP/SMTP in your webmail settings and use the client authorization code when required.")
         : provider === "manual" ? qsTr("Enter the IMAP and SMTP settings supplied by your mail administrator.")

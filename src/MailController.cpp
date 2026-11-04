@@ -105,7 +105,11 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         }
     });
     connect(m_credentials, &AccountSession::passwordReady, this, [this](const QString &id, const QString &password) {
-        if (id != credentialKey() || m_demo || !m_restorePending || !m_account.password.isEmpty()) return;
+        if (id != credentialKey() || m_demo) return;
+        if (m_account.authMethod == "google_oauth" && !m_restorePending && !m_account.password.isEmpty()) {
+            m_account.password = password; return; // Rotated refresh token, already persisted by AccountSession.
+        }
+        if (!m_restorePending || !m_account.password.isEmpty()) return;
         m_restorePending = false;
         m_switchCredentialPending = false;
         m_account.password = password;
@@ -124,7 +128,8 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
             // Stay on the newly selected account and ask for its password.
             m_switchCredentialPending = false;
             m_account.password.clear();
-            setStatus(tr("Account needs a password"), tr("Enter an application password for this account."));
+            if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Sign in with Google to reconnect this account."));
+            else setStatus(tr("Account needs a password"), tr("Enter an application password for this account."));
             return;
         }
         setStatus(tr("System keychain needs attention"), tr("Credential storage or removal could not be completed. The local restore permission is authoritative; no plaintext fallback is used."));
@@ -272,7 +277,27 @@ void MailController::seedDemo() {
     setStatus(tr("Preview · synthetic mail · not connected"));
     if (!page.messages.isEmpty()) openMessage(page.messages.first().uid, page.uidValidity);
 }
+bool MailController::configureGoogleAccount(const QString &existingId) {
+    if (m_demo || m_busy || sending() || m_commands->busy()) return false;
+    auto *setup = static_cast<AccountSetup *>(m_accountSetup);
+    auto next = setup->authorizedGoogleAccount();
+    if (next.authMethod != "google_oauth" || next.password.isEmpty()) return false;
+    if (!existingId.isEmpty()) for (const auto &known : m_database->accounts())
+        if (known.id == existingId && known.address.compare(next.address, Qt::CaseInsensitive) == 0 && !known.name.isEmpty()) next.name = known.name;
+    auto configuration = accountMap(next);
+    configuration.insert("id", existingId.isEmpty() ? next.address.toLower() : existingId);
+    const bool saved = configureAccountImpl(configuration, next.password, true);
+    if (saved) {
+        setup->takeGoogleAccount();
+        if (m_account.id == configuration.value("id").toString()) QTimer::singleShot(0, this, &MailController::refresh);
+    }
+    return saved;
+}
 bool MailController::configureAccount(const QVariantMap &configuration, const QString &password, bool remember) {
+    auto ordinary = configuration; ordinary.insert("authMethod", "password");
+    return configureAccountImpl(ordinary, password, remember);
+}
+bool MailController::configureAccountImpl(const QVariantMap &configuration, const QString &password, bool remember) {
     if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return false; }
     if (m_busy || sending() || m_commands->busy()) return false;
     Account next = accountFromMap(configuration);
@@ -297,8 +322,9 @@ bool MailController::configureAccount(const QVariantMap &configuration, const QS
         setStatus(tr("Account change requires a separate data directory"), tr("Remove and re-add the account to change its email address, username or IMAP host.")); return false;
     }
     // Only the live account may reuse the session-only password held in memory.
-    next.password = password.isEmpty() ? (editingCurrent ? m_account.password : QString{}) : password;
+    next.password = password.isEmpty() ? (editingCurrent && next.authMethod == m_account.authMethod ? m_account.password : QString{}) : password;
     if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return false; }
+    if (editingCurrent && next.authMethod != m_account.authMethod) m_credentials->forget(m_account);
     m_credentials->setPassword(next);
     if (!editingCurrent) {
         // Adding or editing a background account must not disturb the live mailbox.

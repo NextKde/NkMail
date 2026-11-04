@@ -98,6 +98,17 @@ class Server:
                 if self.scenario == "refuse-starttls": self.write(tag + b" NO unavailable\r\n"); continue
                 self.write(tag + b" OK begin TLS\r\n"); self.upgrade(); continue
             if upper.startswith(b"LOGIN "): self.write(tag + b" OK logged in\r\n")
+            elif upper.startswith(b"AUTHENTICATE XOAUTH2"):
+                parts = cmd.split(b" ", 2)
+                if len(parts) == 3: response = parts[2]
+                else:
+                    self.write(b"+ continue\r\n"); response = self.line()
+                assert base64.b64decode(response) == b"user=fixture-user\x01auth=Bearer fixture-access\x01\x01"
+                if self.scenario == "oauth-error":
+                    self.write(b"+ " + base64.b64encode(b'{"status":"401"}') + b"\r\n")
+                    assert self.line() == b""
+                    self.write(tag + b" NO authentication rejected\r\n")
+                else: self.write(tag + b" OK authenticated\r\n")
             elif upper.startswith(b"ID "):
                 assert cmd == b'ID ("name" "NkMail")', cmd
                 identified = True
@@ -105,6 +116,9 @@ class Server:
             elif upper == b"CAPABILITY":
                 capabilities = b"IMAP4rev1" if self.scenario == "no-uidplus" else b"IMAP4rev1 UIDPLUS"
                 if self.scenario in ("require-id", "reject-id"): capabilities += b" ID"
+                if self.scenario.startswith("oauth") and self.scenario != "oauth-unsupported":
+                    capabilities += b" AUTH=XOAUTH2"
+                    if self.scenario != "oauth-continuation": capabilities += b" SASL-IR"
                 self.write(b"* CAPABILITY " + capabilities + b"\r\n" + tag + b" OK capabilities\r\n")
             elif upper.startswith(b"SELECT "):
                 self.write(b"* 2 EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n" + tag + b" OK [READ-WRITE] selected\r\n")
@@ -163,6 +177,13 @@ class Server:
             elif upper == b"STARTTLS":
                 if self.scenario == "refuse-starttls": self.write(b"454 unavailable\r\n"); continue
                 self.write(b"220 begin TLS\r\n"); self.upgrade()
+            elif upper.startswith(b"AUTH XOAUTH2 "):
+                assert base64.b64decode(line.split(b" ", 2)[2]) == b"user=fixture-user\x01auth=Bearer fixture-access\x01\x01"
+                if self.scenario == "oauth-error":
+                    self.write(b"334 " + base64.b64encode(b'{"status":"401"}') + b"\r\n")
+                    assert self.line() == b""
+                    self.write(b"535 authentication rejected\r\n")
+                else: self.write(b"235 authenticated\r\n")
             elif upper == b"AUTH LOGIN": auth_step = 1; self.write(b"334 VXNlcm5hbWU6\r\n")
             elif upper.startswith(b"MAIL FROM:"): self.write(b"250 sender ok\r\n")
             elif upper.startswith(b"RCPT TO:"):
@@ -250,6 +271,18 @@ def main():
         assert result["ok"] and result["folder"] == "CustomOutbox", result
         passed += 1
         for starttls in (False, True):
+            for protocol in ("imap", "smtp"):
+                for scenario in ("oauth", "oauth-error"):
+                    result, server = invoke(protocol, good, ca, "oauth-" + protocol, starttls, scenario)
+                    assert result["ok"] == (scenario == "oauth"), result
+                    assert not any("LOGIN" in command or "MAIL FROM" in command or command == "DATA" for command in server.commands), server.commands
+                    passed += 1
+            for scenario in ("oauth-continuation", "oauth-unsupported"):
+                result, server = invoke("imap", good, ca, "oauth-imap", starttls, scenario)
+                assert result["ok"] == (scenario == "oauth-continuation"), result
+                assert not any("LOGIN" in command for command in server.commands), server.commands
+                if scenario == "oauth-unsupported": assert not any("AUTHENTICATE" in command for command in server.commands), server.commands
+                passed += 1
             folders, server = invoke("imap", good, ca, "folders", starttls)
             assert folders["ok"] and len(folders["folders"]) == 2, folders
             assert folders["folders"][0]["title"] == "Archive/测试", folders

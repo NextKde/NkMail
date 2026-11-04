@@ -84,6 +84,8 @@ string smtp::authenticate(const string& username, const string& password, auth_m
         ;
     else if (method == auth_method_t::LOGIN)
         auth_login(username, password);
+    else if (method == auth_method_t::XOAUTH2)
+        auth_xoauth2(username, password);
     return greeting;
 }
 
@@ -209,6 +211,28 @@ string smtp::connect()
         throw smtp_error("Connection rejection.", std::get<2>(tokens), transient_negative(std::get<0>(tokens)) || permanent_negative(std::get<0>(tokens)));
     greeting += std::get<2>(tokens);
     return greeting;
+}
+
+
+void smtp::auth_xoauth2(const string& username, const string& access_token)
+{
+    if (username.empty() || access_token.empty() || username.find_first_of("\r\n\1") != string::npos
+        || access_token.find_first_of("\r\n\1") != string::npos)
+        throw smtp_error("Invalid XOAUTH2 credentials.", "");
+    const string payload = "user=" + username + '\1' + "auth=Bearer " + access_token + '\1' + '\1';
+    base64 codec(76, 76);
+    string encoded;
+    for (const auto& part : codec.encode(payload)) encoded += part;
+    dlg_->send("AUTH XOAUTH2 " + encoded);
+    auto response = parse_line(dlg_->receive());
+    if (std::get<0>(response) == 334)
+    {
+        dlg_->send(""); // SASL requires an empty acknowledgement of the error.
+        response = parse_line(dlg_->receive());
+        throw smtp_error("XOAUTH2 authentication rejected.", "", true);
+    }
+    if (std::get<0>(response) != 235 || !std::get<1>(response))
+        throw smtp_error("XOAUTH2 authentication rejected.", "", permanent_negative(std::get<0>(response)) || transient_negative(std::get<0>(response)));
 }
 
 

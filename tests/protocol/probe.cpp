@@ -5,6 +5,8 @@
 #include <QJsonObject>
 #include <QTextStream>
 #include <thread>
+#include <mailio/imap.hpp>
+#include <mailio/smtp.hpp>
 
 int main(int argc, char **argv)
 {
@@ -22,7 +24,17 @@ int main(int argc, char **argv)
     QJsonObject result;
     std::thread worker([&] {
         try {
-            if (operation == QStringLiteral("remove") || operation == QStringLiteral("move")) {
+            if (operation == "oauth-imap") {
+                mailio::imap connection(a.imapHost.toStdString(), a.imapPort, std::chrono::milliseconds(5000));
+                connection.ssl_options(mailio::dialog_ssl::ssl_options_t{boost::asio::ssl::context::tls_client, boost::asio::ssl::verify_peer, a.caFile.toStdString()});
+                connection.start_tls(a.imapStartTls);
+                connection.authenticate("fixture-user", "fixture-access", mailio::imap::auth_method_t::XOAUTH2);
+            } else if (operation == "oauth-smtp") {
+                mailio::smtp connection(a.smtpHost.toStdString(), a.smtpPort, std::chrono::milliseconds(5000));
+                connection.ssl_options(mailio::dialog_ssl::ssl_options_t{boost::asio::ssl::context::tls_client, boost::asio::ssl::verify_peer, a.caFile.toStdString()});
+                connection.start_tls(a.smtpStartTls); connection.source_hostname("nkmail.invalid");
+                connection.authenticate("fixture-user", "fixture-access", mailio::smtp::auth_method_t::XOAUTH2);
+            } else if (operation == QStringLiteral("remove") || operation == QStringLiteral("move")) {
                 nkmail::MailioBackend::removeOrMove(a, "INBOX", "42", {"102"}, operation == "move" ? "Archive" : "");
             } else if (operation == QStringLiteral("sent-folder")) {
                 result = {{"folder", nkmail::MailioBackend::sentFolder(a)}};

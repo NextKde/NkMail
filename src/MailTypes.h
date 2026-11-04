@@ -8,7 +8,8 @@
 namespace nkmail {
 struct Account {
     QString id = QStringLiteral("default");
-    QString name, address, username, password;
+    QString name, address, username, password; // Private password or opaque Google refresh credential.
+    QString authMethod = QStringLiteral("password");
     QString imapHost, smtpHost;
     int imapPort = 993, smtpPort = 465;
     bool imapStartTls = false, smtpStartTls = false;
