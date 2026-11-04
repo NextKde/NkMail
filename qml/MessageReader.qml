@@ -27,6 +27,29 @@ Rectangle {
     signal detailsRequested()
     signal saveAttachmentRequested(int index)
 
+    component ImageAction: MailAction {
+        id: imageAction
+        implicitWidth: imageActionContent.implicitWidth + leftPadding + rightPadding
+        toolbarAction: false
+        iconSize: 14
+        secondary: true
+        contentItem: Row {
+            id: imageActionContent
+            spacing: 6
+            VectorIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                name: imageAction.iconName
+                size: imageAction.iconSize
+                color: imageAction.textColor
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: imageAction.text
+                font: imageAction.font
+                color: imageAction.textColor
+            }
+        }
+    }
     objectName: "messageReader"
     color: "transparent"
     ColumnLayout {
@@ -191,20 +214,18 @@ Rectangle {
                         Flow {
                             Layout.fillWidth: true
                             spacing: 8
-                            KosButton {
+                            ImageAction {
                                 objectName: "remoteImagesButton"
+                                iconName: root.mail.failedImageCount > 0 ? "refreshRounded" : "wallpaper"
                                 text: root.mail.failedImageCount > 0 ? qsTr("Retry") : qsTr("Show images for this message")
-                                secondary: true
-                                implicitHeight: 30
                                 enabled: root.mail.remoteImagesLoading !== true
                                 Accessible.name: qsTr("Load remote images")
                                 onClicked: root.mail.loadRemoteImages()
                             }
-                            KosButton {
+                            ImageAction {
                                 objectName: "allowSenderImagesButton"
-                                text: qsTr("Always allow this sender")
-                                secondary: true
-                                implicitHeight: 30
+                                iconName: "artist"
+                                text: qsTr("Allow images from this sender")
                                 visible: String(root.message.senderAddress || "").length > 0
                                 && root.mail.senderImagesAllowed !== true && root.mail.alwaysShowRemoteImages !== true
                                 enabled: root.mail.remoteImagesLoading !== true

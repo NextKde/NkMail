@@ -1110,8 +1110,8 @@
     <context>
         <name>Main</name>
     <message>
-        <source>Always allow this sender</source>
-        <translation>始终允许此发件人</translation>
+        <source>Allow images from this sender</source>
+        <translation>允许此发件人显示图片</translation>
     </message>
     <message>
         <source>Always show remote images</source>
@@ -1512,8 +1512,8 @@ Alex
         <translation>本封显示图片</translation>
     </message>
     <message>
-        <source>Always allow this sender</source>
-        <translation>始终允许此发件人</translation>
+        <source>Allow images from this sender</source>
+        <translation>允许此发件人显示图片</translation>
     </message>
         <message>
             <source>Connect to load the original message formatting.</source>

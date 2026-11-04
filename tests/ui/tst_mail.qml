@@ -215,6 +215,7 @@ TestCase {
         const button = findChild(reader, "allowSenderImagesButton")
         tryCompare(button, "visible", true)
         tryVerify(() => button.parent.width > 0 && button.x + button.width <= button.parent.width + 1)
+        tryVerify(() => button.contentItem.implicitWidth <= button.availableWidth + 1)
         if (imagePolicyCapture.capturePath.length > 0) {
             waitForRendering(reader)
             grabImage(reader).save(imagePolicyCapture.capturePath)

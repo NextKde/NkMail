@@ -1110,8 +1110,8 @@
     <context>
         <name>Main</name>
     <message>
-        <source>Always allow this sender</source>
-        <translation>Always allow this sender</translation>
+        <source>Allow images from this sender</source>
+        <translation>Allow images from this sender</translation>
     </message>
     <message>
         <source>Always show remote images</source>
@@ -1512,8 +1512,8 @@ Synthetic demo draft. Sending is disabled.</translation>
         <translation>Show images for this message</translation>
     </message>
     <message>
-        <source>Always allow this sender</source>
-        <translation>Always allow this sender</translation>
+        <source>Allow images from this sender</source>
+        <translation>Allow images from this sender</translation>
     </message>
         <message>
             <source>Connect to load the original message formatting.</source>

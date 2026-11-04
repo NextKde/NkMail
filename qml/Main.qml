@@ -675,7 +675,7 @@ ApplicationWindow {
                     objectName: "senderImagesCheck"
                     Layout.fillWidth: true
                     visible: String(window.message.senderAddress || "").length > 0
-                    text: qsTr("Always allow this sender")
+                    text: qsTr("Allow images from this sender")
                     checked: mail.senderImagesAllowed === true
                     onToggled: mail.senderImagesAllowed = checked
                 }
