@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import QtTest
+import NextKde.Mail.ReaderTests 1.0
 import Kos.Ui
 import "../../qml/MailboxNavigation.js" as Navigation
 import "../../qml/ReaderLayout.js" as ReaderLayout
@@ -14,6 +15,7 @@ TestCase {
     width: 1280
     height: 820
     property var app: null
+    ReaderTestServer { id: imagePolicyCapture }
 
     Item {
         id: mock
@@ -25,10 +27,13 @@ TestCase {
         property string currentAccountId: "default"
         property var selectedMessage: ({uid: "1", uidValidity: "1", sender: "Studio Example", senderAddress: "studio@example.invalid", subject: "A quieter inbox", date: "2026-10-29T09:00:00Z", to: "alex@example.invalid", cc: "", messageId: "<one@example.invalid>", text: "<img src=https://example.invalid/tracker>\nPlain text only.", attachments: []})
         property string selectedUid: "1"
+        property bool alwaysShowRemoteImages: false
+        property bool senderImagesAllowed: false
         property int blockedImageCount: 0
         property bool remoteImagesLoading: false
         property int failedImageCount: 0
         function loadRemoteImages() {}
+        function resetImagePermissions() { alwaysShowRemoteImages = false; senderImagesAllowed = false }
         property string currentFolder: "INBOX"
         property string smartMailbox: ""
         function selectSmartMailbox(kind) { smartMailbox = kind }
@@ -138,6 +143,7 @@ TestCase {
         AppTheme.reduceMotion = true
         AppTheme.appearanceMode = "light"
         failOnWarning(/.*/)
+        mock.alwaysShowRemoteImages = false; mock.senderImagesAllowed = false;
         mock.blockedImageCount = 0; mock.remoteImagesLoading = false; mock.failedImageCount = 0
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
         mock.googleSaveCount = 0; setupMock.googleConfigured = false; setupMock.googleStarts = 0; setupMock.googleCancels = 0; setupMock.googleAuthorized = false; setupMock.busy = false; setupMock.stage = ""
@@ -184,6 +190,41 @@ TestCase {
         const stopped = grabImage(indicator)
         wait(180)
         verify(stopped.equals(grabImage(indicator)))
+    }
+    function test_image_permission_settings() {
+        const popup = findChild(app, "listOptionsPopover")
+        popup.open()
+        tryCompare(popup, "opened", true)
+        const global = findChild(app, "alwaysShowImagesCheck")
+        const sender = findChild(app, "senderImagesCheck")
+        tryVerify(() => popup.height <= app.height - 16 && global.width > 0)
+        mouseClick(global)
+        compare(mock.alwaysShowRemoteImages, true)
+        mouseClick(sender)
+        compare(mock.senderImagesAllowed, true)
+        const reset = findChild(app, "resetImagePermissions")
+        reset.triggered()
+        compare(mock.alwaysShowRemoteImages, false)
+        compare(mock.senderImagesAllowed, false)
+    }
+    function test_sender_image_permission_action() {
+        mock.blockedImageCount = 1
+        const reader = createTemporaryObject(readerComponent, app.contentItem, {mail: mock,
+            message: {sender: "Example sender", senderAddress: "notice@example.invalid", subject: "Image permissions", text: "Synthetic message body"},
+            hasMessage: true, width: 400, height: 550, color: "#ffffff"})
+        const button = findChild(reader, "allowSenderImagesButton")
+        tryCompare(button, "visible", true)
+        tryVerify(() => button.parent.width > 0 && button.x + button.width <= button.parent.width + 1)
+        if (imagePolicyCapture.capturePath.length > 0) {
+            waitForRendering(reader)
+            grabImage(reader).save(imagePolicyCapture.capturePath)
+        }
+        mouseClick(button)
+        compare(mock.senderImagesAllowed, true)
+        tryCompare(button, "visible", false)
+        mock.senderImagesAllowed = false
+        mock.alwaysShowRemoteImages = true
+        tryCompare(button, "visible", false)
     }
     function test_remote_image_loading_and_retry_are_visible() {
         mock.blockedImageCount = 1

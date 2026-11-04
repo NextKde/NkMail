@@ -30,6 +30,8 @@ class MailController : public QObject {
     Q_PROPERTY(QString currentAccountId READ currentAccountId NOTIFY accountChanged)
     Q_PROPERTY(QVariantMap selectedMessage READ selectedMessage NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedUid READ selectedUid NOTIFY selectionChanged)
+    Q_PROPERTY(bool alwaysShowRemoteImages READ alwaysShowRemoteImages WRITE setAlwaysShowRemoteImages NOTIFY imagePolicyChanged)
+    Q_PROPERTY(bool senderImagesAllowed READ senderImagesAllowed WRITE setSenderImagesAllowed NOTIFY selectionChanged)
     Q_PROPERTY(int blockedImageCount READ blockedImageCount NOTIFY selectionChanged)
     Q_PROPERTY(bool remoteImagesLoading READ remoteImagesLoading NOTIFY selectionChanged)
     Q_PROPERTY(int failedImageCount READ failedImageCount NOTIFY selectionChanged)
@@ -72,6 +74,11 @@ public:
     // replacing each placeholder inline. Never touches the status bar; failures
     // become a local placeholder text.
     Q_INVOKABLE void loadRemoteImages();
+    bool alwaysShowRemoteImages() const;
+    void setAlwaysShowRemoteImages(bool allow);
+    bool senderImagesAllowed() const;
+    void setSenderImagesAllowed(bool allow);
+    Q_INVOKABLE void resetImagePermissions();
     QString smartMailbox() const { return m_smartMailbox; }
     Q_INVOKABLE void selectSmartMailbox(const QString &kind);
     QString currentFolder() const { return m_folder; }
@@ -134,6 +141,7 @@ public:
     Q_INVOKABLE void archiveMessages(const QVariantList &indices);
     Q_INVOKABLE void moveMessages(const QVariantList &indices, const QString &destination);
 signals:
+    void imagePolicyChanged();
     void foldersChanged();
     void folderUnreadChanged();
     void draftsChanged();
@@ -152,6 +160,7 @@ signals:
     void accountUnreadChanged();
     void draftAccepted(const QString &id);
 private:
+    void loadAllowedImages();
     bool configureAccountImpl(const QVariantMap &configuration, const QString &credential, bool remember);
     void initialize();
     void seedDemo();

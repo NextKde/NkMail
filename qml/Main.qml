@@ -597,81 +597,117 @@ ApplicationWindow {
         onOpened: unreadFilterCheck.forceActiveFocus()
         width: Math.min(300, window.width - 16)
         implicitHeight: listOptionsColumn.implicitHeight + topPadding + bottomPadding
-        height: implicitHeight
-        contentItem: ColumnLayout {
-            id: listOptionsColumn
-            spacing: 8
-            Keys.onPressed: event => {
-                if (!(event.modifiers & Qt.ControlModifier)) return
-                if (event.key === Qt.Key_F) {
-                    event.accepted = true
-                    readerHeader.openSearch()
-                } else if (event.key === Qt.Key_N && (mail.configured || mail.demo)) {
-                    event.accepted = true
-                    listOptions.close(); window.compose("new")
-                } else if (event.key === Qt.Key_R && !mail.busy) {
-                    event.accepted = true
-                    listOptions.close(); mail.refresh()
+        height: Math.min(implicitHeight, window.height - 32)
+        contentItem: ScrollView {
+            id: imageOptionsScroll
+            clip: true
+            contentWidth: availableWidth
+            contentHeight: listOptionsColumn.implicitHeight
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ColumnLayout {
+                width: imageOptionsScroll.availableWidth
+                id: listOptionsColumn
+                spacing: 8
+                Keys.onPressed: event => {
+                    if (!(event.modifiers & Qt.ControlModifier)) return
+                    if (event.key === Qt.Key_F) {
+                        event.accepted = true
+                        readerHeader.openSearch()
+                    } else if (event.key === Qt.Key_N && (mail.configured || mail.demo)) {
+                        event.accepted = true
+                        listOptions.close(); window.compose("new")
+                    } else if (event.key === Qt.Key_R && !mail.busy) {
+                        event.accepted = true
+                        listOptions.close(); mail.refresh()
+                    }
                 }
-            }
-            LiquidCheckBox {
-                id: unreadFilterCheck
-                objectName: "unreadFilterCheck"
-                Layout.fillWidth: true
-                text: qsTr("Unread messages only (cached)")
-                checked: mail.unreadOnly
-                onToggled: mail.unreadOnly = checked
-            }
-            LiquidCheckBox {
-                objectName: "senderInitialsCheck"
-                Layout.fillWidth: true
-                text: qsTr("Sender initials")
-                checked: window.showAvatars
-                onToggled: window.showAvatars = checked
-            }
-            LiquidCheckBox {
-                objectName: "groupThreadsCheck"
-                Layout.fillWidth: true
-                text: qsTr("按会话聚合")
-                checked: window.groupThreads
-                onToggled: window.groupThreads = checked
-            }
-            LiquidCheckBox {
-                objectName: "notifyCheck"
-                Layout.fillWidth: true
-                text: qsTr("新邮件通知")
-                checked: mail.notifyEnabled
-                onToggled: mail.notifyEnabled = checked
-            }
-            LiquidCheckBox {
-                objectName: "summaryCheck"
-                Layout.fillWidth: true
-                text: qsTr("Show message summaries")
-                checked: window.showSummary
-                onToggled: window.showSummary = checked
-            }
-            LiquidCheckBox {
-                objectName: "richTextCheck"
-                Layout.fillWidth: true
-                text: qsTr("富文本显示")
-                checked: window.showRichText
-                onToggled: window.showRichText = checked
-            }
-            LiquidPopoverItem {
-                objectName: "overflowRefresh"
-                Layout.fillWidth: true
-                visible: readerHeader.compactActions
-                text: qsTr("Check for mail"); iconName: "refreshRounded"
-                enabled: !mail.busy && (mail.configured || mail.demo)
-                onTriggered: { listOptions.close(); mail.refresh() }
-            }
-            LiquidPopoverItem {
-                objectName: "overflowCompose"
-                Layout.fillWidth: true
-                visible: readerHeader.compactActions
-                text: qsTr("New message"); iconName: "editRounded"
-                enabled: mail.configured || mail.demo
-                onTriggered: { listOptions.close(); window.compose("new") }
+                LiquidCheckBox {
+                    id: unreadFilterCheck
+                    objectName: "unreadFilterCheck"
+                    Layout.fillWidth: true
+                    text: qsTr("Unread messages only (cached)")
+                    checked: mail.unreadOnly
+                    onToggled: mail.unreadOnly = checked
+                }
+                LiquidCheckBox {
+                    objectName: "senderInitialsCheck"
+                    Layout.fillWidth: true
+                    text: qsTr("Sender initials")
+                    checked: window.showAvatars
+                    onToggled: window.showAvatars = checked
+                }
+                LiquidCheckBox {
+                    objectName: "groupThreadsCheck"
+                    Layout.fillWidth: true
+                    text: qsTr("按会话聚合")
+                    checked: window.groupThreads
+                    onToggled: window.groupThreads = checked
+                }
+                LiquidCheckBox {
+                    objectName: "notifyCheck"
+                    Layout.fillWidth: true
+                    text: qsTr("新邮件通知")
+                    checked: mail.notifyEnabled
+                    onToggled: mail.notifyEnabled = checked
+                }
+                LiquidCheckBox {
+                    objectName: "summaryCheck"
+                    Layout.fillWidth: true
+                    text: qsTr("Show message summaries")
+                    checked: window.showSummary
+                    onToggled: window.showSummary = checked
+                }
+                LiquidCheckBox {
+                    objectName: "richTextCheck"
+                    Layout.fillWidth: true
+                    text: qsTr("富文本显示")
+                    checked: window.showRichText
+                    onToggled: window.showRichText = checked
+                }
+                LiquidCheckBox {
+                    objectName: "alwaysShowImagesCheck"
+                    Layout.fillWidth: true
+                    text: qsTr("Always show remote images")
+                    checked: mail.alwaysShowRemoteImages === true
+                    onToggled: mail.alwaysShowRemoteImages = checked
+                }
+                LiquidCheckBox {
+                    objectName: "senderImagesCheck"
+                    Layout.fillWidth: true
+                    visible: String(window.message.senderAddress || "").length > 0
+                    text: qsTr("Always allow this sender")
+                    checked: mail.senderImagesAllowed === true
+                    onToggled: mail.senderImagesAllowed = checked
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: qsTr("Remote images can reveal that you opened a message.")
+                    color: AppTheme.mutedText
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
+                }
+                LiquidPopoverItem {
+                    objectName: "resetImagePermissions"
+                    Layout.fillWidth: true
+                    text: qsTr("Reset image permissions")
+                    onTriggered: { mail.resetImagePermissions(); listOptions.close() }
+                }
+                LiquidPopoverItem {
+                    objectName: "overflowRefresh"
+                    Layout.fillWidth: true
+                    visible: readerHeader.compactActions
+                    text: qsTr("Check for mail"); iconName: "refreshRounded"
+                    enabled: !mail.busy && (mail.configured || mail.demo)
+                    onTriggered: { listOptions.close(); mail.refresh() }
+                }
+                LiquidPopoverItem {
+                    objectName: "overflowCompose"
+                    Layout.fillWidth: true
+                    visible: readerHeader.compactActions
+                    text: qsTr("New message"); iconName: "editRounded"
+                    enabled: mail.configured || mail.demo
+                    onTriggered: { listOptions.close(); window.compose("new") }
+                }
             }
         }
     }

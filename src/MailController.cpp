@@ -49,6 +49,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     connect(m_send, &SendService::draftAccepted, this, &MailController::draftAccepted);
     connect(m_send, &SendService::status, this, &MailController::setStatus);
     m_images = new RemoteImageLoader(this);
+    m_images->configurePermissions(QDir(m_root).filePath("image-permissions.ini"));
     connect(m_images, &RemoteImageLoader::loaded, this, [this](const QString &key, const QString &html) {
         if (key != RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion)) return;
         if (!m_content.displayHtml.isEmpty()) m_content.displayHtml = html;
@@ -467,6 +468,7 @@ void MailController::removeAccount(const QString &id) {
     emit favoritesChanged();
     m_sync->resetReadConnection();
     m_credentials->forget(target);
+    m_images->forgetAccount(accountId);
     emit accountsChanged();
     if (accountId != m_account.id) return;
 
@@ -685,6 +687,7 @@ void MailController::present(const Content &content) {
     else m_content.html = m_images->cached(key, content.html);
     m_selectedUid = content.summary.uid; m_selected = contentMap(m_content);
     emit selectionChanged();
+    loadAllowedImages();
 }
 int MailController::blockedImageCount() const {
     const auto &html = m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml;
@@ -697,7 +700,29 @@ int MailController::failedImageCount() const {
     const auto &html = m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml;
     return int(html.count(QStringLiteral("data-nkmail-failed=\"1\"")));
 }
+bool MailController::alwaysShowRemoteImages() const { return m_images->alwaysAllow(); }
+void MailController::setAlwaysShowRemoteImages(bool allow) {
+    if (alwaysShowRemoteImages() == allow) return;
+    m_images->setAlwaysAllow(allow); emit imagePolicyChanged(); loadAllowedImages();
+}
+bool MailController::senderImagesAllowed() const {
+    return m_images->senderAllowed(m_account.id, m_content.summary.senderAddress);
+}
+void MailController::setSenderImagesAllowed(bool allow) {
+    m_images->setSenderAllowed(m_account.id, m_content.summary.senderAddress, allow);
+    emit selectionChanged(); loadAllowedImages();
+}
+void MailController::resetImagePermissions() {
+    m_images->resetPermissions(); emit imagePolicyChanged(); emit selectionChanged();
+}
+void MailController::loadAllowedImages() {
+    if (!m_selected.value("bodyPending").toBool() && blockedImageCount() > 0
+        && m_images->allowed(m_account.id, m_content.summary))
+        m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion), m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml);
+}
 void MailController::loadRemoteImages() {
+    if (m_selected.value("bodyPending").toBool() || blockedImageCount() == 0) return;
+    m_images->allowMessage(m_account.id, m_content.summary);
     m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion), m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml);
 }
 void MailController::openMessage(const QString &uid, const QString &validity, const QString &sourceFolder) {

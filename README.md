@@ -298,3 +298,9 @@ row 10.5px from the right and 12.5px from the top (4px below Calendar), centred 
 NextKde window-controls protocol and enabled KOS window appearance. The older pinned
 fallback keeps its existing hover-glyph preference; global fallback glyph preference
 integration awaits a tested canonical UI release exposing that property.
+
+### Remote image preferences
+
+Remote images are blocked by default. “Show images for this message” remembers consent for that account/folder/UIDVALIDITY/UID across restarts. “Always allow this sender” remembers the exact sender address within the current account. Display options also provide an optional global “Always show remote images” switch, a current-sender toggle and “Reset image permissions”. Removing an account removes its message/sender permissions. Disabling a policy prevents future automatic downloads; images already loaded can remain visible.
+
+Permissions persist locally; downloaded image bodies still use a bounded in-memory cache and may be fetched again after restarting. Automatic loading uses the same image limits, TLS checks, cookie-free requests and retry UI as explicit loading. No server-side mailbox changes are made by image preferences.

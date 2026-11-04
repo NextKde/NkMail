@@ -1109,6 +1109,22 @@
     </context>
     <context>
         <name>Main</name>
+    <message>
+        <source>Always allow this sender</source>
+        <translation>始终允许此发件人</translation>
+    </message>
+    <message>
+        <source>Always show remote images</source>
+        <translation>始终显示远程图片</translation>
+    </message>
+    <message>
+        <source>Remote images can reveal that you opened a message.</source>
+        <translation>远程图片可能让发件人获知你已打开邮件。</translation>
+    </message>
+    <message>
+        <source>Reset image permissions</source>
+        <translation>重置图片授权</translation>
+    </message>
         <message>
             <location filename="../qml/Main.qml" line="20" />
             <source>NkMail</source>
@@ -1491,6 +1507,14 @@ Alex
     </context>
     <context>
         <name>MessageReader</name>
+    <message>
+        <source>Show images for this message</source>
+        <translation>本封显示图片</translation>
+    </message>
+    <message>
+        <source>Always allow this sender</source>
+        <translation>始终允许此发件人</translation>
+    </message>
         <message>
             <source>Connect to load the original message formatting.</source>
             <translation>连接邮箱以加载这封邮件的原始排版。</translation>
@@ -1543,11 +1567,6 @@ Alex
             <location filename="../qml/MessageReader.qml" line="131" />
             <source>%1 张远程图片已隐藏</source>
             <translation>%1 张远程图片已隐藏</translation>
-        </message>
-        <message>
-            <location filename="../qml/MessageReader.qml" line="136" />
-            <source>显示图片</source>
-            <translation>显示图片</translation>
         </message>
         <message>
             <location filename="../qml/MessageReader.qml" line="137" />

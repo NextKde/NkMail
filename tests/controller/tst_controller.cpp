@@ -207,6 +207,70 @@ struct ReleaseOnExit {
 class ControllerTests : public QObject {
     Q_OBJECT
 private slots:
+    void imagePermissionsPersistAndRemainScoped() {
+        QTemporaryDir root; const auto path = root.filePath("image-permissions.ini");
+        Summary message; message.uid = "1"; message.uidValidity = "42"; message.folder = "INBOX"; message.senderAddress = "Notice@Example.invalid";
+        {
+            RemoteImageLoader loader; loader.configurePermissions(path);
+            QVERIFY(!loader.allowed("account-a", message));
+            loader.allowMessage("account-a", message);
+        }
+        RemoteImageLoader restored; restored.configurePermissions(path);
+        QVERIFY(restored.allowed("account-a", message));
+        QVERIFY(!restored.allowed("account-b", message));
+        auto other = message; other.folder = "Archive"; QVERIFY(!restored.allowed("account-a", other));
+        other = message; other.uidValidity = "43"; QVERIFY(!restored.allowed("account-a", other));
+        other = message; other.uid = "2"; QVERIFY(!restored.allowed("account-a", other));
+        restored.setSenderAllowed("account-a", "notice@example.invalid", true);
+        QVERIFY(restored.allowed("account-a", other)); QVERIFY(!restored.allowed("account-b", other));
+        restored.setSenderAllowed("account-a", other.senderAddress, false);
+        QVERIFY(!restored.allowed("account-a", other));
+        restored.setAlwaysAllow(true); QVERIFY(restored.allowed("account-b", other));
+        restored.setAlwaysAllow(false); QVERIFY(!restored.allowed("account-b", other));
+        restored.forgetAccount("account-a"); QVERIFY(!restored.allowed("account-a", message));
+        restored.allowMessage("account-a", message); restored.setAlwaysAllow(true);
+        restored.resetPermissions();
+        RemoteImageLoader reset; reset.configurePermissions(path);
+        QVERIFY(!reset.alwaysAllow()); QVERIFY(!reset.allowed("account-a", message));
+    }
+    void rememberedImageConsentLoadsOnReopenAndSenderTrustAppliesToNextMessage() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 3));
+        QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost)); int requests = 0;
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            while (auto *socket = server.nextPendingConnection()) {
+                connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+                connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+                    socket->readAll(); ++requests;
+                    const auto image = QByteArray::fromBase64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX2kAAAAASUVORK5CYII=");
+                    socket->write(QByteArray("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: ") + QByteArray::number(image.size()) + "\r\nConnection: close\r\n\r\n" + image);
+                    socket->disconnectFromHost();
+                });
+            }
+        });
+        {
+            MailDatabase db; QVERIFY(db.open(root.path()));
+            for (const auto &uid : {"120", "119", "118"}) {
+                auto c = synthetic::content(account(), "INBOX", "100", uid);
+                c.summary.senderAddress = QString(QString::fromLatin1(uid) == QLatin1String("118") ? "other@example.invalid" : "notice@example.invalid");
+                c.displayHtml = QString("<img data-nkmail-src=\"http://127.0.0.1:%1/image\" alt=\"Fixture\">").arg(server.serverPort());
+                QVERIFY(db.saveContent(c));
+            }
+        }
+        {
+            MailController controller(false, root.path()); QTRY_VERIFY(controller.status().contains("restored"));
+            controller.openMessage("120", "100"); QTest::qWait(100); QCOMPARE(requests, 0);
+            controller.loadRemoteImages(); QTRY_COMPARE(requests, 1); QTRY_COMPARE(controller.blockedImageCount(), 0);
+        }
+        MailController controller(false, root.path()); QTRY_VERIFY(controller.status().contains("restored"));
+        controller.openMessage("120", "100"); QTRY_COMPARE(requests, 2); QTRY_COMPARE(controller.blockedImageCount(), 0);
+        controller.openMessage("119", "100"); QTest::qWait(100); QCOMPARE(requests, 2);
+        controller.setSenderImagesAllowed(true); QTRY_COMPARE(requests, 3); QTRY_COMPARE(controller.blockedImageCount(), 0);
+        QVERIFY(controller.senderImagesAllowed());
+        controller.openMessage("118", "100"); QTest::qWait(100); QCOMPARE(requests, 3);
+        controller.setAlwaysShowRemoteImages(true); QTRY_COMPARE(requests, 4); QTRY_COMPARE(controller.blockedImageCount(), 0);
+        controller.resetImagePermissions(); QVERIFY(!controller.alwaysShowRemoteImages()); QVERIFY(!controller.senderImagesAllowed());
+    }
+
     void remoteImagesLoadConcurrentlyAndFailedUrlsRemainRetryable() {
         QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
         int requests = 0; bool failing = true;

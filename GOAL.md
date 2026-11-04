@@ -612,3 +612,9 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - User confirmed the uncached-body blank issue is resolved. Removed the remaining opt-in IMAP phase timing and image-request diagnostic output, their logging includes and a duplicate include. Lifecycle fixes, error handling and race regression coverage remain intact.
 - Remote images currently require per-message consent and use an 8 MiB in-memory rendered-body cache. Persistent per-message consent and sender exceptions are not implemented; no automatic-loading policy was changed in this cleanup.
 - Cleanup validation: VM controller and loopback protocol tests passed 2/2 in 32.77s; host preview rebuilt and replaced for manual use.
+
+## Persistent remote image permissions · 2026-11-04
+
+- Added persistent per-message permission, account-scoped sender allow rules and an opt-in global auto-load switch. Defaults remain blocked. Display options can revoke the current sender or reset all permissions; account removal cleans up its rules. Policy storage stays in RemoteImageLoader, with hashed account/message/sender keys.
+- Auto-loading happens only for the currently presented message and reuses the bounded cookie-free loader. Per-message consent includes folder and UIDVALIDITY, preventing UID reuse across folders/epochs from inheriting permission. Image bytes remain in-memory rather than becoming a persistent disk cache.
+- Added policy persistence/isolation/revocation tests, synthetic loopback controller coverage for restart and sender/global loading, and UI action/settings/width checks. Tests and screenshot run in the VM only. Controller/protocol/core/CLI checks passed in the initial suite; after removing the obsolete translation and waiting for QML layout in the new geometry test, reader/i18n/catalog checks passed and the final complete UI suite passed in 49.81s.

@@ -1109,6 +1109,22 @@
     </context>
     <context>
         <name>Main</name>
+    <message>
+        <source>Always allow this sender</source>
+        <translation>Always allow this sender</translation>
+    </message>
+    <message>
+        <source>Always show remote images</source>
+        <translation>Always show remote images</translation>
+    </message>
+    <message>
+        <source>Remote images can reveal that you opened a message.</source>
+        <translation>Remote images can reveal that you opened a message.</translation>
+    </message>
+    <message>
+        <source>Reset image permissions</source>
+        <translation>Reset image permissions</translation>
+    </message>
         <message>
             <location filename="../qml/Main.qml" line="20" />
             <source>NkMail</source>
@@ -1491,6 +1507,14 @@ Synthetic demo draft. Sending is disabled.</translation>
     </context>
     <context>
         <name>MessageReader</name>
+    <message>
+        <source>Show images for this message</source>
+        <translation>Show images for this message</translation>
+    </message>
+    <message>
+        <source>Always allow this sender</source>
+        <translation>Always allow this sender</translation>
+    </message>
         <message>
             <source>Connect to load the original message formatting.</source>
             <translation>Connect to load the original message formatting.</translation>
@@ -1543,11 +1567,6 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../qml/MessageReader.qml" line="131" />
             <source>%1 张远程图片已隐藏</source>
             <translation>%1 remote images hidden</translation>
-        </message>
-        <message>
-            <location filename="../qml/MessageReader.qml" line="136" />
-            <source>显示图片</source>
-            <translation>Show images</translation>
         </message>
         <message>
             <location filename="../qml/MessageReader.qml" line="137" />
