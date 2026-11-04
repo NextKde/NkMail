@@ -163,7 +163,7 @@ LiquidDialog {
                     enabled: !root.submitting
                     readOnly: root.submitting
                     Accessible.name: qsTr("Email")
-                    placeholderText: qsTr("Enter you@example.com")
+                    placeholderText: activeFocus ? "" : qsTr("Enter you@example.com")
                     onTextEdited: providerChoice.currentIndex = Profiles.indexForAddress(text)
                 }
             }
