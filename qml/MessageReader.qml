@@ -179,11 +179,13 @@ Rectangle {
                             color: root.muted; font.pixelSize: 11
                             Layout.fillWidth: true
                         }
-                        MailAction {
+                        KosButton {
                             objectName: "remoteImagesButton"
-                            stacked: true; stackedText: root.mail.failedImageCount > 0 ? qsTr("Retry") : qsTr("显示图片"); iconName: "download"
+                            text: root.mail.failedImageCount > 0 ? qsTr("Retry") : qsTr("显示图片")
+                            secondary: true
+                            implicitHeight: 30
                             enabled: root.mail.remoteImagesLoading !== true
-                            accessibleText: qsTr("Load remote images")
+                            Accessible.name: qsTr("Load remote images")
                             onClicked: root.mail.loadRemoteImages()
                         }
                     }
@@ -216,6 +218,7 @@ Rectangle {
                         }
                         KosButton {
                             objectName: "retryMessageBodyButton"
+                            secondary: true
                             visible: root.bodyError.length > 0 && !root.bodyLoading
                             Layout.alignment: Qt.AlignHCenter
                             text: qsTr("Retry")

@@ -529,3 +529,10 @@ The scoped local implementation is substantially complete, but real-provider rea
 - Retained the existing OAuth backend and optional project client configuration for compatibility with accounts already added. No token/account deletion, automatic credential conversion, console mutation or access revocation. Editing an existing OAuth account accepts a verified app password under the same ID; regression fixtures prove cached body retention. Missing/expired legacy authorization guidance directs users to account settings.
 - VM build and UI/controller/i18n/catalog checks passed 4/4 in 53.80s after the final UI/migration changes. Reviewed actual synthetic screenshot docs/progress/2026-11-04-google-app-password/setup.png; demo disables fields/saving, so it is visual evidence only. No host launch/tests and no real mailbox writes or password submissions for this iteration. The currently running host binary has not been replaced.
 - Final backend prompt build and controller/i18n/catalog follow-up passed 3/3 in 6.23s. Hosted release-gate remains the merge requirement.
+
+
+## Ordinary reader actions and account hierarchy · 2026-11-04
+
+- Replaced the remote-image load/retry LiquidActionButton adapter with canonical ordinary KosButton, using its neutral secondary material. Body-download Retry also uses neutral secondary material. Actions and pending-state disabling remain intact.
+- Indented every account folder row by 18px relative to its account header, including inactive accounts; favorites and smart mailboxes retain their existing alignment.
+- VM Release build passed; UI/i18n/catalog checks passed 3/3 in 47.43s. Updated the existing remote-image behavior assertion for the ordinary button text. Optional VM screenshot attempt did not run because xvfb-run was absent from the default PATH; no new visual-capture claim. No host build/launch/tests or real mailbox writes. Running host binary remains unchanged.

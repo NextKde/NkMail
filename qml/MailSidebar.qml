@@ -312,6 +312,7 @@ Item {
                             model: accountSection.collapsed ? [] : (root.unreadRevision, Navigation.ordered(accountSection.current ? root.mail.folders : (root.mail.foldersFor(accountSection.accountId) || [])))
                             delegate: MailboxAction {
                                 id: folderRow
+                                Layout.leftMargin: 18
                                 required property var modelData
                                 // Keep the historical name for the active account; scope
                                 // other accounts so their identical folder ids stay unique.

@@ -199,7 +199,7 @@ TestCase {
         mock.remoteImagesLoading = false
         mock.failedImageCount = 1
         tryCompare(button, "enabled", true)
-        compare(button.stackedText, "Retry")
+        compare(button.text, "Retry")
         verify(findChild(reader, "blockedImagesBar").visible)
     }
     function test_reader_preserves_header_with_visible_loading_and_retry() {
