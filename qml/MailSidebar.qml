@@ -195,6 +195,23 @@ Item {
                     objectName: "favoritesList"
                     model: mail.favorites || []
                     delegate: MailboxAction {
+                        id: favoriteRow
+                        TapHandler {
+                            acceptedButtons: Qt.RightButton
+                            onTapped: favoriteMenu.openAtAnchor()
+                        }
+                        LiquidPopover {
+                            id: favoriteMenu
+                            sourceItem: root.surface
+                            anchorItem: favoriteRow
+                            LiquidPopoverItem {
+                                text: qsTr("从收藏移除"); iconName: "heart"
+                                onTriggered: {
+                                    favoriteMenu.close()
+                                    mail.toggleFavorite(favoriteRow.modelData.accountId, favoriteRow.modelData.folderId, favoriteRow.modelData.title)
+                                }
+                            }
+                        }
                         required property var modelData
                         text: modelData.title
                         iconName: MailLabels.folderIcon(modelData.folderId)
@@ -250,14 +267,7 @@ Item {
                             text: accountSection.modelData.address || accountSection.modelData.name
                             Accessible.name: text
                             onClicked: {
-                                if (accountSection.current) {
-                                    root.toggleAccountCollapsed(accountSection.accountId)
-                                } else {
-                                    root.navigationOrigin = "account"
-                                    root.mail.switchAccount(accountSection.accountId)
-                                    if (accountSection.collapsed)
-                                        root.toggleAccountCollapsed(accountSection.accountId)
-                                }
+                                root.toggleAccountCollapsed(accountSection.accountId)
                             }
                             TapHandler {
                                 acceptedButtons: Qt.RightButton

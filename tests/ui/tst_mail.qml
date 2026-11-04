@@ -542,6 +542,21 @@ TestCase {
         verify(row.selected)
         mock.selectedMessage = original
     }
+    function test_account_header_only_toggles_children() {
+        const sidebar = createTemporaryObject(sidebarComponent, testCase, {
+            mail: mock, surface: testCase, sidebarAccounts: [{id: "another", address: "other@example.invalid"}],
+            width: 240, height: 500
+        })
+        const original = mock.currentAccountId
+        const header = findChild(sidebar, "accountHeader_another")
+        verify(header !== null)
+        header.clicked()
+        compare(mock.currentAccountId, original)
+        verify(sidebar.collapsedAccounts.another)
+        header.clicked()
+        compare(mock.currentAccountId, original)
+        verify(!sidebar.collapsedAccounts.another)
+    }
     function test_sidebar_sections_and_smart_navigation() {
         const sidebar = findChild(app, "sidebarBody")
         verify(findChild(sidebar, "favoritesTitle").visible)

@@ -38,6 +38,7 @@ Rectangle {
             visible: !root.draftsVisible
             Layout.fillWidth: true; Layout.fillHeight: true
             clip: true; boundsBehavior: Flickable.StopAtBounds
+            MailWheelHandler { flickable: messageList }
             model: mail.messages
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
             delegate: AbstractButton {

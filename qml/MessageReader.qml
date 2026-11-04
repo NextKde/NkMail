@@ -37,6 +37,10 @@ Rectangle {
             visible: root.hasMessage && !root.draftsVisible
             Layout.fillWidth: true; Layout.fillHeight: true
             contentWidth: availableWidth; contentHeight: readerColumn.implicitHeight; clip: true
+            MailWheelHandler {
+                flickable: readerScroll.contentItem
+                enabled: !browserBody.active
+            }
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             ScrollBar.vertical: ScrollBar {
                 objectName: "readerVerticalScrollBar"
@@ -240,17 +244,9 @@ Rectangle {
                         Item {
                             anchors.fill: parent
                             z: 1
-                            WheelHandler {
-                                target: null
+                            MailWheelHandler {
+                                flickable: readerScroll.contentItem
                                 enabled: !!browserBody.item && browserBody.item.documentHeight < 12000
-                                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                                onWheel: function(event) {
-                                    const delta = event.pixelDelta.y || event.angleDelta.y / 2
-                                    const flick = readerScroll.contentItem
-                                    if (!delta || !flick) { event.accepted = false; return }
-                                    flick.contentY = Math.max(0, Math.min(readerScroll.contentHeight - readerScroll.availableHeight, flick.contentY - delta))
-                                    event.accepted = true
-                                }
                             }
                         }
                         sourceComponent: Component {

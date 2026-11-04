@@ -182,6 +182,10 @@ QVariantList MailController::favorites() const {
         // still resolve to a usable folder.
         const auto parts = entry.split(QLatin1Char('\t'));
         if (parts.size() < 2 || parts.at(0).isEmpty() || parts.at(1).isEmpty()) continue;
+        bool accountExists = false;
+        for (const auto &account : m_database->accounts())
+            if (account.id == parts.at(0)) { accountExists = true; break; }
+        if (!accountExists) continue;
         QString accountName = parts.size() > 3 ? parts.at(3) : QString{};
         if (accountName.isEmpty()) accountName = favoriteAccountName(parts.at(0));
         out.append(QVariantMap{{"accountId", parts.at(0)},
@@ -449,6 +453,11 @@ void MailController::removeAccount(const QString &id) {
         if (account.id == accountId) { target = account; found = true; break; }
     if (!found) return;
     if (!m_database->removeAccount(accountId)) { setStatus(tr("Could not remove account"), m_database->error()); return; }
+    QStringList retainedFavorites;
+    for (const auto &entry : favoriteEntries())
+        if (entry.section(QLatin1Char('\t'), 0, 0) != accountId) retainedFavorites.append(entry);
+    saveFavoriteEntries(retainedFavorites);
+    emit favoritesChanged();
     m_credentials->forget(target);
     emit accountsChanged();
     if (accountId != m_account.id) return;

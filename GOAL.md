@@ -536,3 +536,11 @@ The scoped local implementation is substantially complete, but real-provider rea
 - Replaced the remote-image load/retry LiquidActionButton adapter with canonical ordinary KosButton, using its neutral secondary material. Body-download Retry also uses neutral secondary material. Actions and pending-state disabling remain intact.
 - Indented every account folder row by 18px relative to its account header, including inactive accounts; favorites and smart mailboxes retain their existing alignment.
 - VM Release build passed; UI/i18n/catalog checks passed 3/3 in 47.43s. Updated the existing remote-image behavior assertion for the ordinary button text. Optional VM screenshot attempt did not run because xvfb-run was absent from the default PATH; no new visual-capture claim. No host build/launch/tests or real mailbox writes. Running host binary remains unchanged.
+
+
+## Scrolling, account disclosure and favorites · 2026-11-04
+
+- Mouse wheel scrolling in message lists and ordinary-height reader content now uses a 160ms easing transition; touchpad pixel deltas remain direct. Capped WebEngine documents retain their internal scrolling. Shared handler respects reduced motion and interrupts animation for dragging.
+- Account headers only expand/collapse. Selecting a child folder performs account navigation. Added a UI regression for a non-current account header preserving current account identity.
+- Custom favorites have a remove context action. Successful account removal clears corresponding persisted favorites; older orphan entries are filtered from display.
+- VM controller/i18n/catalog passed; initial reader/UI load found a handler object-property error, fixed before delivery. Final reader/UI passed 2/2 in 52.66s. Host compiled and relaunched under the user's existing authorization, preserving process environment; no host automated tests or real mailbox mutation. Perceived scrolling smoothness awaits user feedback.
