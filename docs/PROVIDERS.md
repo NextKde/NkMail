@@ -9,7 +9,7 @@
 | 提供商 | IMAP（隐式 TLS，993） | SMTP | 认证范围 |
 |---|---|---|---|
 | iCloud | imap.mail.me.com | smtp.mail.me.com:587 STARTTLS | 应用专用密码 |
-| Google / Gmail | imap.gmail.com | smtp.gmail.com:465 隐式 TLS | 项目统一的 Google OAuth；账户允许时也可选应用密码 |
+| Google / Gmail | imap.gmail.com | smtp.gmail.com:465 隐式 TLS | 应用专用密码；已有 OAuth 账号保留兼容 |
 | QQ | imap.qq.com | smtp.qq.com:465 隐式 TLS | 开启 IMAP/SMTP，使用授权码 |
 | 腾讯企业邮箱 | imap.exmail.qq.com | smtp.exmail.qq.com:465 隐式 TLS | 管理员允许客户端协议；按账户策略使用客户端密码/授权码 |
 | 163 | imap.163.com | smtp.163.com:465 隐式 TLS | 开启客户端协议及授权码 |
@@ -22,7 +22,7 @@ Microsoft / Exchange 入口明确标为尚未支持，禁止进入密码验证�
 
 ## 不止是填服务器
 
-- 密码接入保存前分别验证 IMAP 与 SMTP 登录，不通过发送邮件来验证 SMTP。Google OAuth 在浏览器确认身份后保存，邮件协议连接由后续同步处理。
+- 密码接入保存前分别验证 IMAP 与 SMTP 登录，不通过发送邮件来验证 SMTP。新增 Gmail 账号使用应用专用密码；浏览器 OAuth 入口已隐藏。
 - 所有接入复用同一接收/正文净化/附件/回复转发/SMTP 发送服务；提供商预设不另建一套发送逻辑。
 - 能力协商：仅服务器声明 ID 时发送 RFC 2971 客户端标识，仅包含静态 NkMail 名称，不发送用户/设备标识。可选 ID 被服务器拒绝不阻断后续标准协议。
 - 服务器 `\Sent` 优先于文件夹名字，用于本地化/自定义已发送文件夹；`\All` 显示为所有邮件，可作为归档目的地。
@@ -34,11 +34,11 @@ Microsoft / Exchange 入口明确标为尚未支持，禁止进入密码验证�
 
 使用合成 loopback 验证 TLS/STARTTLS、证书拒绝、IMAP 读取和附件、MIME/SMTP 收件人及发送状态、ID 能力协商、特殊文件夹角色。提供商自动识别、每项预设、Microsoft 阻断、已发送副本策略另有 UI/核心/控制器测试。
 
-未使用真实提供商账户验证登录、接收或实际送达；不能把 loopback 通过标为每家服务商实测通过。服务商账户策略、授权码有效性、组织限制需要后续专用测试账户验证。
+曾完成指定账号的只读接入与 Gmail OAuth 读取检查，但没有逐提供商完成当前应用密码流程或实际送达验收；不能把 loopback 通过标为每家服务商实测通过。服务商账户策略、授权码有效性、组织限制需要后续专用测试账户验证。
 
 ## OAuth / Exchange 配置
 
-- Google：已实现系统浏览器、PKCE、loopback 回调、刷新令牌及钥匙串存储，IMAP/SMTP 使用 SASL XOAUTH2。客户端身份由项目构建统一提供，不借用其他邮件客户端身份。普通用户只需登录并授权。项目配置、测试模式和发布审核见 [Google OAuth](GOOGLE_OAUTH.md)。
+- Google：当前新增账号使用应用专用密码，不要求用户配置 Google Cloud。旧 OAuth 后端保留 PKCE、刷新令牌与 XOAUTH2 兼容，但不提供新增浏览器登录入口。公开 OAuth 发布审核由用户暂缓，历史配置见 [Google OAuth](GOOGLE_OAUTH.md)。
 - Microsoft：仍需 Entra 公共客户端、委托 IMAP.AccessAsUser.All、SMTP.Send 与 offline_access，以及对应令牌生命周期实现。该通路不等同于完整原生 Exchange 接口。
 
 ## 参数与行为来源

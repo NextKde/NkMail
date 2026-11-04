@@ -13,50 +13,36 @@ TestCase {
     ReaderTestServer { id: server }
     Component { id: browserComponent; App.MailHtmlBody {} }
     Component { id: restoreWindow; Window { width: 500; height: 400; visible: true } }
-    function test_body_survives_window_hide_and_restore() {
+    function test_retained_surface_preserves_document_across_restore() {
         const host = createTemporaryObject(restoreWindow, null)
         const view = createTemporaryObject(browserComponent, host.contentItem, {
-            width: 500, height: 400, html: '<div style="height:400px;background:rgb(32,160,80)">Restore fixture</div>'
+            width: 500, height: 400,
+            html: '<div style="height:15000px;background:#20a050">Retained surface fixture</div>'
         })
         tryVerify(() => view.documentReady, 20000)
+        tryCompare(view, "retainedSurface", true)
+        inspect(view, "window.retentionMarker = 42; window.scrollTo(0, 700)")
+        tryVerify(() => view.scrollPosition.y >= 699)
         const originalUrl = String(view.url)
         for (let cycle = 0; cycle < 2; ++cycle) {
             if (cycle === 0) host.showMinimized()
             else host.hide()
-            tryCompare(view, "windowSuspended", true)
-            verify(view.surfaceCovered)
+            wait(150)
             host.showNormal()
-            tryCompare(view, "windowSuspended", false)
-            tryVerify(() => view.visible)
-            wait(350) // Allow the queued restore to reload the local document.
-            tryVerify(() => !view.loading && !view.restorePending)
-            tryVerify(() => {
-                const frame = grabImage(view)
-                return frame.green(250, 200) > 120 && frame.red(250, 200) < 80
-            }, 5000)
+            wait(250)
             compare(String(view.url), originalUrl)
-            verify(view.documentReady)
+            compare(inspect(view, "window.retentionMarker"), 42) // No reload.
+            tryVerify(() => view.scrollPosition.y >= 699)
+            verify(view.retainedSurface)
         }
+        // A new native window requires reattaching to that window's lifecycle.
+        const other = createTemporaryObject(restoreWindow, null)
+        view.parent = other.contentItem
+        compare(view.retainedSurface, false)
+        tryCompare(view, "retainedSurface", true)
+        compare(inspect(view, "window.retentionMarker"), 42)
+        other.close()
         host.close()
-    }
-    function test_surface_restore_keeps_internal_scroll_position() {
-        const view = createTemporaryObject(browserComponent, testCase, {
-            width: 500, height: 400, html: '<div style="height:15000px;background:#20a050">Long fixture</div>'
-        })
-        tryVerify(() => view.documentReady, 20000)
-        inspect(view, "window.scrollTo(0, 700)")
-        tryVerify(() => view.scrollPosition.y >= 699)
-        const originalUrl = String(view.url)
-        view.restoreSurface()
-        verify(view.surfaceCovered)
-        const cover = findChild(view, "restoreSurfaceCover")
-        verify(cover.visible)
-        const coveredFrame = grabImage(view)
-        verify(coveredFrame.red(250, 200) > 240 && coveredFrame.green(250, 200) > 240)
-        tryVerify(() => !view.loading && !view.restorePending, 10000)
-        tryVerify(() => view.scrollPosition.y >= 699)
-        tryCompare(view, "surfaceCovered", false)
-        compare(String(view.url), originalUrl)
     }
     function notification() {
         return '<style>.card{box-sizing:border-box;max-width:600px;margin:0 auto;padding:32px;background:#f5f6f8;border-radius:12px;font-family:sans-serif}.brand{font-size:22px;font-weight:700;color:#1769d2}.title{font-size:26px;line-height:1.3;margin:24px 0 16px}.details{width:100%;border-collapse:collapse;margin:20px 0;background:white}.details td{padding:12px 16px;border-bottom:1px solid #e5e7eb}.muted{color:#687080}.button{display:inline-block;padding:10px 22px;border-radius:6px;background:#1769d2;color:white;text-decoration:none;font-weight:600}</style>'

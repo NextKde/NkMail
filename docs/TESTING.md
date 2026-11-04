@@ -83,7 +83,7 @@ Run these in a real graphical session for GPU/material review. The CLI suite's o
 
 Use a disposable test data directory, not another mail application's profile.
 
-1. Empty account: configure manual TLS endpoints; password remains empty when reopening the dialog. Saving configuration is not an authentication success indicator. Refresh explicitly starts the connection.
+1. Empty account: configure manual TLS endpoints; password remains empty when reopening the dialog. New password accounts validate IMAP and SMTP authentication before saving; SMTP validation does not send mail. Refresh starts mailbox synchronization.
 2. Read: refresh folders and headers, paginate, choose an uncached message, save a selected attachment to a new destination. Reading must not change server Seen/flag state. Never use destructive test commands against real mailboxes.
 3. Offline: disconnect, restart, read previously cached content, search cached headers/body, paginate cached results. Uncached content must be labeled unavailable rather than replaced by another message.
 4. Drafts: create, auto-save, close/reopen, restart, add/remove attachments, reply/reply-all/forward, discard. Review generated recipients before any submission.
@@ -98,3 +98,25 @@ Use a disposable test data directory, not another mail application's profile.
 - Network timeouts bound individual I/O, not an entire multi-message sync; thread shutdown waits for pending work.
 - MIME size/tree checks do not represent a full audit of the upstream parser.
 - Read-only provider verification is independent of local acceptance. Never publish real mailbox output, even after a successful private test.
+
+
+## Retained WebEngine surface regression
+
+The reader keeps the WebEngine front-buffer texture when the render loop pauses,
+while retaining cleanup on scene-graph invalidation and delegate destruction.
+`MailRenderLifecycle` follows visual child/window changes without polling. It
+matches Qt's private delegate class identity, using public QObject disconnection;
+this is a narrowly scoped compatibility adapter, not an upstream Qt fix. The
+reviewed upstream connection is in [Qt WebEngine v6.11.2](https://github.com/qt/qtwebengine/blob/v6.11.2/src/core/render_widget_host_view_qt_delegate_item.cpp).
+
+The reader suite requires `retainedSurface` to become true on a real WebEngine
+view, preserves an isolated-world document marker and internal scroll across
+hide/minimize/restore, and checks reparenting to a different window. A Qt upgrade
+that changes the delegate identity or connection must be reviewed when this check
+fails. Normal document replacement and renderer security tests still apply.
+
+The Xvfb suite does not prove Wayland compositor animation correctness. Pixel
+capture itself can schedule rendering and must not be used as proof that a passive
+restore has no black frame. The original failure and successful texture-lifetime
+comparison were confirmed by the user on native Wayland, threaded OpenGL/EGL,
+Intel Mesa; production-adapter acceptance on that setup is recorded separately.

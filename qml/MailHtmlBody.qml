@@ -1,60 +1,18 @@
 import QtQuick
-import QtQuick.Window
 import QtWebEngine
 import NextKde.Mail.Reader 1.0
 
 WebEngineView {
     id: root
     required property string html
+    readonly property bool retainedSurface: renderLifecycle.attached
+    MailRenderLifecycle { id: renderLifecycle; view: root }
     property url documentUrl: ""
     property int documentHeight: 200
     property bool documentReady: false
     signal linkActivated(string link)
     objectName: "mailHtmlBody"
     implicitHeight: Math.max(200, Math.min(12000, documentHeight))
-    readonly property bool windowSuspended: Window.window !== null
-        && (Window.visibility === Window.Minimized || Window.visibility === Window.Hidden)
-    property bool surfaceCovered: false
-    Rectangle {
-        objectName: "restoreSurfaceCover"
-        anchors.fill: parent
-        z: 100
-        color: root.backgroundColor
-        visible: root.surfaceCovered
-        // Keep the browser rendering underneath until the replacement frame is ready.
-    }
-    property bool restorePending: false
-    property point restoreScroll: Qt.point(0, 0)
-    function restoreSurface() {
-        if (!documentReady || windowSuspended || !visible) return
-        // Reload only our in-memory, network-isolated document. A native-window
-        // repaint alone does not replace a stale Chromium compositor surface.
-        revealTimer.stop()
-        surfaceCovered = true
-        restoreScroll = scrollPosition
-        restorePending = true
-        reload()
-    }
-    onWindowSuspendedChanged: {
-        if (windowSuspended) {
-            revealTimer.stop()
-            surfaceCovered = true
-        } else restoreTimer.restart()
-    }
-    Connections {
-        target: root.Window.window
-        function onActiveChanged() {
-            if (root.Window.window.active) restoreTimer.restart()
-        }
-    }
-    Timer { id: restoreTimer; interval: 120; onTriggered: root.restoreSurface() }
-    Timer {
-        id: revealTimer
-        interval: 120
-        onTriggered: {
-            if (!root.windowSuspended && !root.loading) root.surfaceCovered = false
-        }
-    }
     backgroundColor: "white"
     audioMuted: true
     activeFocusOnPress: true
@@ -118,16 +76,9 @@ WebEngineView {
             root.documentReady = true
         })
     }
-    onLoadProgressChanged: if (loadProgress === 100) {
-        if (restorePending) {
-            restorePending = false
-            runJavaScript("window.scrollTo(" + restoreScroll.x + "," + restoreScroll.y + ")", 1)
-        }
-        if (surfaceCovered) revealTimer.restart()
-        measureTimer.restart()
-    }
+    onLoadProgressChanged: if (loadProgress === 100) measureTimer.restart()
     onWidthChanged: measureTimer.restart()
-    onHtmlChanged: { revealTimer.stop(); surfaceCovered = windowSuspended; restorePending = false; restoreTimer.stop(); documentHeight = 200; documentReady = false; updateTimer.restart() }
+    onHtmlChanged: { documentHeight = 200; documentReady = false; updateTimer.restart() }
     Component.onCompleted: updateTimer.restart()
     Timer { id: updateTimer; interval: 0; onTriggered: root.updateDocument() }
     Timer { id: measureTimer; interval: 50; onTriggered: root.measureDocument() }

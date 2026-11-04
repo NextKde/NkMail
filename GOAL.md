@@ -388,7 +388,9 @@ This file is a recoverable work ledger, not a native Codex Goal. Work requires a
 - First public milestone successfully pushed: `4e4dfea7b51690e01b7ecf8be3c823c0b079529b`, including six reviewed synthetic screenshots.
 - A single controlled read-only provider attempt failed before the header/content slice completed; no alternate password was tried. A separate no-login connection verified system CA/hostname TLS and an IMAP greeting, but fixed backend diagnostics do not identify the failed authenticated phase, so this is not proof of an authentication failure. Provider compatibility remains unverified. No real SMTP submission or mailbox mutation has occurred.
 
-## Remaining work / known limits
+## Historical remaining work / known limits (superseded)
+
+This section records the 2026-10-29 baseline, not current missing features. Multiaccount, Sent APPEND, flags/move/delete and legacy Google OAuth were subsequently implemented. See the current queue below.
 - Controlled provider read-only verification after the now-passing TLS/PEEK suite; never publish account data or raw output, never cycle password alternatives automatically.
 - Controller-level workflow regression added: 23 passed including init/cleanup; reproduced and fixed offline paging, UIDVALIDITY append reset, stale attachments, visible cache on transport change, profile keychain isolation and reply recipient handling.
 - Column resizing, window geometry persistence and keyboard/focus checks implemented; pointer-test scene-coordinate issue fixed with unchanged strict assertions, three consecutive UI runs passed.
@@ -566,3 +568,25 @@ The scoped local implementation is substantially complete, but real-provider rea
 - User confirmed local-document recovery fixes the persistent black body, but black content remains during the minimize/restore animation.
 - Cover the embedded renderer with its normal white document background while suspended/recovering. Keep rendering active underneath; remove the cover 120ms after load completion when the window is no longer suspended. This hides transient black content rather than preserving a screenshot of mail; a brief plain background may be visible during recovery. Native compositor animation behavior still requires user confirmation.
 - VM reader checks passed in 4.12s, including pixel checks for the cover, cover removal, restored content, and retained internal scrolling. Host rebuilt/restarted with original process environment. No host automated tests or mailbox mutation.
+
+
+## Retained reader surface: final compatibility adapter · 2026-11-04
+
+- User confirmed the targeted texture-lifetime intervention resolves the native Wayland minimize/restore black region. Passive lifecycle evidence showed render-loop suspension without scene-graph invalidation. An initial QObject-tree probe never attached and is not valid evidence; the corrected visual-tree probe confirmed attachment before the successful comparison.
+- Removed all focus-reload, visibility/cover workarounds and host-only diagnostic instrumentation. MailRenderLifecycle observes the reader's visual children/window changes through queued event-driven scans. It preserves the delegate's front-buffer resources on suspension while retaining actual invalidation/destruction cleanup. No polling or global Qt modification.
+- The adapter deliberately depends on Qt's private render delegate identity using public QObject APIs. Regression requires successful attachment, no document reload/scroll loss, and fresh attachment after reparenting. Revisit this compatibility adapter on Qt upgrades. No upstream issue was submitted.
+- VM full suite passed 10/10 in 95.52s. Isolated KWin Wayland reader suite passed 8/8; graphics diagnostics during image capture mean this is not artifact-free animation acceptance. Final attachment-state/reparent regression passed in 3.97s. Earlier capture-only assertions were insufficient to prove passive animation correctness.
+- No host automated tests or mailbox mutation. Diagnostic comparison was user-confirmed; final event-driven adapter uses the same scoped disconnection and is prepared for host manual acceptance.
+
+
+## Current delivery queue · 2026-11-04
+
+1. Event-driven retained-surface adapter and VM regressions are complete; final native desktop manual acceptance and PR #18 release-gate remain.
+2. Provider/testing documentation reconciled; merge the final PR only after its own required release-gate passes.
+3. Optimize uncached body latency through a separately designed IMAP session reuse strategy; retain account/session cancellation and TLS/PEEK guarantees.
+4. Cross-account unified inbox and read-only aggregates with explicit account/folder/UIDVALIDITY/UID routing.
+5. Favorite ordering and unknown/stale unread-count semantics; complete copy-to/junk workflows and message/rfc822 attachment forwarding.
+6. CID embedded images; controlled provider/app-password acceptance. QQ credential restoration remains user-deferred.
+7. Deferred product scope: IDLE/background service, Microsoft/Exchange, colored flags/reminders/muting/blocking/rules. Public Google OAuth onboarding/review remains deliberately deferred, not an app-password release blocker.
+
+Old unchecked lists and provider statements above are historical evidence, not an additional duplicate backlog.
