@@ -16,7 +16,6 @@ struct GoogleClient {
     QString id, secret;
     QUrl authorizationUrl = QUrl(QStringLiteral("https://accounts.google.com/o/oauth2/v2/auth"));
     QUrl tokenUrl = QUrl(QStringLiteral("https://oauth2.googleapis.com/token"));
-    QUrl identityUrl = QUrl(QStringLiteral("https://openidconnect.googleapis.com/v1/userinfo"));
     int callbackTimeoutMs = 300000;
     bool fixture = false; // C++ loopback fixtures only; never loaded from user JSON.
     bool valid() const;
@@ -63,7 +62,7 @@ private:
     std::function<bool(QUrl)> m_openBrowser;
     QTcpServer m_listener;
     QTimer m_timeout;
-    QByteArray m_state, m_verifier;
+    QByteArray m_state, m_verifier, m_nonce;
     QString m_redirect;
     bool m_busy = false;
     quint64 m_generation = 0;

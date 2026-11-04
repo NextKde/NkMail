@@ -39,3 +39,15 @@ real acceptance remains pending until the separate error or successful retry is 
 The follow-up UI/i18n/catalog/OAuth checks passed 4/4 in 43.08s. Fixed diagnostic fields
 (stage, network enum, HTTP status and allowlisted provider code) help distinguish request
 failures without logging URLs, headers, response bodies, account identities or tokens.
+
+
+The identity check now uses the ID token obtained directly from Google's fixed token
+endpoint over verified TLS, avoiding a separate UserInfo request. The private exchange
+checks issuer/audience/azp, nonce, times, subject, verified email and any access-token
+hash. See `docs/GOOGLE_OAUTH.md` for the precise OIDC trust boundary: this path never
+accepts a browser-provided ID token and does not expose a general JWT validator. New
+fixtures reject mismatched, expired and unverified claims, missing identity tokens,
+`alg=none` and external key references, and assert zero UserInfo requests.
+
+Final VM pinned-source Release acceptance after the identity change passed all 10 suites
+in 86.50s. Real Google addition and mail synchronization remain separate manual checks.

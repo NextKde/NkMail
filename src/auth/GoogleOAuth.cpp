@@ -49,8 +49,7 @@ bool validEmail(const QString &email) {
 }
 bool endpoint(const GoogleClient &client, const QUrl &url) {
     if (client.fixture) return url.scheme() == "http" && url.host() == "127.0.0.1" && url.userInfo().isEmpty();
-    return url == QUrl("https://oauth2.googleapis.com/token")
-        || url == QUrl("https://openidconnect.googleapis.com/v1/userinfo");
+    return url == QUrl("https://oauth2.googleapis.com/token");
 }
 QJsonObject requestJson(const GoogleClient &client, const QUrl &url, const QUrlQuery *form,
                        const QString &access, const std::shared_ptr<std::atomic_bool> &cancelled) {
@@ -116,6 +115,46 @@ qint64 expiry(const QJsonObject &tokens) {
     if (tokens.contains("scope") && !tokens.value("scope").toString().split(' ').contains("https://mail.google.com/"))
         throw GoogleOAuthError(MissingPermission);
     return QDateTime::currentSecsSinceEpoch() + seconds;
+}
+// Private to the authorization-code exchange: this ID token is accepted only
+// from the fixed Google token endpoint over verified TLS (OIDC Core 3.1.3.7.6).
+// It is never taken from the browser callback, profile, QML or a caller parameter.
+// TLS authenticates its provenance; this is not a general JWT signature verifier.
+QString backchannelEmail(const QJsonObject &tokens, const GoogleClient &client, const QByteArray &nonce) {
+    const auto jwt = tokens.value("id_token").toString().toLatin1();
+    const auto parts = jwt.split('.');
+    if (jwt.size() > 16384 || parts.size() != 3) throw GoogleOAuthError(IdentityError);
+    const auto decode = [](const QByteArray &part) {
+        static const QRegularExpression pattern(QStringLiteral("^[A-Za-z0-9_-]+$"));
+        if (!pattern.match(QString::fromLatin1(part)).hasMatch()) throw GoogleOAuthError(IdentityError);
+        const auto decoded = QByteArray::fromBase64Encoding(part, QByteArray::Base64UrlEncoding | QByteArray::AbortOnBase64DecodingErrors);
+        if (!decoded) throw GoogleOAuthError(IdentityError);
+        return decoded.decoded;
+    };
+    const auto header = QJsonDocument::fromJson(decode(parts[0])).object();
+    const auto claims = QJsonDocument::fromJson(decode(parts[1])).object();
+    if (header.value("alg") != "RS256" || header.contains("crit") || header.contains("jku") || header.contains("jwk")
+        || (!header.value("typ").isUndefined() && header.value("typ") != "JWT") || decode(parts[2]).isEmpty())
+        throw GoogleOAuthError(IdentityError);
+    const auto now = QDateTime::currentSecsSinceEpoch();
+    const auto issued = claims.value("iat").toInteger(-1), expires = claims.value("exp").toInteger(-1);
+    const auto issuer = claims.value("iss").toString();
+    const auto email = claims.value("email").toString();
+    const auto verified = claims.value("email_verified");
+    if ((issuer != "https://accounts.google.com" && issuer != "accounts.google.com")
+        || claims.value("aud").toString() != client.id
+        || (claims.contains("azp") && claims.value("azp").toString() != client.id)
+        || nonce.isEmpty() || claims.value("nonce").toString().toLatin1() != nonce
+        || issued < now - 3600 || issued > now + 300 || expires <= now || expires <= issued || expires > now + 86400
+        || !safeToken(claims.value("sub").toString(), 255) || !validEmail(email)
+        || !(verified == QJsonValue(true) || verified == QJsonValue(QStringLiteral("true"))))
+        throw GoogleOAuthError(IdentityError);
+    if (claims.contains("at_hash")) {
+        const auto expected = QCryptographicHash::hash(tokens.value("access_token").toString().toUtf8(), QCryptographicHash::Sha256)
+            .left(16).toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
+        if (claims.value("at_hash").toString().toLatin1() != expected) throw GoogleOAuthError(IdentityError);
+    }
+    return email;
 }
 QByteArray randomUrlToken() {
     QByteArray bytes(32, '\0');
@@ -293,7 +332,7 @@ GoogleOAuthFlow::GoogleOAuthFlow(GoogleClient client, std::function<bool(QUrl)> 
 #endif
 GoogleOAuthFlow::~GoogleOAuthFlow() { cancel(); m_tasks.finish(); }
 void GoogleOAuthFlow::cancel() {
-    ++m_generation; m_busy = false; m_state.clear(); m_verifier.clear();
+    ++m_generation; m_busy = false; m_state.clear(); m_verifier.clear(); m_nonce.clear();
     m_timeout.stop(); m_listener.close();
     if (m_cancelled) m_cancelled->store(true);
     for (auto *socket : findChildren<QTcpSocket *>())
@@ -306,12 +345,13 @@ void GoogleOAuthFlow::start(const QString &loginHint) {
     if (!m_listener.listen(QHostAddress::LocalHost, 0)) { emit failed(translated(CallbackError)); return; }
     m_busy = true; ++m_generation;
     m_cancelled = std::make_shared<std::atomic_bool>(false);
-    m_state = randomUrlToken(); m_verifier = randomUrlToken();
+    m_state = randomUrlToken(); m_verifier = randomUrlToken(); m_nonce = randomUrlToken();
     m_redirect = QStringLiteral("http://127.0.0.1:%1/oauth2/callback").arg(m_listener.serverPort());
     QUrl url = m_client.authorizationUrl;
     QUrlQuery query;
     query.addQueryItem("client_id", m_client.id); query.addQueryItem("response_type", "code");
     query.addQueryItem("redirect_uri", m_redirect); query.addQueryItem("scope", "openid email https://mail.google.com/");
+    query.addQueryItem("nonce", QString::fromLatin1(m_nonce));
     query.addQueryItem("state", QString::fromLatin1(m_state)); query.addQueryItem("access_type", "offline");
     query.addQueryItem("prompt", "consent"); query.addQueryItem("code_challenge_method", "S256");
     query.addQueryItem("code_challenge", QString::fromLatin1(QCryptographicHash::hash(m_verifier, QCryptographicHash::Sha256)
@@ -366,10 +406,10 @@ void GoogleOAuthFlow::acceptConnection() {
     }
 }
 void GoogleOAuthFlow::exchange(const QString &code) {
-    const auto client = m_client; const auto verifier = m_verifier; const auto redirect = m_redirect;
+    const auto client = m_client; const auto verifier = m_verifier; const auto redirect = m_redirect; const auto nonce = m_nonce;
     const auto generation = m_generation; const auto cancelled = m_cancelled;
-    m_verifier.clear(); QPointer<GoogleOAuthFlow> self(this);
-    m_tasks.run([self, client, verifier, redirect, code, generation, cancelled] {
+    m_verifier.clear(); m_nonce.clear(); QPointer<GoogleOAuthFlow> self(this);
+    m_tasks.run([self, client, verifier, redirect, nonce, code, generation, cancelled] {
         QString email, opaque, message;
         try {
             QUrlQuery form;
@@ -381,9 +421,7 @@ void GoogleOAuthFlow::exchange(const QString &code) {
             const auto expiresAt = expiry(tokens); const auto access = tokens.value("access_token").toString();
             const auto refresh = tokens.value("refresh_token").toString();
             if (!safeToken(refresh)) throw GoogleOAuthError(MissingOfflineAccess);
-            const auto identity = requestJson(client, client.identityUrl, nullptr, access, cancelled);
-            email = identity.value("email").toString();
-            if (!validEmail(email) || !identity.value("email_verified").toBool()) throw GoogleOAuthError(IdentityError);
+            email = backchannelEmail(tokens, client, nonce);
             opaque = GoogleTokens::credential(email, refresh, client.id);
             if (cancelled->load()) throw GoogleOAuthError(Cancelled);
             GoogleTokens::prime(opaque, access, expiresAt);

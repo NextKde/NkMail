@@ -3,6 +3,7 @@
 #include <QTcpSocket>
 #include <QUrlQuery>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QCryptographicHash>
 #include <QElapsedTimer>
 #include <future>
@@ -18,6 +19,9 @@ public:
     GoogleClient client;
     QMap<QString, QString> lastForm;
     QString refreshError, rotatedRefresh, scope = "openid email https://mail.google.com/";
+    QString nonce;
+    QJsonObject claimOverrides, headerOverrides;
+    bool omitIdToken = false;
     int codeRequests = 0, refreshRequests = 0, identityRequests = 0, leakRequests = 0;
     bool verified = true, missingRefresh = false, redirect = false, stall = false;
     GoogleFixture() {
@@ -25,7 +29,7 @@ public:
         const auto base = QStringLiteral("http://127.0.0.1:%1").arg(server.serverPort());
         client.id = "fixture.apps.googleusercontent.com"; client.secret = "fixture-secret+with-plus";
         client.authorizationUrl = QUrl(base + "/authorize"); client.tokenUrl = QUrl(base + "/token");
-        client.identityUrl = QUrl(base + "/identity"); client.fixture = true;
+        client.fixture = true;
         connect(&server, &QTcpServer::newConnection, this, [this] {
             while (auto *socket = server.nextPendingConnection()) {
                 connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
@@ -50,6 +54,18 @@ public:
                             ++codeRequests;
                             response = {{"access_token", "fixture-access"}, {"token_type", "Bearer"}, {"expires_in", 3600}, {"scope", scope}};
                             if (!missingRefresh) response.insert("refresh_token", "fixture-refresh+token");
+                            const auto now = QDateTime::currentSecsSinceEpoch();
+                            QJsonObject claims{{"iss", "https://accounts.google.com"}, {"aud", client.id}, {"azp", client.id},
+                                {"iat", now}, {"exp", now + 3600}, {"nonce", nonce}, {"sub", "fixture-subject"},
+                                {"email", "reader@example.invalid"}, {"email_verified", verified},
+                                {"at_hash", QString::fromLatin1(QCryptographicHash::hash("fixture-access", QCryptographicHash::Sha256)
+                                    .left(16).toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals))}};
+                            for (auto it = claimOverrides.begin(); it != claimOverrides.end(); ++it) claims.insert(it.key(), it.value());
+                            QJsonObject header{{"alg", "RS256"}, {"typ", "JWT"}};
+                            for (auto it = headerOverrides.begin(); it != headerOverrides.end(); ++it) header.insert(it.key(), it.value());
+                            const auto encode = [](const QJsonObject &value) { return QJsonDocument(value).toJson(QJsonDocument::Compact)
+                                .toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals); };
+                            if (!omitIdToken) response.insert("id_token", QString::fromLatin1(encode(header) + '.' + encode(claims) + ".Zml4dHVyZS1zaWduYXR1cmU"));
                         } else {
                             ++refreshRequests;
                             response = {{"access_token", "fixture-renewed"}, {"token_type", "Bearer"}, {"expires_in", 3600}, {"scope", scope}};
@@ -107,7 +123,6 @@ private slots:
         QCOMPARE(client.id, "nkmail-project-fixture.apps.googleusercontent.com");
         QCOMPARE(client.tokenUrl, QUrl("https://oauth2.googleapis.com/token"));
         QCOMPARE(client.authorizationUrl, QUrl("https://accounts.google.com/o/oauth2/v2/auth"));
-        QCOMPARE(client.identityUrl, QUrl("https://openidconnect.googleapis.com/v1/userinfo"));
     }
     void missingRegistrationNeverOpensBrowser() {
         GoogleClient empty; int opened = 0;
@@ -129,7 +144,7 @@ private slots:
     void authorizationUsesPkceAndVerifiedIdentity() {
         GoogleFixture fixture; GoogleTokens::useFixtureClient(fixture.client);
         QUrl browserUrl;
-        GoogleOAuthFlow flow(fixture.client, [&](QUrl url) { browserUrl = url; return true; });
+        GoogleOAuthFlow flow(fixture.client, [&](QUrl url) { browserUrl = url; fixture.nonce = QUrlQuery(url).queryItemValue("nonce"); return true; });
         QSignalSpy granted(&flow, &GoogleOAuthFlow::granted);
         flow.start("reader@example.invalid");
         const QUrlQuery authorization(browserUrl);
@@ -138,6 +153,8 @@ private slots:
         QCOMPARE(authorization.queryItemValue("prompt"), "consent");
         QVERIFY(authorization.queryItemValue("scope").contains("https://mail.google.com/"));
         QVERIFY(authorization.queryItemValue("state").size() >= 43);
+        QVERIFY(authorization.queryItemValue("nonce").size() >= 43);
+        QVERIFY(authorization.queryItemValue("nonce") != authorization.queryItemValue("state"));
         const QUrl redirect(authorization.queryItemValue("redirect_uri"));
         QCOMPARE(redirect.host(), "127.0.0.1"); QVERIFY(redirect.port() > 0);
         const QByteArray code = "fixture-code+with/reserved=&";
@@ -157,12 +174,13 @@ private slots:
         auto token = tokenAsync(opaque);
         QTRY_VERIFY(token.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready);
         QCOMPARE(token.get(), "fixture-access"); QCOMPARE(fixture.refreshRequests, 0);
+        QCOMPARE(fixture.identityRequests, 0); QCOMPARE(fixture.leakRequests, 0);
         QVERIFY(!flow.busy());
         QVERIFY(callback(redirect, target(authorization)).isEmpty()); QCOMPARE(fixture.codeRequests, 1);
     }
     void wrongStateHostAndDuplicateParametersCannotConsumeFlow() {
         GoogleFixture fixture; GoogleTokens::useFixtureClient(fixture.client); QUrl browser;
-        GoogleOAuthFlow flow(fixture.client, [&](QUrl url) { browser = url; return true; });
+        GoogleOAuthFlow flow(fixture.client, [&](QUrl url) { browser = url; fixture.nonce = QUrlQuery(url).queryItemValue("nonce"); return true; });
         QSignalSpy granted(&flow, &GoogleOAuthFlow::granted); flow.start({});
         const QUrlQuery auth(browser); const QUrl redirect(auth.queryItemValue("redirect_uri"));
         QVERIFY(callback(redirect, "/oauth2/callback?state=wrong&code=fixture").startsWith("HTTP/1.1 400"));
@@ -175,7 +193,7 @@ private slots:
     }
     void denialAndCancellationNeverExchangeCredentials() {
         GoogleFixture fixture; GoogleTokens::useFixtureClient(fixture.client); QUrl browser;
-        GoogleOAuthFlow flow(fixture.client, [&](QUrl url) { browser = url; return true; });
+        GoogleOAuthFlow flow(fixture.client, [&](QUrl url) { browser = url; fixture.nonce = QUrlQuery(url).queryItemValue("nonce"); return true; });
         QSignalSpy failed(&flow, &GoogleOAuthFlow::failed); flow.start({});
         const QUrlQuery auth(browser); const QUrl redirect(auth.queryItemValue("redirect_uri"));
         QVERIFY(callback(redirect, target(auth, "&error=access_denied")).startsWith("HTTP/1.1 200"));
@@ -188,7 +206,7 @@ private slots:
             GoogleFixture fixture; GoogleTokens::useFixtureClient(fixture.client); QUrl browser;
             fixture.verified = which != 0; fixture.missingRefresh = which == 1;
             if (which == 2) fixture.scope = "openid email";
-            GoogleOAuthFlow flow(fixture.client, [&](QUrl url) { browser = url; return true; });
+            GoogleOAuthFlow flow(fixture.client, [&](QUrl url) { browser = url; fixture.nonce = QUrlQuery(url).queryItemValue("nonce"); return true; });
             QSignalSpy failed(&flow, &GoogleOAuthFlow::failed), granted(&flow, &GoogleOAuthFlow::granted);
             flow.start({}); const QUrlQuery auth(browser);
             callback(QUrl(auth.queryItemValue("redirect_uri")), target(auth));
@@ -203,6 +221,35 @@ private slots:
                 QVERIFY(message.contains("allow Gmail mail access"));
                 QCOMPARE(fixture.identityRequests, 0);
             }
+        }
+    }
+    void backchannelIdentityRejectsMismatchedAndExpiredClaims() {
+        const QList<QJsonObject> invalid = {
+            {{"iss", "https://attacker.invalid"}}, {{"aud", "other-client"}}, {{"azp", "other-client"}},
+            {{"nonce", "replayed-nonce"}}, {{"exp", QDateTime::currentSecsSinceEpoch() - 1}},
+            {{"iat", QDateTime::currentSecsSinceEpoch() + 600}}, {{"sub", ""}},
+            {{"email_verified", false}}, {{"email_verified", "false"}}, {{"at_hash", "wrong"}},
+            {{"aud", QJsonArray{"fixture.apps.googleusercontent.com", "other-client"}}}, {{"email", "bad-address"}}
+        };
+        for (const auto &claims : invalid) {
+            GoogleFixture fixture; fixture.claimOverrides = claims;
+            GoogleTokens::useFixtureClient(fixture.client); QUrl browser;
+            GoogleOAuthFlow flow(fixture.client, [&](QUrl url) { browser = url; fixture.nonce = QUrlQuery(url).queryItemValue("nonce"); return true; });
+            QSignalSpy failed(&flow, &GoogleOAuthFlow::failed), granted(&flow, &GoogleOAuthFlow::granted);
+            flow.start({}); const QUrlQuery auth(browser);
+            callback(QUrl(auth.queryItemValue("redirect_uri")), target(auth));
+            QTRY_COMPARE(failed.count(), 1); QCOMPARE(granted.count(), 0); QCOMPARE(fixture.identityRequests, 0);
+        }
+        for (int which = 0; which < 3; ++which) {
+            GoogleFixture fixture; fixture.omitIdToken = which == 0;
+            if (which == 1) fixture.headerOverrides = {{"alg", "none"}};
+            if (which == 2) fixture.headerOverrides = {{"jku", "https://attacker.invalid/keys"}};
+            GoogleTokens::useFixtureClient(fixture.client); QUrl browser;
+            GoogleOAuthFlow flow(fixture.client, [&](QUrl url) { browser = url; fixture.nonce = QUrlQuery(url).queryItemValue("nonce"); return true; });
+            QSignalSpy failed(&flow, &GoogleOAuthFlow::failed), granted(&flow, &GoogleOAuthFlow::granted);
+            flow.start({}); const QUrlQuery auth(browser);
+            callback(QUrl(auth.queryItemValue("redirect_uri")), target(auth));
+            QTRY_COMPARE(failed.count(), 1); QCOMPARE(granted.count(), 0); QCOMPARE(fixture.identityRequests, 0);
         }
     }
     void concurrentRefreshIsSingleFlightAndIdentityBound() {

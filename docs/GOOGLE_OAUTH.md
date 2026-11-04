@@ -61,6 +61,16 @@ strict callback validation. Google's endpoints are fixed in code; JSON endpoint 
 are ignored. Tokens are exchanged with TLS verification, response limits, timeouts,
 manual redirects and no browser cookies. NkMail does not receive the Google password.
 
+The verified identity is taken from the ID token returned directly by Google's fixed
+token endpoint during this authorization-code exchange. This private path authenticates
+the response through verified TLS, as permitted by OIDC Core 3.1.3.7 step 6 and Google's
+server-flow guidance. It checks issuer, audience, authorized presenter, one-use nonce,
+subject, expiry/issuance times, verified email and any supplied access-token hash. It
+rejects `alg=none`, malformed token structure and externally supplied key references.
+This is not a general JWT signature-verification API: browser/profile/QML-supplied ID
+tokens are never accepted. ID tokens are neither stored nor exposed. A second UserInfo
+request is unnecessary, avoiding an extra network dependency after successful exchange.
+
 Only an opaque refresh credential goes through QtKeychain; account SQLite metadata and
 QML never contain tokens. Access tokens stay in memory, refresh is single-flight and
 refresh-token rotation updates the keychain through AccountSession. Removal/cancellation
@@ -74,7 +84,7 @@ checks never send mail. Real mailbox writes are outside the synthetic acceptance
 
 ## Evidence and remaining acceptance
 
-The OAuth tests use local synthetic authorization/token/userinfo endpoints and include
+The OAuth tests use local synthetic authorization/token endpoints and backchannel identity claims and include
 PKCE, verified identity, callback rejection, cancellation, refresh concurrency, rotation,
 expiry and redirect rejection. Protocol fixtures exercise XOAUTH2 success/failure and
 challenge acknowledgment without password fallback. UI tests cover project-configured
@@ -84,4 +94,6 @@ must be reported separately from those fixtures.
 Sources: [Google native applications](https://developers.google.com/identity/protocols/oauth2/native-app),
 [Gmail XOAUTH2](https://developers.google.com/workspace/gmail/imap/xoauth2-protocol),
 [OAuth production readiness](https://developers.google.com/identity/protocols/oauth2/production-readiness/policy-compliance),
-[testing restrictions](https://support.google.com/cloud/answer/15549945).
+[testing restrictions](https://support.google.com/cloud/answer/15549945),
+[OIDC code-flow identity validation](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation),
+[Google direct token response](https://developers.google.com/identity/openid-connect/openid-connect#obtainuserinfo).
