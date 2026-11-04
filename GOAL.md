@@ -656,3 +656,6 @@ Old unchecked lists and provider statements above are historical evidence, not a
 
 - Grouped input sizing: reduced MailSettingsInput from 24px to 20px and vertical padding to 1px, retaining 12px text and the existing row layout.
   VM account editing/binding regression passed (3/3 including lifecycle). Host preview rebuilt and replaced for user inspection.
+
+- Grouped input colors: default #d1d1d6, active input focus uses canonical AppTheme.defaultAccentSeed blue; contrasting text and inverted selection keep editing legible.
+  VM account editing/binding regression passed (3/3 including lifecycle); host preview rebuilt and replaced for manual inspection.
