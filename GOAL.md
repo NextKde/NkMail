@@ -659,3 +659,6 @@ Old unchecked lists and provider statements above are historical evidence, not a
 
 - Grouped input colors: default #d1d1d6, active input focus uses canonical AppTheme.defaultAccentSeed blue; contrasting text and inverted selection keep editing legible.
   VM account editing/binding regression passed (3/3 including lifecycle); host preview rebuilt and replaced for manual inspection.
+
+- Corrected grouped input focus per user clarification: keep #d1d1d6 background and dark text, show only a 1px canonical-blue border on active input focus. This explicitly requested border supersedes the prior no-focus-border styling for this input.
+  VM account editing/binding regression passed (3/3 including lifecycle); host preview rebuilt and replaced for manual inspection.
