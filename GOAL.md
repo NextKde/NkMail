@@ -581,8 +581,8 @@ The scoped local implementation is substantially complete, but real-provider rea
 
 ## Current delivery queue · 2026-11-04
 
-1. Event-driven retained-surface adapter and VM regressions are complete; final native desktop manual acceptance and PR #18 release-gate remain.
-2. Provider/testing documentation reconciled; merge the final PR only after its own required release-gate passes.
+1. Event-driven retained-surface adapter accepted by the user; PR #18 merged after release-gate.
+2. Provider/testing documentation reconciled. PR #19 includes IMAP session reuse and the body/flag race fix; merge only after its required release-gate passes.
 3. IMAP header/body session reuse implemented on codex/imap-body-session; VM regressions pass. Real-provider latency and final PR release-gate remain to verify.
 4. Cross-account unified inbox and read-only aggregates with explicit account/folder/UIDVALIDITY/UID routing.
 5. Favorite ordering and unknown/stale unread-count semantics; complete copy-to/junk workflows and message/rfc822 attachment forwarding.
@@ -599,3 +599,10 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - Every operation still uses read-only EXAMINE; bodies check UIDVALIDITY before UID BODY.PEEK. Transport failure on a reused connection gets at most one fresh attempt. Fresh-connection failure, protocol errors, UIDVALIDITY changes and TLS rejection do not loop. Send/write retry semantics are unchanged.
 - VM full suite passed 10/10 in 98.24s. Final protocol follow-up (actual server UIDVALIDITY change and controlled timing) passed in 25.79s. Fixtures cover header/body reuse, two UIDs, cross-folder reading, account/password/trust changes, explicit reset, closed connection, bounded double failure, protocol NO and controller cleanup.
 - With an artificial 150ms login delay, fixture reads measured 214→4ms (implicit TLS) and 168→2ms (STARTTLS). This proves avoided handshake/authentication work, not real-provider end-to-end latency. Cold/expired sessions and body transfer/parse still take time. No real mailbox writes or automated host validation.
+
+## Uncached body and flag-update race · 2026-11-04
+
+- Opening an unread row starts a body read and then marks it read. Flag-command dispatch invalidated both the list and body generations; completion invalidated the body again and rebuilt selection from header-only content, removing the loading state. The otherwise successful body callback was discarded.
+- Body delivery now depends on the selection generation, independent of list refresh/filter/flag changes. Account/folder/selection changes and completed removal still invalidate it. Flag completion updates selection flags in place, preserving pending/error/body state; a late PEEK snapshot preserves current read/star flags before caching.
+- Four deterministic VM regressions reproduced the old bug: read/star updates completing before/after the body. All four failed before the fix. Tests also cover large HTML delivery through callback/cache/selection. After the fix, the full VM suite passed 10/10 in 100.16s, including all four race cases.
+- Temporary MIME/DOM/dispatch diagnostics and the diagnostic empty-cache bypass have been removed. No real-mail content or raw logs are published. Host builds/replacements are for user manual inspection; automated tests run only in the VM.

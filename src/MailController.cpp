@@ -66,9 +66,14 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
                 if (row >= 0) m_messages->remove(row);
             } else m_messages->update(s);
             if (sameMessage(m_content.summary, s)) {
-                ++m_selectionGeneration;
-                if (removed) { m_content = {}; m_selected.clear(); m_selectedUid.clear(); }
-                else { m_content.summary = s; m_selected = contentMap(m_content); }
+                if (removed) { ++m_selectionGeneration; m_content = {}; m_selected.clear(); m_selectedUid.clear(); }
+                else {
+                    m_content.summary = s;
+                    // Flag updates must preserve a pending body/error state.
+                    m_selected.insert("unread", s.unread);
+                    m_selected.insert("flagged", s.flagged);
+                    m_selected.insert("summary", summaryMap(s));
+                }
                 emit selectionChanged();
             }
         }
@@ -721,18 +726,26 @@ void MailController::openMessage(const QString &uid, const QString &validity, co
         setStatus(tr("This message is not cached"), tr("Connect to download its content.")); return;
     }
     emit selectionChanged();
-    const auto generation = m_generation; const auto account = m_account;
+    const auto account = m_account;
     setStatus(tr("Loading message without changing server flags…"));
-    m_sync->content(account, folder, validity, uid, [this, generation, selectionGeneration](const Content &content, const QString &error) {
-        if (generation != m_generation || selectionGeneration != m_selectionGeneration) return;
+    m_sync->content(account, folder, validity, uid, [this, selectionGeneration](const Content &content, const QString &error) {
+        // List refresh/filter/flag operations do not change the selected body.
+        // Account, folder, selection and completed removal invalidate this token.
+        if (selectionGeneration != m_selectionGeneration) return;
         const auto failed = [this](const QString &message) {
             m_selected.insert("bodyLoading", false);
             m_selected.insert("bodyError", QCoreApplication::translate("MailErrors", message.toUtf8().constData()));
             emit selectionChanged();
         };
         if (!error.isEmpty()) { failed(error); setStatus(tr("Could not load message"), error); return; }
-        if (!m_database->saveContent(content)) { failed(m_database->error()); setStatus(tr("Could not cache content"), m_database->error()); return; }
-        present(content); setStatus(tr("Message cached · remote content blocked"));
+        Content current = content;
+        // The PEEK snapshot can predate a concurrent read/star update.
+        if (sameMessage(m_content.summary, current.summary)) {
+            current.summary.unread = m_content.summary.unread;
+            current.summary.flagged = m_content.summary.flagged;
+        }
+        if (!m_database->saveContent(current)) { failed(m_database->error()); setStatus(tr("Could not cache content"), m_database->error()); return; }
+        present(current); setStatus(tr("Message cached · remote content blocked"));
     });
 }
 
@@ -807,7 +820,7 @@ void MailController::executeCommand(const QVariantList &indices, MailboxCommands
         seen.insert(identity); selected.append(summary);
     }
     if (selected.isEmpty()) return;
-    ++m_generation; ++m_selectionGeneration; m_serverSearching = false;
+    ++m_generation; m_serverSearching = false;
     setStatus(tr("Updating messages…"));
     m_commands->execute(m_account, selected, action, value, destination, m_demo);
     emit statusChanged();

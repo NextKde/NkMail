@@ -272,6 +272,80 @@ private slots:
         QCOMPARE(synthetic::sendCalls.load(), 0);
     }
 
+    void flagsDuringBodyDownload_data() {
+        QTest::addColumn<bool>("flagsFirst");
+        QTest::addColumn<bool>("markRead");
+        QTest::newRow("read-before-body") << true << true;
+        QTest::newRow("read-after-body") << false << true;
+        QTest::newRow("flag-before-body") << true << false;
+        QTest::newRow("flag-after-body") << false << false;
+    }
+    void flagsDuringBodyDownload() {
+        QFETCH(bool, flagsFirst); QFETCH(bool, markRead);
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
+        QSemaphore bodyRelease, flagsRelease;
+        class DelayedFlags final : public MailTransport {
+        public:
+            QSemaphore *release;
+            void storeFlagsMany(const Account &, const QString &, const QString &, const QStringList &, const QStringList &, bool) override { release->acquire(); }
+        };
+        auto transport = std::make_shared<DelayedFlags>(); transport->release = &flagsRelease;
+        const auto normal = synthetic::content;
+        synthetic::content = [&bodyRelease, normal](const Account &a, const QString &folder, const QString &validity, const QString &uid) {
+            bodyRelease.acquire(); auto c = normal(a, folder, validity, uid);
+            c.summary.unread = true;
+            c.displayHtml = QStringLiteral("<p>Synthetic HTML body</p>").repeated(1100);
+            return c;
+        };
+        MailController controller(false, root.path(), nullptr, transport);
+        ReleaseOnExit bodyCleanup{bodyRelease}, flagsCleanup{flagsRelease};
+        QTRY_VERIFY(controller.status().contains("restored"));
+        controller.openMessage("120", "100");
+        if (markRead) controller.setMessageRead(0, true);
+        else controller.setMessagesFlagged({0}, true);
+        if (flagsFirst) {
+            flagsRelease.release();
+            QTRY_VERIFY(controller.status().contains("Messages updated"));
+            QVERIFY(controller.selectedMessage().value("bodyPending").toBool());
+            QVERIFY(controller.selectedMessage().value("bodyLoading").toBool());
+        }
+        bodyRelease.release();
+        QTRY_COMPARE(controller.selectedMessage().value("text").toString(), QString("Synthetic body 120"));
+        if (!flagsFirst) { flagsRelease.release(); QTRY_VERIFY(controller.status().contains("Messages updated")); }
+        QCOMPARE(controller.selectedMessage().value("displayHtml").toString(), QStringLiteral("<p>Synthetic HTML body</p>").repeated(1100));
+        QCOMPARE(controller.selectedMessage().value(markRead ? "unread" : "flagged").toBool(), !markRead);
+        QVERIFY(!controller.selectedMessage().value("bodyPending").toBool());
+        QVERIFY(!controller.selectedMessage().value("bodyLoading").toBool());
+        MailDatabase db; QVERIFY(db.open(root.path())); const auto cached = db.content("INBOX", "100", "120");
+        QVERIFY(cached); QCOMPARE(markRead ? cached->summary.unread : cached->summary.flagged, !markRead);
+    }
+
+    void uncachedHtmlBodySurvivesAsyncDeliveryAndCache() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
+        QSemaphore release;
+        const QString html = QStringLiteral("<p>Synthetic HTML body</p>").repeated(1100);
+        const auto normal = synthetic::content;
+        synthetic::content = [&release, normal, html](const Account &a, const QString &folder, const QString &validity, const QString &uid) {
+            release.acquire();
+            auto result = normal(a, folder, validity, uid);
+            result.html = html; result.displayHtml = html;
+            return result;
+        };
+        MailController controller(false, root.path()); ReleaseOnExit cleanup{release};
+        QTRY_VERIFY(controller.status().contains("restored"));
+        controller.openMessage("120", "100");
+        QVERIFY(controller.selectedMessage().value("bodyPending").toBool());
+        release.release();
+        QTRY_COMPARE(controller.selectedMessage().value("displayHtml").toString(), html);
+        QCOMPARE(controller.selectedMessage().value("text").toString(), QString("Synthetic body 120"));
+        QVERIFY(!controller.selectedMessage().value("bodyLoading").toBool());
+        MailDatabase db; QVERIFY(db.open(root.path()));
+        const auto cached = db.content("INBOX", "100", "120");
+        QVERIFY(cached); QCOMPARE(cached->displayHtml, html);
+        controller.openMessage("120", "100");
+        QCOMPARE(controller.selectedMessage().value("displayHtml").toString(), html);
+    }
+
     void bodyLoadingPreservesHeaderAndOffersRetryAfterFailure() {
         QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
         QSemaphore release;
