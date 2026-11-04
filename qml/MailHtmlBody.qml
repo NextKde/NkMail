@@ -12,12 +12,26 @@ WebEngineView {
     signal linkActivated(string link)
     objectName: "mailHtmlBody"
     implicitHeight: Math.max(200, Math.min(12000, documentHeight))
-    // Explicitly notify Chromium when the containing window is minimized/hidden.
-    // Keeping only the native window hidden can leave its imported texture stale
-    // on restore until unrelated input schedules another compositor frame.
     readonly property bool windowSuspended: Window.window !== null
         && (Window.visibility === Window.Minimized || Window.visibility === Window.Hidden)
-    visible: !windowSuspended
+    property bool restorePending: false
+    property point restoreScroll: Qt.point(0, 0)
+    function restoreSurface() {
+        if (!documentReady || windowSuspended || !visible) return
+        // Reload only our in-memory, network-isolated document. A native-window
+        // repaint alone does not replace a stale Chromium compositor surface.
+        restoreScroll = scrollPosition
+        restorePending = true
+        reload()
+    }
+    onWindowSuspendedChanged: if (!windowSuspended) restoreTimer.restart()
+    Connections {
+        target: root.Window.window
+        function onActiveChanged() {
+            if (root.Window.window.active) restoreTimer.restart()
+        }
+    }
+    Timer { id: restoreTimer; interval: 120; onTriggered: root.restoreSurface() }
     backgroundColor: "white"
     audioMuted: true
     activeFocusOnPress: true
@@ -81,9 +95,15 @@ WebEngineView {
             root.documentReady = true
         })
     }
-    onLoadProgressChanged: if (loadProgress === 100) measureTimer.restart()
+    onLoadProgressChanged: if (loadProgress === 100) {
+        if (restorePending) {
+            restorePending = false
+            runJavaScript("window.scrollTo(" + restoreScroll.x + "," + restoreScroll.y + ")", 1)
+        }
+        measureTimer.restart()
+    }
     onWidthChanged: measureTimer.restart()
-    onHtmlChanged: { documentHeight = 200; documentReady = false; updateTimer.restart() }
+    onHtmlChanged: { restorePending = false; restoreTimer.stop(); documentHeight = 200; documentReady = false; updateTimer.restart() }
     Component.onCompleted: updateTimer.restart()
     Timer { id: updateTimer; interval: 0; onTriggered: root.updateDocument() }
     Timer { id: measureTimer; interval: 50; onTriggered: root.measureDocument() }

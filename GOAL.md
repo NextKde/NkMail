@@ -552,3 +552,10 @@ The scoped local implementation is substantially complete, but real-provider rea
 - Bind WebEngine item visibility to its containing window's minimized/hidden state, explicitly notifying the browser renderer through suspend/resume without replacing the document or resetting scrolling.
 - VM reader suite passed in 2.89s, including new minimize/restore and hide/show pixel checks without user input, with document URL/readiness preserved. This VM result does not establish reproduction or resolution on the user's compositor.
 - Host rebuilt/relaunched with prior process environment under existing authorization. No host automated tests or mailbox mutations. Await user confirmation of the original minimize/restore symptom.
+
+
+## Restore follow-up: visibility synchronization insufficient · 2026-11-04
+
+- User reports the black surface still occurs. Prior VM success did not reproduce or resolve the host symptom. Host session is Wayland; no explicit Qt renderer override was present. No definitive GPU/compositor cause established.
+- Replace ineffective view-visibility workaround with a debounced local-document reload on restore/reactivation. Reload uses the existing isolated in-memory URL, not mail transport; preserve document dimensions, outer reader position and internal browser scrolling. New mail cancels pending restoration. This is a rendering recovery workaround; browser text selection can reset on reactivation.
+- VM reader suite passed in 4.08s, with pixels checked after queued restoration and a long-document regression confirming internal scroll restoration. Host rebuilt/restarted with original process environment. No host automated tests, mailbox writes, global renderer changes or credential changes. Actual host symptom confirmation remains pending.
