@@ -31,6 +31,9 @@ WebEngineView {
     settings.navigateOnDropEnabled: false
     settings.hyperlinkAuditingEnabled: false
     settings.errorPageEnabled: false
+    // Normal documents use the reader scrollbar; capped surfaces retain native
+    // scrolling so the rest of an exceptionally long document remains reachable.
+    settings.showScrollBars: documentHeight >= 12000
     settings.defaultTextEncoding: "UTF-8"
     onContextMenuRequested: function(request) { request.accepted = true }
     onNewWindowRequested: function(request) {
@@ -65,7 +68,7 @@ WebEngineView {
     // mail scripts stay disabled and no WebChannel/host object is exposed.
     function measureDocument() {
         const expectedUrl = String(root.documentUrl)
-        runJavaScript("document.body ? Math.ceil(Math.max(document.body.scrollHeight, document.body.getBoundingClientRect().height)) : 0", 1, function(value) {
+        runJavaScript("document.body ? Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, document.body.getBoundingClientRect().height)) : 0", 1, function(value) {
             if (String(root.url) !== expectedUrl || !(Number(value) > 0)) return
             root.documentHeight = Math.max(200, Math.min(12000, Number(value)))
             root.documentReady = true

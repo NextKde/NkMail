@@ -1628,6 +1628,14 @@ Alex
             <source>Retry</source>
             <translation>重试</translation>
         </message>
+        <message>
+            <source>Loading images…</source>
+            <translation>正在加载图片…</translation>
+        </message>
+        <message>
+            <source>Some images could not be loaded. Retry to load them again.</source>
+            <translation>部分图片加载失败，可点击重试。</translation>
+        </message>
     </context>
     <context>
         <name>ProviderPicker</name>

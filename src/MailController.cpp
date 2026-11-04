@@ -55,6 +55,9 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         else m_content.html = html;
         m_selected = contentMap(m_content); emit selectionChanged();
     });
+    connect(m_images, &RemoteImageLoader::loadingChanged, this, [this](const QString &key) {
+        if (key == RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion)) emit selectionChanged();
+    });
     m_commands = new MailboxCommands(*m_database, m_transport, this);
     connect(m_commands, &MailboxCommands::completed, this, [this](const QList<Summary> &messages, bool removed, const QString &error) {
         for (const auto &s : messages) {
@@ -669,6 +672,13 @@ void MailController::present(const Content &content) {
 int MailController::blockedImageCount() const {
     const auto &html = m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml;
     return int(html.count(QStringLiteral("data-nkmail-src=\"")));
+}
+bool MailController::remoteImagesLoading() const {
+    return m_images->loading(RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion));
+}
+int MailController::failedImageCount() const {
+    const auto &html = m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml;
+    return int(html.count(QStringLiteral("data-nkmail-failed=\"1\"")));
 }
 void MailController::loadRemoteImages() {
     m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion), m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml);

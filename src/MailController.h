@@ -31,6 +31,8 @@ class MailController : public QObject {
     Q_PROPERTY(QVariantMap selectedMessage READ selectedMessage NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedUid READ selectedUid NOTIFY selectionChanged)
     Q_PROPERTY(int blockedImageCount READ blockedImageCount NOTIFY selectionChanged)
+    Q_PROPERTY(bool remoteImagesLoading READ remoteImagesLoading NOTIFY selectionChanged)
+    Q_PROPERTY(int failedImageCount READ failedImageCount NOTIFY selectionChanged)
     Q_PROPERTY(QString currentFolder READ currentFolder NOTIFY folderChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
@@ -64,6 +66,8 @@ public:
     QVariantMap selectedMessage() const { return m_selected; }
     QString selectedUid() const { return m_selectedUid; }
     int blockedImageCount() const;
+    bool remoteImagesLoading() const;
+    int failedImageCount() const;
     // Downloads the remote images of the selected message on explicit request,
     // replacing each placeholder inline. Never touches the status bar; failures
     // become a local placeholder text.

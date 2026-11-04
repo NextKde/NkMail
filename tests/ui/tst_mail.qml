@@ -26,6 +26,8 @@ TestCase {
         property var selectedMessage: ({uid: "1", uidValidity: "1", sender: "Studio Example", senderAddress: "studio@example.invalid", subject: "A quieter inbox", date: "2026-10-29T09:00:00Z", to: "alex@example.invalid", cc: "", messageId: "<one@example.invalid>", text: "<img src=https://example.invalid/tracker>\nPlain text only.", attachments: []})
         property string selectedUid: "1"
         property int blockedImageCount: 0
+        property bool remoteImagesLoading: false
+        property int failedImageCount: 0
         function loadRemoteImages() {}
         property string currentFolder: "INBOX"
         property string smartMailbox: ""
@@ -136,6 +138,7 @@ TestCase {
         AppTheme.reduceMotion = true
         AppTheme.appearanceMode = "light"
         failOnWarning(/.*/)
+        mock.blockedImageCount = 0; mock.remoteImagesLoading = false; mock.failedImageCount = 0
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
         mock.googleSaveCount = 0; setupMock.googleConfigured = false; setupMock.googleStarts = 0; setupMock.googleCancels = 0; setupMock.googleAuthorized = false; setupMock.busy = false; setupMock.stage = ""
         mock.refreshCount = 0; mock.search = ""
@@ -181,6 +184,23 @@ TestCase {
         const stopped = grabImage(indicator)
         wait(180)
         verify(stopped.equals(grabImage(indicator)))
+    }
+    function test_remote_image_loading_and_retry_are_visible() {
+        mock.blockedImageCount = 1
+        const reader = createTemporaryObject(readerComponent, app.contentItem, {mail: mock,
+            message: {sender: "Example sender", subject: "Images", text: "Body"}, hasMessage: true,
+            width: 700, height: 600})
+        const button = findChild(reader, "remoteImagesButton")
+        verify(button.enabled)
+        mock.remoteImagesLoading = true
+        tryCompare(button, "enabled", false)
+        verify(findChild(reader, "remoteImagesSpinner").running)
+        verifyActivityPixelsMove(findChild(reader, "remoteImagesSpinner"), reader)
+        mock.remoteImagesLoading = false
+        mock.failedImageCount = 1
+        tryCompare(button, "enabled", true)
+        compare(button.stackedText, "Retry")
+        verify(findChild(reader, "blockedImagesBar").visible)
     }
     function test_reader_preserves_header_with_visible_loading_and_retry() {
         const pending = {uid: "pending", uidValidity: "42", folder: "INBOX", sender: "Studio Example",

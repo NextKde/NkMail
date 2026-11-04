@@ -10,6 +10,7 @@
 #include <QPointer>
 #include <QBuffer>
 #include <QImageReader>
+#include <QDebug>
 namespace nkmail {
 namespace {
 bool remoteHttpUrl(const QString &value) {
@@ -56,82 +57,76 @@ void RemoteImageLoader::load(const QString &key, const QString &input) {
     }
     if (sources.isEmpty()) return;
     m_pending.insert(key);
+    emit loadingChanged(key);
     QPointer<RemoteImageLoader> self(this);
     m_tasks.run([self, key, html, sources, cancelled = m_cancelled] {
         constexpr qint64 maxBytes = 2 * 1024 * 1024;
         constexpr int timeoutMs = 10000;
         // One manager per batch, created inside the task and never shared.
         QNetworkAccessManager manager;
-        QList<QPair<QString, QString>> results; // escaped attribute text, replacement HTML
-        for (const auto &source : sources) {
-            if (cancelled->load()) return;
-            const QString &escaped = source.first;
-            const QUrl url(source.second);
-            const bool schemeOk = url.isValid()
-                && (url.scheme() == QLatin1String("http") || url.scheme() == QLatin1String("https"));
-            QString replacement = QStringLiteral("<span>[图片加载失败]</span>");
-            if (schemeOk) {
-                // No Referer, no cookies: only the bare image request goes out.
-                QNetworkRequest request(url);
-                request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                                     QNetworkRequest::NoLessSafeRedirectPolicy);
+        QList<QPair<QString, QString>> results;
+        for (const auto &source : sources) results.append({source.first, {}});
+        QEventLoop loop;
+        QHash<QNetworkReply *, int> active;
+        int next = 0, completed = 0;
+        bool stopping = false;
+        std::function<void()> schedule;
+        schedule = [&] {
+            while (!stopping && !cancelled->load() && active.size() < 4 && next < sources.size()) {
+                const int index = next++;
+                QNetworkRequest request(QUrl(sources[index].second));
+                request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
                 request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("NkMail"));
                 request.setAttribute(QNetworkRequest::CookieLoadControlAttribute, QNetworkRequest::Manual);
                 request.setAttribute(QNetworkRequest::CookieSaveControlAttribute, QNetworkRequest::Manual);
-                QNetworkReply *reply = manager.get(request);
-                QEventLoop loop;
-                QTimer timer;
-                timer.setSingleShot(true);
-                QObject::connect(&timer, &QTimer::timeout, &loop, [&reply, &loop] {
-                    reply->abort();
-                    loop.quit();
+                auto *reply = manager.get(request);
+                active.insert(reply, index);
+                auto *timer = new QTimer(reply); timer->setSingleShot(true);
+                QObject::connect(timer, &QTimer::timeout, reply, &QNetworkReply::abort);
+                timer->start(timeoutMs);
+                QObject::connect(reply, &QNetworkReply::readyRead, &loop, [reply] {
+                    if (reply->bytesAvailable() > maxBytes) reply->abort();
                 });
-                // Stop buffering once a response clearly exceeds the size cap.
-                QObject::connect(reply, &QNetworkReply::readyRead, &loop, [&reply, &loop, maxBytes] {
-                    if (reply->bytesAvailable() > maxBytes) {
-                        reply->abort();
-                        loop.quit();
+                QObject::connect(reply, &QNetworkReply::finished, &loop, [&, reply, index] {
+                    auto contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString().section(';', 0, 0).trimmed().toLower();
+                    const auto scheme = reply->url().scheme();
+                    const QByteArray data = reply->error() == QNetworkReply::NoError ? reply->readAll() : QByteArray();
+                    if (reply->error() == QNetworkReply::NoError && (scheme == "http" || scheme == "https")
+                        && contentType.startsWith("image/") && !data.isEmpty() && data.size() <= maxBytes) {
+                        QBuffer buffer; buffer.setData(data); buffer.open(QIODevice::ReadOnly);
+                        QImageReader reader(&buffer); const QSize size = reader.size();
+                        if (size.isValid() && qint64(size.width()) * size.height() <= 16000000)
+                            results[index].second = QStringLiteral("<img width=\"%1\" height=\"%2\" src=\"data:%3;base64,%4\">")
+                                .arg(size.width()).arg(size.height()).arg(contentType, QString::fromLatin1(data.toBase64()));
                     }
+                    if (results[index].second.isEmpty() && qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
+                        qInfo() << "NkMail image request failed: network=" << int(reply->error())
+                            << "http=" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                    active.remove(reply); ++completed; reply->deleteLater();
+                    if ((stopping && active.isEmpty()) || completed == sources.size()) loop.quit();
+                    else schedule();
                 });
-                QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-                QTimer cancellation;
-                QObject::connect(&cancellation, &QTimer::timeout, &loop, [&reply, &loop, cancelled] {
-                    if (cancelled->load()) { reply->abort(); loop.quit(); }
-                });
-                cancellation.start(50);
-                timer.start(timeoutMs);
-                if (!reply->isFinished()) loop.exec();
-                timer.stop();
-
-                const QUrl finalUrl = reply->url();
-                const bool finalSchemeOk = finalUrl.scheme() == QLatin1String("http")
-                    || finalUrl.scheme() == QLatin1String("https");
-                QString contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString().trimmed();
-                const auto semi = contentType.indexOf(QLatin1Char(';'));
-                if (semi >= 0) contentType = contentType.left(semi).trimmed();
-                const QByteArray data = reply->error() == QNetworkReply::NoError ? reply->readAll() : QByteArray();
-                if (reply->error() == QNetworkReply::NoError && finalSchemeOk
-                    && contentType.toLower().startsWith(QStringLiteral("image/"))
-                    && data.size() <= maxBytes && !data.isEmpty()) {
-                    QBuffer buffer;
-                    buffer.setData(data);
-                    buffer.open(QIODevice::ReadOnly);
-                    QImageReader reader(&buffer);
-                    const QSize size = reader.size();
-                    if (size.isValid()) {
-                        replacement = QStringLiteral("<img width=\"%1\" height=\"%2\" src=\"data:%3;base64,%4\">")
-                            .arg(size.width()).arg(size.height())
-                            .arg(contentType, QString::fromLatin1(data.toBase64()));
-                    }
-                }
-                delete reply;
             }
-            results.append({escaped, replacement});
-        }
+        };
+        const auto stop = [&] {
+            stopping = true;
+            const auto pending = active.keys();
+            for (auto *reply : pending) reply->abort();
+            if (active.isEmpty()) loop.quit();
+        };
+        QTimer cancellation, deadline;
+        QObject::connect(&cancellation, &QTimer::timeout, &loop, [&] { if (cancelled->load()) stop(); });
+        deadline.setSingleShot(true);
+        QObject::connect(&deadline, &QTimer::timeout, &loop, stop);
+        cancellation.start(50); deadline.start(30000);
+        QTimer::singleShot(0, &loop, schedule);
+        loop.exec();
+        if (cancelled->load()) return;
 
         if (self) QMetaObject::invokeMethod(self, [self, key, html, results] {
             if (!self) return;
             self->m_pending.remove(key);
+            emit self->loadingChanged(key);
             const QString current = html;
             static const QRegularExpression imgPattern(
                 QStringLiteral("<img\\b[^>]*\\bdata-nkmail-src=\"([^\"]*)\"[^>]*>"));
@@ -145,13 +140,18 @@ void RemoteImageLoader::load(const QString &key, const QString &input) {
                 const auto it = replacements.constFind(match.captured(1));
                 if (it == replacements.constEnd()) continue;
                 out += current.mid(last, match.capturedStart() - last);
-                if (match.captured().contains(QStringLiteral("data-nkmail-layout=\"1\""))
+                if (it.value().isEmpty()) {
+                    QString image = match.captured();
+                    if (!image.contains(QStringLiteral("data-nkmail-failed=\"1\""))) image.insert(image.size() - 1, QStringLiteral(" data-nkmail-failed=\"1\""));
+                    out += image;
+                } else if (match.captured().contains(QStringLiteral("data-nkmail-layout=\"1\""))
                     && it.value().startsWith(QStringLiteral("<img "))) {
                     // Preserve the sender's display dimensions/styles, rather
                     // than substituting the image's intrinsic pixel dimensions.
                     static const QRegularExpression dataSource(QStringLiteral("src=\"(data:[^\"]*)\""));
                     const auto data = dataSource.match(it.value());
                     QString image = match.captured();
+                    image.remove(QStringLiteral(" data-nkmail-failed=\"1\""));
                     image.replace(srcPattern, QStringLiteral("src=\"%1\"").arg(data.captured(1)));
                     out += image;
                 } else out += it.value();

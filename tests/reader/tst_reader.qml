@@ -24,6 +24,8 @@ TestCase {
         property var account: ({name: "Example Account", address: "reader@example.invalid"})
         property string currentFolder: "INBOX"
         property int blockedImageCount: 0
+        property bool remoteImagesLoading: false
+        property int failedImageCount: 0
         property bool configured: true
         property bool demo: true
         function clearError() {}
@@ -51,6 +53,25 @@ TestCase {
         tryCompare(findChild(reader, "messageBody"), "visible", true)
         const plainBody = findChild(reader, "messageBody")
         compare(plainBody.getText(0, plainBody.length), "Plain fallback")
+    }
+    function test_long_message_has_a_visible_draggable_scrollbar() {
+        const reader = createTemporaryObject(readerComponent, testCase, {x: 20, y: 20, width: 800, height: 500,
+            mail: readerMail, hasMessage: true, message: {sender: "Example sender", subject: "Long synthetic mail",
+                displayHtml: '<div>' + Array(100).fill('<p style="margin:12px 0;padding:12px;background:#f2f6fa">Synthetic message section with readable content.</p>').join('') + '</div><p id="end">End of message</p>',
+                text: "Long body", attachments: []}})
+        verify(reader !== null)
+        const loader = findChild(reader, "browserBodyLoader")
+        tryVerify(() => loader.item !== null && loader.item.documentReady, 20000)
+        const scroll = findChild(reader, "readerScroll")
+        const bar = findChild(reader, "readerVerticalScrollBar")
+        tryVerify(() => scroll.contentHeight > scroll.height * 5)
+        tryVerify(() => loader.height >= loader.item.documentHeight - 1)
+        tryVerify(() => bar.visible && bar.size < 1 && bar.width > 0 && bar.height > 100)
+        const flick = scroll.contentItem
+        mouseWheel(reader, 400, 250, 0, -360)
+        tryVerify(() => flick.contentY > 0)
+        mouseDrag(bar, bar.width / 2, (bar.position + bar.size / 2) * bar.height, 0, 200)
+        tryVerify(() => flick.contentY > scroll.height)
     }
     function test_large_inline_document_and_loaded_image() {
         const view = createTemporaryObject(browserComponent, testCase, {width: 660, height: 500, html:

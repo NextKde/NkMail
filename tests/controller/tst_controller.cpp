@@ -206,6 +206,54 @@ struct ReleaseOnExit {
 class ControllerTests : public QObject {
     Q_OBJECT
 private slots:
+    void remoteImagesLoadConcurrentlyAndFailedUrlsRemainRetryable() {
+        QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
+        int requests = 0; bool failing = true;
+        QList<QTcpSocket *> waiting;
+        const auto respond = [&](QTcpSocket *socket, bool fail) {
+            const auto image = QByteArray::fromBase64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX2kAAAAASUVORK5CYII=");
+            socket->write(fail ? QByteArray("HTTP/1.1 503 Retry\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                : QByteArray("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: ") + QByteArray::number(image.size()) + "\r\nConnection: close\r\n\r\n" + image);
+            socket->disconnectFromHost();
+        };
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            while (auto *socket = server.nextPendingConnection()) {
+                connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+                connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+                    const auto request = socket->readAll();
+                    QVERIFY(!request.contains("Cookie:")); QVERIFY(!request.contains("Referer:"));
+                    disconnect(socket, &QTcpSocket::readyRead, socket, nullptr);
+                    ++requests;
+                    if (requests <= 4) {
+                        waiting.append(socket);
+                        if (waiting.size() == 4) {
+                            const auto batch = waiting; waiting.clear();
+                            for (int i = 0; i < batch.size(); ++i) respond(batch[i], failing && i == 0);
+                        }
+                    } else respond(socket, false);
+                });
+            }
+        });
+        RemoteImageLoader loader;
+        QSignalSpy loaded(&loader, &RemoteImageLoader::loaded);
+        QString html;
+        for (int i = 0; i < 4; ++i) html += QString("<img data-nkmail-src=\"http://127.0.0.1:%1/%2\" data-nkmail-layout=\"1\" width=\"80\">").arg(server.serverPort()).arg(i);
+        QCOMPARE(requests, 0);
+        loader.load("retryable", html); QVERIFY(loader.loading("retryable"));
+        QTRY_COMPARE(loaded.count(), 1); QVERIFY(!loader.loading("retryable"));
+        QCOMPARE(requests, 4);
+        const auto partial = loader.cached("retryable", html);
+        QCOMPARE(partial.count("data:image/png;base64,"), 3);
+        QCOMPARE(partial.count("data-nkmail-src="), 1);
+        QVERIFY(partial.contains("data-nkmail-failed=\"1\""));
+        failing = false; loader.load("retryable", partial);
+        QTRY_COMPARE(loaded.count(), 2); QCOMPARE(requests, 5);
+        const auto complete = loader.cached("retryable", html);
+        QCOMPARE(complete.count("data:image/png;base64,"), 4);
+        QVERIFY(!complete.contains("data-nkmail-src="));
+        QVERIFY(!complete.contains("data-nkmail-failed="));
+    }
+
     void qqMissingCredentialExplainsAuthorizationCodeWithoutConnecting() {
         QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1, false));
         {

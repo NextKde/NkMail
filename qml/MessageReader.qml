@@ -36,9 +36,23 @@ Rectangle {
             objectName: "readerScroll"
             visible: root.hasMessage && !root.draftsVisible
             Layout.fillWidth: true; Layout.fillHeight: true
-            contentWidth: availableWidth; clip: true
+            contentWidth: availableWidth; contentHeight: readerColumn.implicitHeight; clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ScrollBar.vertical: ScrollBar {
+                objectName: "readerVerticalScrollBar"
+                parent: readerScroll
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                width: 12
+                policy: readerScroll.contentHeight > readerScroll.availableHeight ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                active: size < 1
+                interactive: true
+                minimumSize: 0.06
+                z: 10
+            }
             ColumnLayout {
+                id: readerColumn
                 width: readerScroll.availableWidth
                 spacing: 0
                 ColumnLayout {
@@ -151,14 +165,24 @@ Rectangle {
                         objectName: "blockedImagesBar"
                         Layout.fillWidth: true
                         spacing: 8
-                        visible: root.mail.blockedImageCount > 0
+                        visible: root.mail.blockedImageCount > 0 || root.mail.remoteImagesLoading === true
+                        MailActivityIndicator {
+                            objectName: "remoteImagesSpinner"
+                            visible: root.mail.remoteImagesLoading === true
+                            running: visible
+                            Layout.preferredWidth: 20; Layout.preferredHeight: 20
+                        }
                         Text {
-                            text: qsTr("%1 张远程图片已隐藏").arg(root.mail.blockedImageCount)
+                            text: root.mail.remoteImagesLoading === true ? qsTr("Loading images…")
+                                : root.mail.failedImageCount > 0 ? qsTr("Some images could not be loaded. Retry to load them again.")
+                                : qsTr("%1 张远程图片已隐藏").arg(root.mail.blockedImageCount)
                             color: root.muted; font.pixelSize: 11
                             Layout.fillWidth: true
                         }
                         MailAction {
-                            stacked: true; stackedText: qsTr("显示图片"); iconName: "download"
+                            objectName: "remoteImagesButton"
+                            stacked: true; stackedText: root.mail.failedImageCount > 0 ? qsTr("Retry") : qsTr("显示图片"); iconName: "download"
+                            enabled: root.mail.remoteImagesLoading !== true
                             accessibleText: qsTr("Load remote images")
                             onClicked: root.mail.loadRemoteImages()
                         }
@@ -207,6 +231,25 @@ Rectangle {
                         visible: active
                         Layout.fillWidth: true
                         Layout.preferredHeight: item ? item.implicitHeight : 0
+                        // The web view otherwise consumes wheel events even
+                        // when its measured document fits its own surface.
+                        // Leave capped documents their internal browser scroll.
+                        Item {
+                            anchors.fill: parent
+                            z: 1
+                            WheelHandler {
+                                target: null
+                                enabled: !!browserBody.item && browserBody.item.documentHeight < 12000
+                                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                                onWheel: function(event) {
+                                    const delta = event.pixelDelta.y || event.angleDelta.y / 2
+                                    const flick = readerScroll.contentItem
+                                    if (!delta || !flick) { event.accepted = false; return }
+                                    flick.contentY = Math.max(0, Math.min(readerScroll.contentHeight - readerScroll.availableHeight, flick.contentY - delta))
+                                    event.accepted = true
+                                }
+                            }
+                        }
                         sourceComponent: Component {
                             MailHtmlBody {
                                 html: browserBody.displayHtml

@@ -1628,6 +1628,14 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Retry</source>
             <translation>Retry</translation>
         </message>
+        <message>
+            <source>Loading images…</source>
+            <translation>Loading images…</translation>
+        </message>
+        <message>
+            <source>Some images could not be loaded. Retry to load them again.</source>
+            <translation>Some images could not be loaded. Retry to load them again.</translation>
+        </message>
     </context>
     <context>
         <name>ProviderPicker</name>
