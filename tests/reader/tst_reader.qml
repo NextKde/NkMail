@@ -24,6 +24,7 @@ TestCase {
             if (cycle === 0) host.showMinimized()
             else host.hide()
             tryCompare(view, "windowSuspended", true)
+            verify(view.surfaceCovered)
             host.showNormal()
             tryCompare(view, "windowSuspended", false)
             tryVerify(() => view.visible)
@@ -47,8 +48,14 @@ TestCase {
         tryVerify(() => view.scrollPosition.y >= 699)
         const originalUrl = String(view.url)
         view.restoreSurface()
+        verify(view.surfaceCovered)
+        const cover = findChild(view, "restoreSurfaceCover")
+        verify(cover.visible)
+        const coveredFrame = grabImage(view)
+        verify(coveredFrame.red(250, 200) > 240 && coveredFrame.green(250, 200) > 240)
         tryVerify(() => !view.loading && !view.restorePending, 10000)
         tryVerify(() => view.scrollPosition.y >= 699)
+        tryCompare(view, "surfaceCovered", false)
         compare(String(view.url), originalUrl)
     }
     function notification() {

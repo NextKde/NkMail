@@ -559,3 +559,10 @@ The scoped local implementation is substantially complete, but real-provider rea
 - User reports the black surface still occurs. Prior VM success did not reproduce or resolve the host symptom. Host session is Wayland; no explicit Qt renderer override was present. No definitive GPU/compositor cause established.
 - Replace ineffective view-visibility workaround with a debounced local-document reload on restore/reactivation. Reload uses the existing isolated in-memory URL, not mail transport; preserve document dimensions, outer reader position and internal browser scrolling. New mail cancels pending restoration. This is a rendering recovery workaround; browser text selection can reset on reactivation.
 - VM reader suite passed in 4.08s, with pixels checked after queued restoration and a long-document regression confirming internal scroll restoration. Host rebuilt/restarted with original process environment. No host automated tests, mailbox writes, global renderer changes or credential changes. Actual host symptom confirmation remains pending.
+
+
+## Cover transient restore frames · 2026-11-04
+
+- User confirmed local-document recovery fixes the persistent black body, but black content remains during the minimize/restore animation.
+- Cover the embedded renderer with its normal white document background while suspended/recovering. Keep rendering active underneath; remove the cover 120ms after load completion when the window is no longer suspended. This hides transient black content rather than preserving a screenshot of mail; a brief plain background may be visible during recovery. Native compositor animation behavior still requires user confirmation.
+- VM reader checks passed in 4.12s, including pixel checks for the cover, cover removal, restored content, and retained internal scrolling. Host rebuilt/restarted with original process environment. No host automated tests or mailbox mutation.
