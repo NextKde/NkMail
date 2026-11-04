@@ -97,3 +97,10 @@ Sources: [Google native applications](https://developers.google.com/identity/pro
 [testing restrictions](https://support.google.com/cloud/answer/15549945),
 [OIDC code-flow identity validation](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation),
 [Google direct token response](https://developers.google.com/identity/openid-connect/openid-connect#obtainuserinfo).
+
+
+On 2026-11-04 the project owner confirmed successful real Google account addition with
+the configured build. This is evidence for authorization and account creation, not proof
+of real IMAP synchronization, restart restoration, sending or public-release readiness.
+System-browser proxy settings can differ from application networking; the acceptance run
+used an explicitly authorized temporary process proxy, without changing system settings.

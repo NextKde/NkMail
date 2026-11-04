@@ -50,4 +50,7 @@ fixtures reject mismatched, expired and unverified claims, missing identity toke
 `alg=none` and external key references, and assert zero UserInfo requests.
 
 Final VM pinned-source Release acceptance after the identity change passed all 10 suites
-in 86.50s. Real Google addition and mail synchronization remain separate manual checks.
+in 86.50s. The user subsequently confirmed successful real Google account addition. Mail
+synchronization, restart/refresh persistence and sending remain separate acceptance
+checks; none is implied by account creation. The successful run used an explicitly
+authorized process-only proxy, without changing system network settings.
