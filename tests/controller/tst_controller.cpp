@@ -36,7 +36,7 @@ std::function<void(CredentialStore *, const QString &)> readCredential;
 QMutex callsMutex;
 QList<int> offsets;
 QStringList contentUids;
-std::atomic_int sentFolderCalls{0};
+std::atomic_int sentFolderCalls{0}, readResets{0};
 std::atomic_int folderCalls{0}, pageCalls{0}, contentCalls{0}, sendCalls{0};
 std::atomic_int credentialReads{0}, credentialWrites{0}, credentialDeletes{0};
 QString lastPassword;
@@ -86,13 +86,14 @@ QList<Folder> MailioBackend::folders(const Account &a)
     ++synthetic::folderCalls;
     return synthetic::folders(a);
 }
-Page MailioBackend::page(const Account &a, const QString &folder, int offset, int limit)
+Page MailioBackend::page(const Account &a, const QString &folder, int offset, int limit, bool)
 {
     ++synthetic::pageCalls;
     { QMutexLocker lock(&synthetic::callsMutex); synthetic::offsets.append(offset); }
     return synthetic::page(a, folder, offset, limit);
 }
-Content MailioBackend::content(const Account &a, const QString &folder, const QString &validity, const QString &uid)
+void MailioBackend::resetReadConnection() { ++synthetic::readResets; }
+Content MailioBackend::content(const Account &a, const QString &folder, const QString &validity, const QString &uid, bool)
 {
     ++synthetic::contentCalls;
     { QMutexLocker lock(&synthetic::callsMutex); synthetic::contentUids.append(uid); }
@@ -569,7 +570,10 @@ void ControllerTests::disconnectPermissionSurvivesRestart()
         MailController controller(false, root.path());
         QTRY_VERIFY(controller.status().contains("restored"));
         controller.configureAccount(controller.account(), "synthetic-session", true);
+        QTest::qWait(50);
+        const auto resets = synthetic::readResets.load();
         controller.disconnectAccount();
+        QTRY_VERIFY(synthetic::readResets.load() > resets);
     }
     const auto before = synthetic::credentialReads.load();
     MailController restarted(false, root.path());
@@ -988,7 +992,9 @@ void ControllerTests::draftsStayWithTheirAccount()
     MailController controller(false, root.path());
     QTRY_VERIFY(controller.status().contains("restored"));
     auto draft = controller.newDraft(); draft["body"] = "original"; draft = controller.saveDraft(draft);
+    const auto resets = synthetic::readResets.load();
     controller.switchAccount("second");
+    QTRY_VERIFY(synthetic::readResets.load() > resets);
     draft["body"] = "wrong account"; QVERIFY(controller.saveDraft(draft).isEmpty());
     controller.switchAccount("default");
     QCOMPARE(controller.loadDraft(draft["id"].toString())["body"].toString(), QString("original"));

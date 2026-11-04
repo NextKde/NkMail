@@ -31,6 +31,22 @@ Google Cloud configuration. Existing OAuth accounts can switch to an app passwor
 through account settings without removing their cached mail. The earlier
 [OAuth distributor notes](docs/GOOGLE_OAUTH.md) are retained for future development.
 
+## Uncached message latency
+
+Header pages and on-demand bodies share a short-lived IMAP connection on the
+account synchronization worker. Opening a body after a recent header fetch, or
+opening another uncached body, avoids another TLS/authentication exchange. Each
+read still uses read-only EXAMINE and UID-based BODY.PEEK; body reads revalidate
+UIDVALIDITY before fetching.
+
+Sessions expire after 60 seconds of idle reuse eligibility, with queued idle
+cleanup, and are reset on account switching, edits/removal and disconnect.
+Credential, endpoint and custom trust-anchor changes prevent reuse. A network
+failure on a reused read connection permits one fresh connection attempt; protocol
+errors and new-connection failures do not loop. Sending and mailbox mutations do
+not use this retry path. Cold connections and downloading large messages still
+incur network latency; this change does not prefetch unseen mail.
+
 ## Languages
 
 Simplified Chinese and English are included. The interface follows the system language

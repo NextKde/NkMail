@@ -56,18 +56,21 @@ class Server:
 
     def run(self):
         try:
-            conn, _ = self.socket.accept()
-            conn.settimeout(20)
-            if self.scenario == "stall":
-                time.sleep(17)
-                conn.close()
-                return
-            with conn:
-                if not self.starttls:
-                    conn = self.context.wrap_socket(conn, server_side=True)
-                self.conn = conn
-                if self.protocol == "imap": self.imap()
-                else: self.smtp()
+            attempts = 2 if self.scenario in ("reuse-reset", "reuse-account", "reuse-password", "reuse-trust", "reuse-drop", "reuse-drop-twice") else 1
+            for connection_index in range(attempts):
+                self.connection_index = connection_index
+                conn, _ = self.socket.accept()
+                conn.settimeout(20)
+                if self.scenario == "stall":
+                    time.sleep(17)
+                    conn.close()
+                    return
+                with conn:
+                    if not self.starttls:
+                        conn = self.context.wrap_socket(conn, server_side=True)
+                    self.conn = conn
+                    if self.protocol == "imap": self.imap()
+                    else: self.smtp()
         except (ssl.SSLError, ConnectionResetError, BrokenPipeError):
             pass  # Expected for TLS-negative tests and closed sessions.
         except Exception as exc:
@@ -97,7 +100,9 @@ class Server:
             if upper == b"STARTTLS":
                 if self.scenario == "refuse-starttls": self.write(tag + b" NO unavailable\r\n"); continue
                 self.write(tag + b" OK begin TLS\r\n"); self.upgrade(); continue
-            if upper.startswith(b"LOGIN "): self.write(tag + b" OK logged in\r\n")
+            if upper.startswith(b"LOGIN "):
+                if self.scenario == "reuse-normal": time.sleep(0.15)
+                self.write(tag + b" OK logged in\r\n")
             elif upper.startswith(b"AUTHENTICATE XOAUTH2"):
                 parts = cmd.split(b" ", 2)
                 if len(parts) == 3: response = parts[2]
@@ -130,14 +135,19 @@ class Server:
                 assert b"102" in upper
                 self.write(b"* 2 EXPUNGE\r\n" + tag + b" OK expunged\r\n")
             elif upper.startswith(b"EXAMINE "):
+                if self.scenario == "reuse-drop-twice" and self.connection_index == 1:
+                    self.conn.shutdown(socket.SHUT_RDWR); self.conn.close(); return
                 if self.scenario == "require-id": assert identified
                 count = b"6" if self.scenario.startswith("page-batch") else b"2"
                 next_uid = b"901" if self.scenario.startswith("page-batch") else b"103"
-                self.write(b"* " + count + b" EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n* OK [UIDNEXT " + next_uid + b"] next\r\n" + tag + b" OK [READ-ONLY] examined\r\n")
+                validity = b"43" if self.scenario == "reuse-stale" and sum(" EXAMINE " in c for c in self.commands) > 1 else b"42"
+                self.write(b"* " + count + b" EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY " + validity + b"] identity\r\n* OK [UIDNEXT " + next_uid + b"] next\r\n" + tag + b" OK [READ-ONLY] examined\r\n")
             elif upper.startswith(b"UID SEARCH "):
                 assert upper == (b"UID SEARCH 4:6" if self.scenario.startswith("page-batch") else b"UID SEARCH 2:2"), upper
                 self.write((b"* SEARCH 109 205 900\r\n" if self.scenario.startswith("page-batch") else b"* SEARCH 102\r\n") + tag + b" OK search done\r\n")
             elif upper.startswith(b"UID FETCH "):
+                if self.scenario == "reuse-no" and sum("UID FETCH" in c for c in self.commands) > 1:
+                    self.write(tag + b" NO unavailable\r\n"); continue
                 assert b"BODY.PEEK[" in upper, upper
                 header = b"BODY.PEEK[HEADER]" in upper
                 source = QUOTED_MESSAGE if self.scenario == "quoted-names" else MESSAGE
@@ -153,6 +163,14 @@ class Server:
                 elif self.scenario == "oversize":
                     self.write(b"* 2 FETCH (UID 102 " + section + b" {999999999}\r\n")
                 else:
+                    if self.scenario.startswith("reuse-"):
+                        requested = upper.split()[2].split(b":")[0]
+                        self.write(b"* 2 FETCH (FLAGS () " + section + b" {" + str(len(body)).encode() + b"}\r\n" + body + b" UID " + requested + b")\r\n" + tag + b" OK fetched\r\n")
+                        if self.scenario in ("reuse-drop", "reuse-drop-twice") and self.connection_index == 0:
+                            self.conn.shutdown(socket.SHUT_RDWR)
+                            self.conn.close()
+                            return
+                        continue
                     # UID deliberately follows BODY/FLAGS: legal order exposed an upstream identity bug.
                     self.write(b"* 2 FETCH (FLAGS (\\Flagged) " + section + b" {" + str(len(body)).encode() + b"}\r\n" + body + b" UID 102)\r\n" + tag + b" OK fetched\r\n")
             elif upper == b'LIST "" ""':
@@ -322,6 +340,21 @@ def main():
             assert content["attachments"] == [{"name": "evil.txt", "bytes": base64.b64encode(b"fixture\x00attachment").decode(), "path": ""}], content
             assert any("BODY.PEEK[]" in cmd for cmd in server.commands)
             passed += 1
+            for scenario in ("reuse-normal", "reuse-page", "reuse-reset", "reuse-account", "reuse-password", "reuse-trust", "reuse-drop", "reuse-drop-twice", "reuse-no", "reuse-stale"):
+                reused, server = invoke("imap", good, ca, "content-reuse", starttls, scenario)
+                assert reused["ok"] == (scenario not in ("reuse-stale", "reuse-drop-twice", "reuse-no", "reuse-trust")), reused
+                if reused["ok"]:
+                    assert (reused["first"], reused["second"], reused["folder"]) == ("102", "103", "Archive"), reused
+                logins = [c for c in server.commands if " LOGIN " in c]
+                assert len(logins) == (1 if scenario in ("reuse-normal", "reuse-page", "reuse-stale", "reuse-no", "reuse-trust") else 2), server.commands
+                assert not any(" SELECT " in c or " STORE " in c or " EXPUNGE" in c for c in server.commands)
+                fetches = [c for c in server.commands if "UID FETCH" in c]
+                assert len(fetches) == (1 if scenario in ("reuse-stale", "reuse-drop-twice", "reuse-trust") else 2), server.commands
+                assert all("BODY.PEEK[" in c for c in fetches), server.commands
+                assert sum("BODY.PEEK[HEADER]" in c for c in fetches) == (1 if scenario == "reuse-page" else 0)
+                if scenario == "reuse-normal":
+                    print(f"Reuse timing (synthetic 150ms login delay, STARTTLS={starttls}): first={reused['firstMs']}ms second={reused['secondMs']}ms", flush=True)
+                passed += 1
             quoted, server = invoke("imap", good, ca, "content", starttls, "quoted-names")
             assert quoted["ok"], quoted
             assert quoted["to"] == '"Doe, Jane" <to@fixture.invalid>', quoted

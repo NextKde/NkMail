@@ -332,6 +332,7 @@ bool MailController::configureAccountImpl(const QVariantMap &configuration, cons
     // Only the live account may reuse the session-only password held in memory.
     next.password = password.isEmpty() ? (editingCurrent && next.authMethod == m_account.authMethod ? m_account.password : QString{}) : password;
     if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return false; }
+    m_sync->resetReadConnection();
     if (editingCurrent && next.authMethod != m_account.authMethod) m_credentials->forget(m_account);
     m_credentials->setPassword(next);
     if (!editingCurrent) {
@@ -372,6 +373,7 @@ void MailController::switchAccount(const QString &id) {
     for (const auto &account : m_database->accounts())
         if (account.id == accountId) { exists = true; break; }
     if (!exists) return;
+    m_sync->resetReadConnection();
 
     clearPendingSend();
     ++m_generation; ++m_selectionGeneration;
@@ -458,6 +460,7 @@ void MailController::removeAccount(const QString &id) {
         if (entry.section(QLatin1Char('\t'), 0, 0) != accountId) retainedFavorites.append(entry);
     saveFavoriteEntries(retainedFavorites);
     emit favoritesChanged();
+    m_sync->resetReadConnection();
     m_credentials->forget(target);
     emit accountsChanged();
     if (accountId != m_account.id) return;
@@ -751,6 +754,7 @@ int MailController::sendDelay() const { return m_send->delay(); }
 void MailController::clearError() { m_error.clear(); emit statusChanged(); }
 void MailController::disconnectAccount() {
     if (sending()) return;
+    m_sync->resetReadConnection();
     clearPendingSend();
     ++m_generation; ++m_selectionGeneration; m_account.password.clear(); m_busy = false; m_restorePending = false; m_switchCredentialPending = false; m_cachedOnly = true;
     m_refreshTimer.stop();

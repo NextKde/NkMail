@@ -583,10 +583,19 @@ The scoped local implementation is substantially complete, but real-provider rea
 
 1. Event-driven retained-surface adapter and VM regressions are complete; final native desktop manual acceptance and PR #18 release-gate remain.
 2. Provider/testing documentation reconciled; merge the final PR only after its own required release-gate passes.
-3. Optimize uncached body latency through a separately designed IMAP session reuse strategy; retain account/session cancellation and TLS/PEEK guarantees.
+3. IMAP header/body session reuse implemented on codex/imap-body-session; VM regressions pass. Real-provider latency and final PR release-gate remain to verify.
 4. Cross-account unified inbox and read-only aggregates with explicit account/folder/UIDVALIDITY/UID routing.
 5. Favorite ordering and unknown/stale unread-count semantics; complete copy-to/junk workflows and message/rfc822 attachment forwarding.
 6. CID embedded images; controlled provider/app-password acceptance. QQ credential restoration remains user-deferred.
 7. Deferred product scope: IDLE/background service, Microsoft/Exchange, colored flags/reminders/muting/blocking/rules. Public Google OAuth onboarding/review remains deliberately deferred, not an app-password release blocker.
 
 Old unchecked lists and provider statements above are historical evidence, not an additional duplicate backlog.
+
+
+## Reuse short-lived IMAP connections for uncached bodies · 2026-11-04
+
+- Header pages and uncached bodies opt into a worker-thread-local connection on the existing dedicated serial MailboxSync queue. A recent header page can warm the first body read; successive bodies reuse authentication. No prefetch or write-session pooling.
+- Identity digest covers account/user/endpoint/authentication/TLS/custom trust anchor and credentials. Reuse expires after 60s; the owner queues idle cleanup and explicit cleanup on switch, settings save, removal and disconnect. All cleanup stays on the worker; worker teardown closes its thread-local session.
+- Every operation still uses read-only EXAMINE; bodies check UIDVALIDITY before UID BODY.PEEK. Transport failure on a reused connection gets at most one fresh attempt. Fresh-connection failure, protocol errors, UIDVALIDITY changes and TLS rejection do not loop. Send/write retry semantics are unchanged.
+- VM full suite passed 10/10 in 98.24s. Final protocol follow-up (actual server UIDVALIDITY change and controlled timing) passed in 25.79s. Fixtures cover header/body reuse, two UIDs, cross-folder reading, account/password/trust changes, explicit reset, closed connection, bounded double failure, protocol NO and controller cleanup.
+- With an artificial 150ms login delay, fixture reads measured 214→4ms (implicit TLS) and 168→2ms (STARTTLS). This proves avoided handshake/authentication work, not real-provider end-to-end latency. Cold/expired sessions and body transfer/parse still take time. No real mailbox writes or automated host validation.

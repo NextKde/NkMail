@@ -25,10 +25,13 @@ public:
     static void verifySmtp(const Account &account);
     static InboxStats inboxStats(const Account &account);
     static QList<Folder> folders(const Account &account);
+    // Opt-in connection reuse is thread-local and requires a dedicated serial
+    // owner. Reset on account/credential lifecycle changes; idle reuse is 60s.
     static Page page(const Account &account, const QString &folder,
-                     int offset, int limit = 50);
+                     int offset, int limit = 50, bool reuseConnection = false);
     static Content content(const Account &account, const QString &folder,
-                           const QString &uidValidity, const QString &uid);
+                           const QString &uidValidity, const QString &uid, bool reuseConnection = false);
+    static void resetReadConnection();
     static QList<QVariantMap> search(const Account &account, const QString &folder,
                                      const QString &uidValidity, const QString &query, int limit);
     static SendResult send(const Account &account, const Draft &draft, QByteArray *raw = nullptr);

@@ -4,6 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTextStream>
+#include <QElapsedTimer>
 #include <thread>
 #include <mailio/imap.hpp>
 #include <mailio/smtp.hpp>
@@ -48,6 +49,19 @@ int main(int argc, char **argv)
                 QJsonArray array;
                 for (const auto &s : p.messages) array.append(QJsonObject{{"uid", s.uid}, {"subject", s.subject}, {"unread", s.unread}, {"flagged", s.flagged}});
                 result = {{"uidValidity", p.uidValidity}, {"messages", array}, {"hasMore", p.hasMore}, {"nextOffset", p.nextOffset}};
+            } else if (operation == QStringLiteral("content-reuse")) {
+                QElapsedTimer clock; clock.start();
+                const QString firstUid = scenario == "reuse-page"
+                    ? nkmail::MailioBackend::page(a, "INBOX", 0, 1, true).messages.first().uid
+                    : nkmail::MailioBackend::content(a, "INBOX", "42", "102", true).summary.uid;
+                const auto firstMs = clock.elapsed(); clock.restart();
+                if (scenario == "reuse-reset") nkmail::MailioBackend::resetReadConnection();
+                if (scenario == "reuse-account") a.id = "another-account";
+                if (scenario == "reuse-password") a.password = "replacement-secret";
+                if (scenario == "reuse-trust") a.caFile.clear();
+                const auto second = nkmail::MailioBackend::content(a, "Archive", "42", "103", true);
+                result = {{"first", firstUid}, {"second", second.summary.uid}, {"folder", second.summary.folder}, {"firstMs", firstMs}, {"secondMs", clock.elapsed()}};
+                nkmail::MailioBackend::resetReadConnection();
             } else if (operation == QStringLiteral("content")) {
                 const auto c = nkmail::MailioBackend::content(a, QStringLiteral("INBOX"), scenario == QStringLiteral("stale") ? QStringLiteral("99") : QStringLiteral("42"), QStringLiteral("102"));
                 QJsonArray attachments;

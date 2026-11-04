@@ -9,9 +9,10 @@ public:
     virtual InboxStats inboxStats(const Account &account) { return MailioBackend::inboxStats(account); }
     virtual QList<Folder> folders(const Account &account) { return MailioBackend::folders(account); }
     virtual Page page(const Account &account, const QString &folder,
-                     int offset, int limit = 50) { return MailioBackend::page(account, folder, offset, limit); }
+                     int offset, int limit = 50) { return MailioBackend::page(account, folder, offset, limit, true); }
     virtual Content content(const Account &account, const QString &folder,
-                           const QString &uidValidity, const QString &uid) { return MailioBackend::content(account, folder, uidValidity, uid); }
+                           const QString &uidValidity, const QString &uid) { return MailioBackend::content(account, folder, uidValidity, uid, true); }
+    virtual void resetReadConnection() { MailioBackend::resetReadConnection(); }
     virtual QList<QVariantMap> search(const Account &account, const QString &folder,
                                      const QString &uidValidity, const QString &query, int limit) { return MailioBackend::search(account, folder, uidValidity, query, limit); }
     virtual SendResult send(const Account &account, const Draft &draft, QByteArray *raw = nullptr) { return MailioBackend::send(account, draft, raw); }
