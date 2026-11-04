@@ -390,6 +390,14 @@ ApplicationWindow {
                     }
                     HeaderAction { glyph: "recipients"; floatingAction: true; shellBackdrop: composerBackdrop; text: qsTr("Bcc"); enabled: root.editable; onClicked: root.showBcc = !root.showBcc }
                 }
+                MailActivityIndicator {
+                    objectName: "sendingSpinner"
+                    x: composerChrome.controlsLeft - 66
+                    y: composerChrome.controlsCenterY - height / 2
+                    width: 20; height: 20
+                    visible: root.mail.sending
+                    running: root.mail.sending
+                }
                 HeaderAction {
                     objectName: "sendDraftButton"
                     glyph: root.mail.sendPending ? "undo" : "send"

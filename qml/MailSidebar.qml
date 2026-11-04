@@ -285,15 +285,25 @@ Item {
                                 }
                             }
                         }
-                        Text {
-                            objectName: "accountSyncStatus_" + accountSection.accountId
+                        RowLayout {
                             visible: accountSection.current && (mail.busy || !!mail.error)
-                            text: mail.error ? mail.error : mail.status
                             Layout.fillWidth: true
                             Layout.leftMargin: 24
-                            font.pixelSize: 10
-                            color: mail.error ? AppTheme.destructive : AppTheme.mutedText
-                            wrapMode: Text.Wrap
+                            spacing: 6
+                            MailActivityIndicator {
+                                objectName: "accountSyncSpinner_" + accountSection.accountId
+                                visible: mail.busy
+                                running: mail.busy
+                                Layout.preferredWidth: 14; Layout.preferredHeight: 14
+                            }
+                            Text {
+                                objectName: "accountSyncStatus_" + accountSection.accountId
+                                text: mail.error ? mail.error : mail.status
+                                Layout.fillWidth: true
+                                font.pixelSize: 10
+                                color: mail.error ? AppTheme.destructive : AppTheme.mutedText
+                                wrapMode: Text.Wrap
+                            }
                         }
                         Repeater {
                             // Synchronous cache read; it is not re-evaluated when

@@ -172,7 +172,7 @@ Rectangle {
                         RowLayout {
                             Layout.alignment: Qt.AlignHCenter
                             spacing: 12
-                            BusyIndicator {
+                            MailActivityIndicator {
                                 objectName: "messageBodySpinner"
                                 running: root.bodyLoading || root.renderingBody
                                 visible: running

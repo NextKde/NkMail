@@ -127,6 +127,7 @@ TestCase {
         property int hides: 0
         function hideToTray() { hides++; app.hide(); return true }
     }
+    Component { id: activityComponent; App.MailActivityIndicator {} }
     Component { id: readerComponent; App.MessageReader {} }
     Component { id: sidebarComponent; App.MailSidebar {} }
     Component { id: paneComponent; App.MessagePane { selection: App.MailSelection {} } }
@@ -153,6 +154,34 @@ TestCase {
         app.requestActivate()
         wait(40)
     }
+    function verifyActivityPixelsMove(indicator, surface) {
+        const target = surface || indicator
+        waitForRendering(target)
+        const before = grabImage(target)
+        wait(180)
+        verify(!before.equals(grabImage(target)), "The visible activity pixels must change over time")
+    }
+    function test_activity_animates_in_normal_and_reduced_motion_and_stops_when_hidden() {
+        const indicator = createTemporaryObject(activityComponent, app.contentItem,
+            {x: 400, y: 300, width: 40, height: 40, running: true, reducedMotion: false})
+        verify(indicator !== null)
+        verifyActivityPixelsMove(indicator)
+        indicator.reducedMotion = true
+        verifyActivityPixelsMove(indicator)
+        indicator.visible = false
+        wait(50)
+        const paused = indicator.phase
+        wait(180)
+        compare(indicator.phase, paused)
+        verify(!indicator.animating)
+        indicator.visible = true
+        verifyActivityPixelsMove(indicator)
+        indicator.running = false
+        wait(50)
+        const stopped = grabImage(indicator)
+        wait(180)
+        verify(stopped.equals(grabImage(indicator)))
+    }
     function test_reader_preserves_header_with_visible_loading_and_retry() {
         const pending = {uid: "pending", uidValidity: "42", folder: "INBOX", sender: "Studio Example",
             subject: "A message on its way", to: "alex@example.invalid", bodyPending: true, bodyLoading: true}
@@ -162,6 +191,7 @@ TestCase {
         tryCompare(findChild(reader, "readerSubject"), "text", pending.subject)
         verify(findChild(reader, "messageBodyLoadingState").visible)
         verify(findChild(reader, "messageBodySpinner").running)
+        verifyActivityPixelsMove(findChild(reader, "messageBodySpinner"), reader)
         verify(!findChild(reader, "messageBody").visible)
         verify(!findChild(reader, "browserBodyLoader").active)
         reader.message = Object.assign({}, pending, {bodyLoading: false, bodyError: "Synthetic connection failure"})
@@ -186,6 +216,7 @@ TestCase {
             const empty = findChild(app, "messageEmptyState")
             verify(empty !== null)
             tryCompare(empty, "description", mock.status)
+            verifyActivityPixelsMove(findChild(app, "messageListSpinner"), findChild(app, "messagePane"))
             mock.status = "Fetching message headers…"
             tryCompare(empty, "description", mock.status)
         } finally {

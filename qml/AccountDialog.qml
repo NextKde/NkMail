@@ -247,11 +247,20 @@ LiquidDialog {
                 color: AppTheme.text; font.pixelSize: 18
                 Layout.fillWidth: true; wrapMode: Text.Wrap
             }
-            Text {
+            RowLayout {
                 visible: root.submitting
-                text: root.setup && root.setup.stage === "google" ? qsTr("Finish signing in with Google in your browser…")
-                    : root.setup && root.setup.stage === "smtp" ? qsTr("Checking outgoing server…") : qsTr("Checking incoming server…")
-                color: AppTheme.mutedText; Layout.fillWidth: true
+                Layout.fillWidth: true
+                spacing: 10
+                MailActivityIndicator {
+                    objectName: "accountSetupSpinner"
+                    running: root.submitting
+                    Layout.preferredWidth: 20; Layout.preferredHeight: 20
+                }
+                Text {
+                    text: root.setup && root.setup.stage === "google" ? qsTr("Finish signing in with Google in your browser…")
+                        : root.setup && root.setup.stage === "smtp" ? qsTr("Checking outgoing server…") : qsTr("Checking incoming server…")
+                    color: AppTheme.mutedText; Layout.fillWidth: true; wrapMode: Text.Wrap
+                }
             }
             Text { visible: root.setupError.length > 0; text: root.setupError; color: AppTheme.destructive; Layout.fillWidth: true; wrapMode: Text.Wrap }
             SettingsGroup {

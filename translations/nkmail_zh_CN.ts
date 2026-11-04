@@ -2312,4 +2312,11 @@ Alex
             <translation>Google 未返回离线访问权限。请重新登录并完成授权；如仍失败，请联系应用发布者。</translation>
         </message>
     </context>
+    <context>
+        <name>MailActivityIndicator</name>
+        <message>
+            <source>Loading…</source>
+            <translation>正在加载…</translation>
+        </message>
+    </context>
 </TS>

@@ -2312,4 +2312,11 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation>Google did not return offline access. Sign in again and complete the consent process; if this persists, contact the application distributor.</translation>
         </message>
     </context>
+    <context>
+        <name>MailActivityIndicator</name>
+        <message>
+            <source>Loading…</source>
+            <translation>Loading…</translation>
+        </message>
+    </context>
 </TS>
