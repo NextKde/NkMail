@@ -239,6 +239,18 @@
             <source>Protocol</source>
             <translation>Protocol</translation>
         </message>
+        <message>
+            <source>Connection options</source>
+            <translation>Connection options</translation>
+        </message>
+        <message>
+            <source>Incoming STARTTLS</source>
+            <translation>Incoming STARTTLS</translation>
+        </message>
+        <message>
+            <source>Outgoing STARTTLS</source>
+            <translation>Outgoing STARTTLS</translation>
+        </message>
     </context>
     <context>
         <name>MailComposer</name>
@@ -1720,11 +1732,6 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../qml/ProviderPicker.qml" line="20" />
             <source>Choose your provider</source>
             <translation>Choose your provider</translation>
-        </message>
-        <message>
-            <location filename="../qml/ProviderPicker.qml" line="40" />
-            <source> · Not available yet</source>
-            <translation> · Not available yet</translation>
         </message>
         <message>
             <location filename="../qml/ProviderPicker.qml" line="15" />

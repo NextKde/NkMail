@@ -1391,8 +1391,44 @@ TestCase {
         compare(Profiles.forAddress("person@gmail.com.attacker.invalid"), "manual")
         compare(Profiles.ids.indexOf("microsoft"), -1)
         compare(visualChild(picker, "providerLogo_microsoft"), null)
+        compare(visualChild(picker, "provider_undefined"), null)
+        dialog.step = 0
+        wait(30)
+        const selectedProvider = visualChild(picker, "provider_icloud")
+        mouseClick(selectedProvider); mouseClick(selectedProvider)
+        verify(selectedProvider.checked)
         compare(Profiles.logo("manual"), "")
         dialog.close()
+    }
+    function test_account_settings_editing_and_switch_bindings() {
+        const dialog = findChild(app, "accountDialog")
+        const oldDemo = mock.demo
+        try {
+            mock.demo = false
+            dialog.addAccount()
+            findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("qq")
+            dialog.nextStep()
+            const name = findChild(dialog, "accountName")
+            name.forceActiveFocus(); keyClick(Qt.Key_N)
+            compare(dialog.configuration().name, "n")
+            const remember = findChild(dialog, "rememberPasswordSwitch")
+            remember.toggle(); compare(remember.checked, true)
+            remember.toggle(); compare(remember.checked, false)
+            const advanced = findChild(dialog, "advancedSettingsSwitch")
+            advanced.toggle(); compare(dialog.advanced, true)
+            dialog.advanced = false; compare(advanced.checked, false)
+            const protocol = findChild(dialog, "incomingProtocolChoice")
+            protocol.select(1); compare(dialog.configuration().incomingProtocol, "pop3")
+            compare(dialog.configuration().imapPort, 995)
+            protocol.select(0); compare(dialog.configuration().incomingProtocol, "imap")
+            for (const width of [1180, 460]) {
+                app.width = width
+                wait(100)
+                verify(name.width > 0)
+                const point = name.mapToItem(dialog.contentItem, 0, 0)
+                verify(point.x >= 0 && point.x + name.width <= dialog.contentItem.width + 1)
+            }
+        } finally { dialog.close(); mock.demo = oldDemo }
     }
     function test_pop_account_configuration_and_local_action_labels() {
         const dialog = findChild(app, "accountDialog")
@@ -1401,7 +1437,7 @@ TestCase {
         picker.currentIndex = Profiles.ids.indexOf("qq")
         dialog.nextStep()
         const protocol = findChild(dialog, "incomingProtocolChoice")
-        protocol.currentIndex = 1; protocol.activated(1)
+        protocol.activated(1)
         compare(dialog.configuration().incomingProtocol, "pop3")
         compare(dialog.configuration().imapHost, "pop.qq.com")
         compare(dialog.configuration().imapPort, 995)
@@ -1411,12 +1447,20 @@ TestCase {
             findChild(dialog, "accountName").text = "POP fixture"
             wait(150)
             grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".pop.png")
+            protocol.openMenu(); tryCompare(protocol, "popupOpened", true)
+            wait(80)
+            grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".select.png")
+            protocol.closeMenu()
+            AppTheme.appearanceMode = "dark"
+            wait(80)
+            grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".dark.png")
+            AppTheme.appearanceMode = "light"
         }
         dialog.editAccount({id: "existing-pop", incomingProtocol: "pop3", imapHost: "pop.example.invalid", imapPort: 995})
         compare(dialog.configuration().incomingProtocol, "pop3")
         verify(!protocol.enabled)
         dialog.addAccount(); picker.currentIndex = Profiles.ids.indexOf("icloud"); dialog.nextStep()
-        compare(protocol.count, 1)
+        compare(protocol.model.length, 1)
         compare(dialog.configuration().incomingProtocol, "imap")
         dialog.close()
     }

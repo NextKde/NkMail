@@ -48,16 +48,16 @@ ColumnLayout {
                 width: providerScroll.availableWidth
                 spacing: 0
                 Repeater {
-                    model: [1,2,3,4,5,6,7,8,9,0]
+                    model: Profiles.ids.map((_, index) => index).slice(1).concat([0])
                     delegate: LiquidNavigationButton {
                         id: providerRow
                         required property int modelData
                         objectName: "provider_" + Profiles.ids[modelData]
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 32
+                        Layout.preferredHeight: 30
                         specificationForm: true
                         specificationFontSize: 13
-                        text: root.labels[modelData] + (modelData === 9 ? qsTr(" · Not available yet") : "")
+                        text: root.labels[modelData]
                         // Preserve brand colors and wordmark aspect ratios; the shared
                         // button still owns selection, focus, hover and input behavior.
                         contentItem: RowLayout {
@@ -100,6 +100,9 @@ ColumnLayout {
                                 verticalAlignment: Text.AlignVCenter
                             }
                         }
+                        autoExclusive: true
+                        Accessible.role: Accessible.RadioButton
+                        Accessible.checked: root.currentIndex === modelData
                         checked: root.currentIndex === modelData
                         onClicked: root.currentIndex = modelData
                     }

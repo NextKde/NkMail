@@ -239,6 +239,18 @@
             <source>Protocol</source>
             <translation>协议</translation>
         </message>
+        <message>
+            <source>Connection options</source>
+            <translation>连接选项</translation>
+        </message>
+        <message>
+            <source>Incoming STARTTLS</source>
+            <translation>收件 STARTTLS</translation>
+        </message>
+        <message>
+            <source>Outgoing STARTTLS</source>
+            <translation>发件 STARTTLS</translation>
+        </message>
     </context>
     <context>
         <name>MailComposer</name>
@@ -1720,11 +1732,6 @@ Alex
             <location filename="../qml/ProviderPicker.qml" line="20" />
             <source>Choose your provider</source>
             <translation>选择邮箱提供商</translation>
-        </message>
-        <message>
-            <location filename="../qml/ProviderPicker.qml" line="40" />
-            <source> · Not available yet</source>
-            <translation> · 暂未支持</translation>
         </message>
         <message>
             <location filename="../qml/ProviderPicker.qml" line="15" />

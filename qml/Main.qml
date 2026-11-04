@@ -621,63 +621,82 @@ ApplicationWindow {
                         listOptions.close(); mail.refresh()
                     }
                 }
-                LiquidCheckBox {
-                    id: unreadFilterCheck
-                    objectName: "unreadFilterCheck"
-                    Layout.fillWidth: true
-                    text: qsTr("Unread messages only (cached)")
-                    checked: mail.unreadOnly
-                    onToggled: mail.unreadOnly = checked
-                }
-                LiquidCheckBox {
-                    objectName: "senderInitialsCheck"
-                    Layout.fillWidth: true
-                    text: qsTr("Sender initials")
-                    checked: window.showAvatars
-                    onToggled: window.showAvatars = checked
-                }
-                LiquidCheckBox {
-                    objectName: "groupThreadsCheck"
-                    Layout.fillWidth: true
-                    text: qsTr("按会话聚合")
-                    checked: window.groupThreads
-                    onToggled: window.groupThreads = checked
-                }
-                LiquidCheckBox {
-                    objectName: "notifyCheck"
-                    Layout.fillWidth: true
-                    text: qsTr("新邮件通知")
-                    checked: mail.notifyEnabled
-                    onToggled: mail.notifyEnabled = checked
-                }
-                LiquidCheckBox {
-                    objectName: "summaryCheck"
-                    Layout.fillWidth: true
-                    text: qsTr("Show message summaries")
-                    checked: window.showSummary
-                    onToggled: window.showSummary = checked
-                }
-                LiquidCheckBox {
-                    objectName: "richTextCheck"
-                    Layout.fillWidth: true
-                    text: qsTr("富文本显示")
-                    checked: window.showRichText
-                    onToggled: window.showRichText = checked
-                }
-                LiquidCheckBox {
-                    objectName: "alwaysShowImagesCheck"
-                    Layout.fillWidth: true
-                    text: qsTr("Always show remote images")
-                    checked: mail.alwaysShowRemoteImages === true
-                    onToggled: mail.alwaysShowRemoteImages = checked
-                }
-                LiquidCheckBox {
-                    objectName: "senderImagesCheck"
-                    Layout.fillWidth: true
-                    visible: String(window.message.senderAddress || "").length > 0
-                    text: qsTr("Allow images from this sender")
-                    checked: mail.senderImagesAllowed === true
-                    onToggled: mail.senderImagesAllowed = checked
+                SettingsGroup {
+                    objectName: "displaySettingsGroup"
+                    SettingsItem {
+                        title: qsTr("Unread messages only (cached)")
+                        SettingsSwitch {
+                            accessibleName: qsTr("Unread messages only (cached)")
+                            id: unreadFilterCheck
+                            objectName: "unreadFilterCheck"
+                            checked: mail.unreadOnly
+                            onToggled: checked => mail.unreadOnly = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("Sender initials")
+                        SettingsSwitch {
+                            accessibleName: qsTr("Sender initials")
+                            objectName: "senderInitialsCheck"
+                            checked: window.showAvatars
+                            onToggled: checked => window.showAvatars = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("按会话聚合")
+                        SettingsSwitch {
+                            accessibleName: qsTr("按会话聚合")
+                            objectName: "groupThreadsCheck"
+                            checked: window.groupThreads
+                            onToggled: checked => window.groupThreads = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("新邮件通知")
+                        SettingsSwitch {
+                            accessibleName: qsTr("新邮件通知")
+                            objectName: "notifyCheck"
+                            checked: mail.notifyEnabled
+                            onToggled: checked => mail.notifyEnabled = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("Show message summaries")
+                        SettingsSwitch {
+                            accessibleName: qsTr("Show message summaries")
+                            objectName: "summaryCheck"
+                            checked: window.showSummary
+                            onToggled: checked => window.showSummary = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("富文本显示")
+                        SettingsSwitch {
+                            accessibleName: qsTr("富文本显示")
+                            objectName: "richTextCheck"
+                            checked: window.showRichText
+                            onToggled: checked => window.showRichText = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("Always show remote images")
+                        SettingsSwitch {
+                            accessibleName: qsTr("Always show remote images")
+                            objectName: "alwaysShowImagesCheck"
+                            checked: mail.alwaysShowRemoteImages === true
+                            onToggled: checked => mail.alwaysShowRemoteImages = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("Allow images from this sender")
+                        visible: String(window.message.senderAddress || "").length > 0
+                        SettingsSwitch {
+                            accessibleName: qsTr("Allow images from this sender")
+                            objectName: "senderImagesCheck"
+                            checked: mail.senderImagesAllowed === true
+                            onToggled: checked => mail.senderImagesAllowed = checked
+                        }
+                    }
                 }
                 Text {
                     Layout.fillWidth: true
