@@ -45,6 +45,13 @@ Rectangle {
                 id: messageRow
                 required property int index
                 required property string uid
+                required property var model
+                readonly property string sourceAccountId: String(model.accountId || "")
+                readonly property bool readOnlyMailbox: mail.smartMailbox === "allInbox"
+                readonly property string accountCaption: {
+                    const account = (mail.accounts || []).find(a => a.id === sourceAccountId)
+                    return account ? (account.name || account.address) : sourceAccountId
+                }
                 required property string folder
                 required property string uidValidity
                 required property string sender
@@ -64,15 +71,15 @@ Rectangle {
                 height: visible ? MailStyle.messageRowHeight : 0
                 implicitHeight: visible ? MailStyle.messageRowHeight : 0
                 hoverEnabled: true
-                readonly property bool selected: mail.selectedUid === uid && (mail.selectedMessage.folder || (mail.smartMailbox ? "" : mail.currentFolder)) === folder
+                readonly property bool selected: (!sourceAccountId || sourceAccountId === mail.currentAccountId) && mail.selectedUid === uid && (mail.selectedMessage.folder || (mail.smartMailbox ? "" : mail.currentFolder)) === folder
                 readonly property color rowInk: selected ? "#ffffff" : root.ink
                 readonly property color rowMuted: selected ? "#ffffff" : root.muted
                 readonly property color rowAccent: selected ? "#ffffff" : AppTheme.accent
                 readonly property bool multiSelected: root.selection.isRowSelected(index)
                 readonly property int messageIndex: (mail.messages && typeof mail.messages.indexOf === "function")
-                    ? mail.messages.indexOf(folder, uidValidity, uid) : -1
+                    ? mail.messages.indexOf(folder, uidValidity, uid, sourceAccountId || mail.currentAccountId) : -1
                 readonly property bool bulkMenu: root.selection.isRowSelected(index) && root.selection.selectionSize > 1
-                readonly property bool canCompose: !bulkMenu && !mail.sending
+                readonly property bool canCompose: !bulkMenu && !mail.sending && (!sourceAccountId || sourceAccountId === mail.currentAccountId)
                     && (mail.selectedMessage.folder || (mail.smartMailbox ? "" : mail.currentFolder)) === folder && mail.selectedMessage.uid === uid && mail.selectedMessage.uidValidity === uidValidity
                 function composeMessage(mode) {
                     if (!canCompose) return
@@ -80,7 +87,7 @@ Rectangle {
                     root.composeRequested(mode)
                 }
                 function contextCommand(action, value) {
-                    if (messageIndex < 0) return
+                    if (readOnlyMailbox || messageIndex < 0) return
                     const rows = bulkMenu ? root.selection.selectedIndexList() : [messageIndex]
                     if (action === "read") mail.setMessagesRead(rows, value)
                     else if (action === "flag") mail.setMessagesFlagged(rows, value)
@@ -108,10 +115,10 @@ Rectangle {
                     selectRow()
                     openMenuAtContext(rowMenu)
                 }
-                function selectRow() { mail.openMessage(uid, uidValidity, folder); root.messageOpened() }
+                function selectRow() { mail.openMessage(uid, uidValidity, folder, sourceAccountId); root.messageOpened() }
                 function openRow() {
                     selectRow()
-                    if (unread) mail.setMessageRead(messageIndex, true)
+                    if (!readOnlyMailbox && unread) mail.setMessageRead(messageIndex, true)
                 }
                 Accessible.name: sender + ". " + subject + (root.showSummary ? ". " + preview : "")
                 onClicked: {}   // 鼠标点击由 TapHandler 处理；键盘见下方 Keys
@@ -140,26 +147,35 @@ Rectangle {
                     LiquidPopoverItem { objectName: "rowReply"; text: qsTr("Reply"); iconName: "undo"; enabled: messageRow.canCompose; onTriggered: messageRow.composeMessage("reply") }
                     LiquidPopoverItem { objectName: "rowReplyAll"; text: qsTr("Reply to all"); iconName: "arrows"; enabled: messageRow.canCompose; onTriggered: messageRow.composeMessage("replyAll") }
                     LiquidPopoverItem { objectName: "rowForward"; text: qsTr("Forward"); iconName: "forward"; enabled: messageRow.canCompose; onTriggered: messageRow.composeMessage("forward") }
+                    LiquidPopoverItem {
+                        text: qsTr("Open source folder")
+                        iconName: "folder"
+                        visible: messageRow.readOnlyMailbox
+                        implicitHeight: visible ? 30 : 0
+                        onTriggered: { rowMenu.close(); mail.openFavorite(messageRow.sourceAccountId, messageRow.folder) }
+                    }
                     Rectangle { implicitHeight: 1; Layout.fillWidth: true; color: root.rule }
                     LiquidPopoverItem {
                         text: messageRow.unread ? qsTr("标为已读") : qsTr("标为未读")
                         iconName: messageRow.unread ? "envelopeOpen" : "envelope"
+                        enabled: !messageRow.readOnlyMailbox
                         onTriggered: messageRow.contextCommand("read", messageRow.unread)
                     }
                     LiquidPopoverItem {
                         text: messageRow.flagged ? qsTr("移除旗标") : qsTr("添加旗标")
                         iconName: "flag"
+                        enabled: !messageRow.readOnlyMailbox
                         onTriggered: messageRow.contextCommand("flag", !messageRow.flagged)
                     }
                     LiquidPopoverItem {
                         objectName: "moveToMenuItem"
                         text: qsTr("移动到…")
                         iconName: "folder"
-                        enabled: mail.folders.filter(f => f.id !== messageRow.folder).length > 0
+                        enabled: !messageRow.readOnlyMailbox && mail.folders.filter(f => f.id !== messageRow.folder).length > 0
                         onTriggered: { rowMenu.close(); messageRow.openMenuAtContext(messageMoveMenu) }
                     }
-                    LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; onTriggered: messageRow.contextCommand("archive") }
-                    LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; onTriggered: messageRow.contextCommand("delete") }
+                    LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; enabled: !messageRow.readOnlyMailbox; onTriggered: messageRow.contextCommand("archive") }
+                    LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; enabled: !messageRow.readOnlyMailbox; onTriggered: messageRow.contextCommand("delete") }
                 }
                 LiquidPopover {
                     id: messageMoveMenu
@@ -239,6 +255,14 @@ Rectangle {
                                     grabPermissions: PointerHandler.CanTakeOverFromAnything
                                     onTapped: root.selection.toggleThread(messageRow.threadKey)
                                 }
+                            }
+                            Text {
+                                objectName: "sourceAccountLabel"
+                                visible: messageRow.sourceAccountId.length > 0
+                                text: messageRow.accountCaption
+                                color: messageRow.rowMuted; font.pixelSize: 10
+                                Layout.maximumWidth: 90; elide: Text.ElideRight
+                                textFormat: Text.PlainText
                             }
                             Text { text: MailLabels.dateLabel(messageRow.date, root.localeName); color: messageRow.rowMuted; font.pixelSize: AppTheme.compactControlFontSize }
                         }

@@ -437,6 +437,69 @@ private slots:
         QVERIFY(controller.selectedMessage().value("bodyError").toString().isEmpty());
     }
 
+    void unifiedInboxReadsSameUidFromCorrectAccountWithoutWrites() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
+        {
+            MailDatabase db; QVERIFY(db.open(root.path()));
+            auto first = synthetic::content(account(), "INBOX", "100", "120"); first.text = "First account body"; QVERIFY(db.saveContent(first));
+            QVERIFY(db.open(root.path(), "other")); auto other = account(); other.id = "other";
+            other.address = other.username = "other@example.invalid"; QVERIFY(db.saveAccount(other));
+            QVERIFY(db.savePage(synthetic::page(other, "INBOX", 0, 1)));
+        }
+        int writes = 0;
+        class NoWrites final : public MailTransport {
+        public:
+            int *writes;
+            void storeFlagsMany(const Account &, const QString &, const QString &, const QStringList &, const QStringList &, bool) override { ++*writes; }
+            void removeOrMove(const Account &, const QString &, const QString &, const QStringList &, const QString &) override { ++*writes; }
+        };
+        auto transport = std::make_shared<NoWrites>(); transport->writes = &writes;
+        const auto normal = synthetic::content;
+        synthetic::content = [normal](const Account &a, const QString &f, const QString &v, const QString &u) {
+            auto c = normal(a, f, v, u); c.text = "Downloaded for " + a.id; return c;
+        };
+        MailController controller(false, root.path(), nullptr, transport);
+        QTRY_VERIFY(controller.status().contains("restored"));
+        controller.selectSmartMailbox("allInbox"); QCOMPARE(messages(controller)->count(), 2);
+        controller.openMessage("120", "100", "INBOX", "other");
+        QCOMPARE(controller.currentAccountId(), QString("other"));
+        QCOMPARE(controller.smartMailbox(), QString("allInbox"));
+        QTRY_COMPARE(controller.selectedMessage().value("text").toString(), QString("Downloaded for other"));
+        QCOMPARE(messages(controller)->count(), 2);
+        controller.setMessagesRead({0, 1}, true); controller.deleteMessages({0, 1}); QCOMPARE(writes, 0);
+        controller.openMessage("120", "100", "INBOX", "default");
+        QCOMPARE(controller.selectedMessage().value("text").toString(), QString("First account body"));
+        QCOMPARE(controller.currentAccountId(), QString("default"));
+        QCOMPARE(controller.smartMailbox(), QString("allInbox"));
+        controller.openMessage("120", "100", "INBOX", "missing-account");
+        QCOMPARE(controller.currentAccountId(), QString("default"));
+        controller.selectFolder("INBOX"); QVERIFY(controller.smartMailbox().isEmpty());
+    }
+    void unifiedInboxKeepsLoadedPagesWhenChangingSourceAccount() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 80));
+        {
+            MailDatabase db; QVERIFY(db.open(root.path(), "other"));
+            auto other = account(); other.id = "other";
+            other.address = other.username = "other@example.invalid";
+            QVERIFY(db.saveAccount(other));
+            auto page = synthetic::page(other, "INBOX", 0, 1);
+            page.messages[0].date = "2030-01-01T00:00:00Z";
+            QVERIFY(db.savePage(page));
+        }
+        MailController controller(false, root.path());
+        QTRY_VERIFY(controller.status().contains("restored"));
+        controller.selectSmartMailbox("allInbox");
+        while (controller.hasMore()) controller.loadMore();
+        QCOMPARE(messages(controller)->count(), 81);
+        controller.openMessage("120", "100", "INBOX", "other");
+        QCOMPARE(controller.currentAccountId(), QString("other"));
+        QCOMPARE(messages(controller)->count(), 81);
+        QVERIFY(!controller.hasMore());
+        controller.openMessage("41", "100", "INBOX", "default");
+        QCOMPARE(controller.currentAccountId(), QString("default"));
+        QTRY_COMPARE(controller.selectedMessage().value("text").toString(), QString("Synthetic body 41"));
+        QCOMPARE(messages(controller)->count(), 81);
+    }
     void smartMailboxOpensDuplicateUidFromSourceFolder() {
         QTemporaryDir root(temporaryTemplate());
         QVERIFY(seed(root.path(), 0, false));

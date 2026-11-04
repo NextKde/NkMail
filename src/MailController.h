@@ -104,7 +104,7 @@ public:
     Q_INVOKABLE bool configureGoogleAccount(const QString &existingId = {});
     Q_INVOKABLE bool configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
     // Foreground account owns browsing/search. Background accounts poll inbox stats.
-    Q_INVOKABLE void switchAccount(const QString &id);
+    Q_INVOKABLE void switchAccount(const QString &id, bool keepUnifiedInbox = false);
     // Read-only cache probe: lists another account's folders without touching the
     // active account or opening a connection.
     Q_INVOKABLE QVariantList foldersFor(const QString &accountId) const;
@@ -119,7 +119,7 @@ public:
     Q_INVOKABLE void searchServer();
     Q_INVOKABLE void selectFolder(const QString &folder);
     Q_INVOKABLE void loadMore();
-    Q_INVOKABLE void openMessage(const QString &uid, const QString &uidValidity, const QString &folder = {});
+    Q_INVOKABLE void openMessage(const QString &uid, const QString &uidValidity, const QString &folder = {}, const QString &sourceAccount = {});
     Q_INVOKABLE QVariantMap newDraft(const QString &mode = QStringLiteral("new"));
     Q_INVOKABLE QVariantMap loadDraft(const QString &id);
     Q_INVOKABLE QVariantMap saveDraft(const QVariantMap &draft);

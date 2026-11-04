@@ -849,6 +849,7 @@
     </context>
     <context>
         <name>MailLabels</name>
+        <message><source>All inboxes (cached)</source><translation>所有收件箱（缓存）</translation></message>
         <message>
             <location filename="../qml/MailLabels.qml" line="7" />
             <source>Flagged</source>
@@ -1007,8 +1008,8 @@
         </message>
         <message>
             <location filename="../qml/MailSidebar.qml" line="217" />
-            <source>Current account · cached mail</source>
-            <translation>当前账户 · 已缓存邮件</translation>
+            <source>Cached mail</source>
+            <translation>已缓存邮件</translation>
         </message>
         <message>
             <location filename="../qml/MailSidebar.qml" line="361" />
@@ -1339,6 +1340,7 @@ Alex
     </context>
     <context>
         <name>MessagePane</name>
+        <message><source>Open source folder</source><translation>打开来源文件夹</translation></message>
         <message>
             <source>Add an account</source>
             <translation>添加账号</translation>
@@ -1812,6 +1814,8 @@ Alex
     </context>
     <context>
         <name>nkmail::MailController</name>
+        <message><source>All inboxes · cached messages · read-only</source><translation>所有收件箱 · 缓存邮件 · 只读</translation></message>
+        <message><source>Open the account folder to change messages.</source><translation>请打开对应账号的文件夹后修改邮件。</translation></message>
         <message>
             <location filename="../src/MailController.cpp" line="73" />
             <source>Messages updated</source>

@@ -63,14 +63,14 @@ TestCase {
         signal draftAccepted(string id)
         ListModel {
             id: messageModel
-            function indexOf(folder, validity, uid) {
+            function indexOf(folder, validity, uid, accountId) {
                 for (let i = 0; i < count; ++i) {
                     const message = get(i)
-                    if (message.folder === folder && message.uidValidity === validity && message.uid === uid) return i
+                    if (message.folder === folder && message.uidValidity === validity && message.uid === uid && (!accountId || !message.accountId || message.accountId === accountId)) return i
                 }
                 return -1
             }
-            ListElement { uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false; threadKey: ""; threadCount: 1; threadFirst: true }
+            ListElement { accountId: ""; uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false; threadKey: ""; threadCount: 1; threadFirst: true }
         }
         property var accountSetup: setupMock
         function configureAccount(config, password, remember) { return !busy }
@@ -97,7 +97,10 @@ TestCase {
         function openFavorite(accountId, folderId) { currentAccountId = accountId }
         function switchAccount(accountId) { currentAccountId = accountId }
         function loadMore() {}
-        function openMessage(uid, validity) { selectedUid = uid }
+        property var lastOpened: []
+        property int markReadCount: 0
+        function setMessageRead(row, read) { markReadCount++ }
+        function openMessage(uid, validity, folder, accountId) { lastOpened = [uid, validity, folder, accountId]; selectedUid = uid; if (accountId) currentAccountId = accountId }
         function newDraft(mode) { return {id: "test-draft", to: "", cc: "", bcc: "", subject: "", body: "", inReplyTo: "", references: "", state: "draft", attachments: []} }
         function loadDraft(id) { return drafts.find(d => d.id === id) || ({}) }
         function saveDraft(draft) {
@@ -583,6 +586,47 @@ TestCase {
         wait(30)
         verify(row.selected)
         mock.selectedMessage = original
+    }
+    function test_unified_inbox_routes_source_and_disables_mutations() {
+        const originalAccount = mock.currentAccountId
+        const originalAccountData = mock.account
+        const originalAccounts = mock.accounts
+        const originalMessage = mock.selectedMessage
+        try {
+            mock.accounts = [{id: "default", name: "Personal"}, {id: "work", name: "Work"}]
+            mock.currentAccountId = "default"
+            mock.selectedMessage = Object.assign({}, originalMessage, {folder: "INBOX", text: "Synthetic message from the Work inbox."})
+            messageModel.setProperty(0, "accountId", "work")
+            findChild(findChild(app, "sidebarBody"), "smartMailbox_allInbox").clicked()
+            compare(mock.smartMailbox, "allInbox")
+            const row = findChild(app, "messageList").itemAtIndex(0)
+            compare(row.sourceAccountId, "work")
+            compare(findChild(row, "sourceAccountLabel").text, "Work")
+            verify(!row.selected)
+            verify(!row.canCompose)
+            const reads = mock.markReadCount
+            row.openRow()
+            compare(mock.lastOpened, ["1", "1", "INBOX", "work"])
+            compare(mock.markReadCount, reads)
+            mock.account = {id: "work", name: "Work", address: "work@example.invalid"}
+            verify(row.selected)
+            const deleted = mock.lastContextRows
+            row.contextCommand("delete")
+            compare(mock.lastContextRows, deleted)
+            verify(!findChild(row, "moveToMenuItem").enabled)
+            verify(!findChild(app, "selectionOpsGroup").enabled)
+            if (imagePolicyCapture.capturePath.length > 0) {
+                wait(100)
+                grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".unified.png")
+            }
+        } finally {
+            messageModel.setProperty(0, "accountId", "")
+            mock.currentAccountId = originalAccount
+            mock.accounts = originalAccounts
+            mock.account = originalAccountData
+            mock.selectedMessage = originalMessage
+            mock.smartMailbox = ""
+        }
     }
     function test_account_header_only_toggles_children() {
         const sidebar = createTemporaryObject(sidebarComponent, testCase, {

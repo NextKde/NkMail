@@ -123,6 +123,10 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         m_switchCredentialPending = false;
         m_account.password = password;
         setStatus(tr("Saved credentials restored. Refresh to connect."));
+        if (m_smartMailbox == QLatin1String("allInbox") && m_selected.value("bodyPending").toBool()) {
+            const auto selected = m_content.summary;
+            openMessage(selected.uid, selected.uidValidity, selected.folder, m_account.id);
+        }
     });
     connect(m_credentials, &AccountSession::passwordSaved, this, [this](const QString &) {
         QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
@@ -371,7 +375,8 @@ bool MailController::configureAccountImpl(const QVariantMap &configuration, cons
     setStatus(tr("Account saved. Refresh to connect."));
     return true;
 }
-void MailController::switchAccount(const QString &id) {
+void MailController::switchAccount(const QString &id, bool keepUnifiedInbox) {
+    keepUnifiedInbox = keepUnifiedInbox && m_smartMailbox == QLatin1String("allInbox");
     const QString accountId = id.trimmed();
     if (m_busy || sending() || m_commands->busy()) { setStatus(tr("Finish the current operation before switching accounts")); return; }
     if (accountId.isEmpty() || accountId == m_account.id) return;
@@ -393,17 +398,18 @@ void MailController::switchAccount(const QString &id) {
     }
 
     // Foreground view starts cached-only; background accounts poll inbox statistics.
-    m_messages->replace({});
+    if (!keepUnifiedInbox) m_messages->replace({});
     m_selected.clear(); m_selectedUid.clear(); m_content = {};
-    m_folder = QStringLiteral("INBOX"); m_smartMailbox.clear();
-    m_search.clear();
-    m_offset = 0; m_hasMore = false; m_uidValidity.clear(); m_cachedOnly = true;
+    m_folder = QStringLiteral("INBOX");
+    if (!keepUnifiedInbox) { m_smartMailbox.clear(); m_search.clear(); }
+    if (!keepUnifiedInbox) { m_offset = 0; m_hasMore = false; }
+    m_uidValidity.clear(); m_cachedOnly = true;
 
     m_account = m_database->account();
     m_folders.clear();
     for (const auto &folder : m_database->folders())
         m_folders.append(QVariantMap{{"id", folder.id}, {"title", folder.title}, {"total", folder.total}, {"role", folder.role}});
-    loadCached();
+    if (!keepUnifiedInbox) loadCached();
     // Account has no per-account interval yet; reuse the controller-wide value.
     startRefreshTimer();
 
@@ -470,7 +476,10 @@ void MailController::removeAccount(const QString &id) {
     m_credentials->forget(target);
     m_images->forgetAccount(accountId);
     emit accountsChanged();
-    if (accountId != m_account.id) return;
+    if (accountId != m_account.id) {
+        if (m_smartMailbox == QLatin1String("allInbox")) loadCached();
+        return;
+    }
 
     const auto remaining = m_database->accounts();
     if (!remaining.isEmpty()) { switchAccount(remaining.first().id); return; }
@@ -482,7 +491,7 @@ void MailController::removeAccount(const QString &id) {
     setStatus(tr("No accounts left"));
 }
 void MailController::refresh() {
-    if (!m_smartMailbox.isEmpty()) { loadCached(); setStatus(tr("Smart mailbox · current account cached messages")); return; }
+    if (!m_smartMailbox.isEmpty()) { loadCached(); setStatus(m_smartMailbox == QLatin1String("allInbox") ? tr("All inboxes · cached messages · read-only") : tr("Smart mailbox · current account cached messages")); return; }
     if (m_demo) { setStatus(tr("Preview · synthetic mail · not connected")); return; }
     if (m_busy || sending() || m_commands->busy()) return;
     if (!configured() || m_account.password.isEmpty()) {
@@ -515,14 +524,14 @@ void MailController::loadCached(bool append) {
     emit folderUnreadChanged();
 }
 void MailController::selectSmartMailbox(const QString &kind) {
-    if (kind != "flagged" && kind != "unread" && kind != "attachments") return;
+    if (kind != "flagged" && kind != "unread" && kind != "attachments" && kind != "allInbox") return;
     if (m_commands->busy()) return;
     ++m_generation; ++m_selectionGeneration; m_busy = false; m_offset = 0;
     m_smartMailbox = kind; m_cachedOnly = true; m_search.clear(); m_unreadOnly = false;
     m_selected.clear(); m_selectedUid.clear(); m_content = {};
     emit folderChanged(); emit selectionChanged(); emit searchChanged(); emit unreadOnlyChanged();
     loadCached();
-    setStatus(tr("Smart mailbox · current account cached messages"));
+    setStatus(m_smartMailbox == QLatin1String("allInbox") ? tr("All inboxes · cached messages · read-only") : tr("Smart mailbox · current account cached messages"));
 }
 void MailController::selectFolder(const QString &folder) {
     if (folder == m_folder && m_smartMailbox.isEmpty()) return;
@@ -725,9 +734,16 @@ void MailController::loadRemoteImages() {
     m_images->allowMessage(m_account.id, m_content.summary);
     m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion), m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml);
 }
-void MailController::openMessage(const QString &uid, const QString &validity, const QString &sourceFolder) {
+void MailController::openMessage(const QString &uid, const QString &validity, const QString &sourceFolder, const QString &sourceAccount) {
+    if (!sourceAccount.isEmpty() && sourceAccount != m_account.id) {
+        if (m_smartMailbox != QLatin1String("allInbox")) return;
+        // Verify aggregate membership before touching account/credential state.
+        if (m_messages->indexOf(sourceFolder, validity, uid, sourceAccount) < 0) return;
+        switchAccount(sourceAccount, true);
+        if (m_account.id != sourceAccount) return;
+    }
     const auto folder = sourceFolder.isEmpty() ? m_folder : sourceFolder;
-    if (!m_smartMailbox.isEmpty() && m_messages->indexOf(folder, validity, uid) < 0) return;
+    if (!m_smartMailbox.isEmpty() && m_messages->indexOf(folder, validity, uid, m_account.id) < 0) return;
     if (m_commands->busy()) return;
     const auto selectionGeneration = ++m_selectionGeneration;
     bool upgrading = false;
@@ -738,7 +754,7 @@ void MailController::openMessage(const QString &uid, const QString &validity, co
     }
     if (!upgrading) {
         m_selectedUid = uid; m_content = {};
-        const int row = m_messages->indexOf(folder, validity, uid);
+        const int row = m_messages->indexOf(folder, validity, uid, m_account.id);
         if (row >= 0) m_content.summary = summaryFromMap(m_messages->get(row));
         else { m_content.summary.uid = uid; m_content.summary.uidValidity = validity; m_content.summary.folder = folder; }
         m_content.to = m_content.summary.recipients;
@@ -826,6 +842,9 @@ void MailController::moveMessages(const QVariantList &indices, const QString &de
 }
 void MailController::executeCommand(const QVariantList &indices, MailboxCommands::Action action,
                                      bool value, const QString &destination) {
+    if (m_smartMailbox == QLatin1String("allInbox")) {
+        setStatus(tr("Open the account folder to change messages.")); return;
+    }
     if (m_commands->busy() || m_busy || sending() || sendPending()) { setStatus(tr("Another mail operation is in progress")); return; }
     if (!m_demo && (!configured() || m_account.password.isEmpty())) {
         if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));

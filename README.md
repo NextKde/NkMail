@@ -310,3 +310,7 @@ Permissions persist locally; downloaded image bodies still use a bounded in-memo
 CID-referenced raster images inside MIME messages render without remote-image permission or network access. PNG, JPEG, GIF and WebP parts are matched by Content-ID (including URL-encoded CID references), checked for valid decoding and capped at 2 MiB / 16 million pixels each. Inline expansion is capped at 8 MiB per rendered body. SVG, broken/missing/ambiguous references and oversized resources fall back to alternative text. Remote HTTP images remain permission-gated. Inline image parts do not clutter the attachment list; explicit attachments remain available.
 
 Body cache format 2 retains the resolved images in sanitized HTML, making them available offline. Older selected cached messages are upgraded with a read-only fetch when credentials are available; their existing content stays visible while upgrading.
+
+### Cached unified inbox
+
+**All inboxes (cached)** combines cached inbox headers across saved accounts, retaining each row's account/folder/UIDVALIDITY/UID identity. The list shows the source account and opens content with that account's credentials. Search and unread filtering operate on the local cache; Refresh reloads cached rows rather than syncing every account remotely. This initial aggregate is read-only: opening mail does not mark it read, and mailbox modifications are disabled. Use the row menu's **Open source folder** action to manage messages in their original account. Replies use the selected message's source account.

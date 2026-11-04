@@ -42,6 +42,7 @@ Account accountFromMap(const QVariantMap &m)
 }
 Summary summaryFromMap(const QVariantMap &map) {
     Summary summary;
+    summary.accountId = map.value("accountId").toString();
     summary.folder = map.value("folder").toString();
     summary.uidValidity = map.value("uidValidity").toString();
     summary.uid = map.value("uid").toString();
@@ -61,7 +62,7 @@ Summary summaryFromMap(const QVariantMap &map) {
 }
 QVariantMap summaryMap(const Summary &s)
 {
-    return {{"folder", s.folder}, {"uidValidity", s.uidValidity}, {"uid", s.uid},
+    return {{"accountId", s.accountId}, {"folder", s.folder}, {"uidValidity", s.uidValidity}, {"uid", s.uid},
             {"sender", s.sender}, {"senderAddress", s.senderAddress},
             {"recipients", s.recipients}, {"subject", s.subject}, {"date", s.date},
             {"preview", s.preview}, {"messageId", s.messageId},

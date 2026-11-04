@@ -117,7 +117,7 @@ Item {
                 && readerHeader.actionWidth >= readerHeader.baseActionsWidth + implicitWidth + 14
             icons: ["trash", "archive", "flag"]
             labels: [qsTr("删除"), qsTr("归档"), qsTr("旗标")]
-            enabledActions: [readerHeader.hasMessage, readerHeader.hasMessage, readerHeader.hasMessage]
+            enabledActions: [readerHeader.hasMessage && mail.smartMailbox !== "allInbox", readerHeader.hasMessage && mail.smartMailbox !== "allInbox", readerHeader.hasMessage && mail.smartMailbox !== "allInbox"]
             onTriggered: index => {
                 readerHeader.messageCommandRequested(index)
             }
@@ -133,6 +133,7 @@ Item {
             backdrop: readerHeader.backdrop
             materialForm: !readerHeader.liquidControls
             id: selectionOpsGroup
+            enabled: mail.smartMailbox !== "allInbox"
             showLabels: true
             objectName: "selectionOpsGroup"
             visible: !readerHeader.draftsVisible && !readerHeader.searching && readerHeader.selection.selectionSize > 0

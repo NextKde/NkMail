@@ -135,6 +135,41 @@ private slots:
         QVERIFY(db.invalidateUidValidity("Archive", "201"));
         QCOMPARE(db.smartPage("flagged", 0, 20).messages.size(), 1);
     }
+    void unifiedInboxKeepsAccountIdentityAndCurrentEpochs() {
+        QTemporaryDir dir(temporaryTemplate()); MailDatabase db;
+        for (const auto &id : {"first", "second"}) {
+            QVERIFY(db.open(dir.path(), id));
+            Account a; a.id = id; a.address = QString(id) + "@example.invalid"; QVERIFY(db.saveAccount(a));
+            auto mail = message("1"); mail.subject = QString(id); mail.unread = QString(id) == "second";
+            QVERIFY(db.savePage(page({mail})));
+            auto archived = message("1", "100", "Archive");
+            Page archive; archive.folder = "Archive"; archive.uidValidity = "100"; archive.messages = {archived}; QVERIFY(db.savePage(archive));
+        }
+        const auto all = db.smartPage("allInbox", 0, 10);
+        QCOMPARE(all.messages.size(), 2);
+        QCOMPARE(all.messages[0].accountId, QString("first")); QCOMPARE(all.messages[1].accountId, QString("second"));
+        MessageListModel model; model.replace(all.messages);
+        QCOMPARE(model.count(), 2);
+        model.replace({all.messages[1], all.messages[0]});
+        QCOMPARE(model.get(0).value("accountId").toString(), QString("second"));
+        model.replace(all.messages); QCOMPARE(model.count(), 2);
+        QCOMPARE(model.indexOf("INBOX", "100", "1"), -1);
+        QCOMPARE(model.indexOf("INBOX", "100", "1", "first"), 0);
+        QCOMPARE(model.indexOf("INBOX", "100", "1", "second"), 1);
+        QVERIFY(MessageListModel::identity(all.messages[0]) != MessageListModel::identity(all.messages[1]));
+        auto changed = all.messages[1]; changed.flagged = true; QVERIFY(model.update(changed));
+        QVERIFY(!model.get(0).value("flagged").toBool()); QVERIFY(model.get(1).value("flagged").toBool());
+        auto firstPage = db.smartPage("allInbox", 0, 1); QVERIFY(firstPage.hasMore);
+        QCOMPARE(db.smartPage("allInbox", firstPage.nextOffset, 1).messages.first().accountId, QString("second"));
+        QCOMPARE(db.smartPage("allInbox", 0, 10, "second").messages.size(), 1);
+        QCOMPARE(db.smartPage("allInbox", 0, 10, {}, true).messages.size(), 1);
+        QVERIFY(db.invalidateUidValidity("INBOX", "101"));
+        QCOMPARE(db.smartPage("allInbox", 0, 10).messages.size(), 1);
+        QVERIFY(db.removeAccount("first")); QCOMPARE(db.smartPage("allInbox", 0, 10).messages.size(), 0);
+        Content wrongAccount; wrongAccount.summary = all.messages.first();
+        QVERIFY(!db.saveContent(wrongAccount));
+        QVERIFY(!db.savePage(page({all.messages.first()})));
+    }
     void unreadCountsStayAccountScoped() {
         QTemporaryDir dir(temporaryTemplate());
         MailDatabase db;
@@ -655,7 +690,8 @@ void CoreTests::messageModelIdentity()
     QCOMPARE(model.indexOf("INBOX", "100", "2"), 0);
     QVERIFY(model.get(-1).isEmpty());
     QVERIFY(!model.data(model.index(0), Qt::UserRole - 1).isValid());
-    QCOMPARE(model.roleNames().size(), 14);
+    QCOMPARE(model.roleNames().size(), 15);
+    QCOMPARE(model.roleNames().value(MessageListModel::AccountIdRole), QByteArray("accountId"));
     model.replace({message("2", "101")});
     QVERIFY(!persistent.isValid());
     QCOMPARE(model.indexOf("INBOX", "100", "2"), -1);

@@ -23,6 +23,7 @@ struct Summary {
     QString sender, senderAddress, recipients, subject, date, preview;
     QString messageId, inReplyTo, references;
     bool unread = false, flagged = false, hasAttachments = false;
+    QString accountId; // Explicit source identity for cross-account aggregate rows.
 };
 struct Attachment { QString name, mimeType, path; qint64 size = 0; QByteArray bytes; };
 struct Content {

@@ -849,6 +849,7 @@
     </context>
     <context>
         <name>MailLabels</name>
+        <message><source>All inboxes (cached)</source><translation>All inboxes (cached)</translation></message>
         <message>
             <location filename="../qml/MailLabels.qml" line="7" />
             <source>Flagged</source>
@@ -1007,8 +1008,8 @@
         </message>
         <message>
             <location filename="../qml/MailSidebar.qml" line="217" />
-            <source>Current account · cached mail</source>
-            <translation>Current account · cached mail</translation>
+            <source>Cached mail</source>
+            <translation>Cached mail</translation>
         </message>
         <message>
             <location filename="../qml/MailSidebar.qml" line="361" />
@@ -1339,6 +1340,7 @@ Synthetic demo draft. Sending is disabled.</translation>
     </context>
     <context>
         <name>MessagePane</name>
+        <message><source>Open source folder</source><translation>Open source folder</translation></message>
         <message>
             <source>Add an account</source>
             <translation>Add an account</translation>
@@ -1812,6 +1814,8 @@ Synthetic demo draft. Sending is disabled.</translation>
     </context>
     <context>
         <name>nkmail::MailController</name>
+        <message><source>All inboxes · cached messages · read-only</source><translation>All inboxes · cached messages · read-only</translation></message>
+        <message><source>Open the account folder to change messages.</source><translation>Open the account folder to change messages.</translation></message>
         <message>
             <location filename="../src/MailController.cpp" line="73" />
             <source>Messages updated</source>

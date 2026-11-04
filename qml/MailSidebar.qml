@@ -231,18 +231,18 @@ Item {
                     topPadding: 16; bottomPadding: 4
                 }
                 Text {
-                    text: qsTr("Current account · cached mail")
+                    text: qsTr("Cached mail")
                     color: root.muted; font.pixelSize: 9
                     Layout.fillWidth: true; wrapMode: Text.Wrap
                     bottomPadding: 6
                 }
                 Repeater {
-                    model: ["unread", "attachments"]
+                    model: ["allInbox", "unread", "attachments"]
                     delegate: MailboxAction {
                         required property string modelData
                         objectName: "smartMailbox_" + modelData
                         text: MailLabels.smartMailboxTitle(modelData)
-                        iconName: modelData === "unread" ? "envelope" : "copy"
+                        iconName: modelData === "attachments" ? "copy" : "envelope"
                         checked: !root.draftsVisible && mail.smartMailbox === modelData
                         onClicked: { root.mailboxOpened(); mail.selectSmartMailbox(modelData) }
                     }

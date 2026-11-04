@@ -94,7 +94,7 @@ ApplicationWindow {
     function value(map, key) { return MailLabels.value(map, key) }
     function selectedIndex() {
         if (!hasMessage) return -1
-        return mail.messages.indexOf(window.value(message, "folder") || mail.currentFolder, window.value(message, "uidValidity"), mail.selectedUid)
+        return mail.messages.indexOf(window.value(message, "folder") || mail.currentFolder, window.value(message, "uidValidity"), mail.selectedUid, mail.currentAccountId)
     }
     function mailboxTitle(folder) { return MailLabels.mailboxTitle(folder) }
     function folderIcon(id) { return MailLabels.folderIcon(id) }
@@ -750,17 +750,17 @@ ApplicationWindow {
         LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: window.detailsVisible = true }
         LiquidPopoverItem {
             text: qsTr("删除"); iconName: "trash"
-            enabled: window.hasMessage && !readerHeader.messageOpsVisible
+            enabled: mail.smartMailbox !== "allInbox" && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.deleteMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: qsTr("归档"); iconName: "archive"
-            enabled: window.hasMessage && !readerHeader.messageOpsVisible
+            enabled: mail.smartMailbox !== "allInbox" && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.archiveMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: window.message.flagged ? qsTr("取消旗标") : qsTr("标为旗标"); iconName: "flag"
-            enabled: window.hasMessage && !readerHeader.messageOpsVisible
+            enabled: mail.smartMailbox !== "allInbox" && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.toggleFlagged(window.selectedIndex())
         }
     }
@@ -826,27 +826,27 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+R"; enabled: !composer.visible && !accountDialog.visible && !mail.busy; onActivated: mail.refresh() }
     Shortcut {
         sequence: "Delete"
-        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: mail.smartMailbox !== "allInbox" && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.deleteMessage(window.selectedIndex())
     }
     Shortcut {
         sequence: "Ctrl+Backspace"
-        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: mail.smartMailbox !== "allInbox" && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.deleteMessage(window.selectedIndex())
     }
     Shortcut {
         sequence: "Ctrl+Shift+U"
-        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: mail.smartMailbox !== "allInbox" && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.setMessageRead(window.selectedIndex(), !!window.message.unread)
     }
     Shortcut {
         sequence: "Ctrl+Shift+L"
-        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: mail.smartMailbox !== "allInbox" && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.toggleFlagged(window.selectedIndex())
     }
     Shortcut {
         sequence: "Ctrl+Shift+A"
-        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: mail.smartMailbox !== "allInbox" && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.archiveMessage(window.selectedIndex())
     }
 }
