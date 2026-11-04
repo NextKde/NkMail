@@ -131,17 +131,26 @@ class Server:
                 self.write(b"* 2 EXPUNGE\r\n" + tag + b" OK expunged\r\n")
             elif upper.startswith(b"EXAMINE "):
                 if self.scenario == "require-id": assert identified
-                self.write(b"* 2 EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n* OK [UIDNEXT 103] next\r\n" + tag + b" OK [READ-ONLY] examined\r\n")
+                count = b"6" if self.scenario.startswith("page-batch") else b"2"
+                next_uid = b"901" if self.scenario.startswith("page-batch") else b"103"
+                self.write(b"* " + count + b" EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n* OK [UIDNEXT " + next_uid + b"] next\r\n" + tag + b" OK [READ-ONLY] examined\r\n")
             elif upper.startswith(b"UID SEARCH "):
-                assert upper == b"UID SEARCH 2:2", upper
-                self.write(b"* SEARCH 102\r\n" + tag + b" OK search done\r\n")
+                assert upper == (b"UID SEARCH 4:6" if self.scenario.startswith("page-batch") else b"UID SEARCH 2:2"), upper
+                self.write((b"* SEARCH 109 205 900\r\n" if self.scenario.startswith("page-batch") else b"* SEARCH 102\r\n") + tag + b" OK search done\r\n")
             elif upper.startswith(b"UID FETCH "):
                 assert b"BODY.PEEK[" in upper, upper
                 header = b"BODY.PEEK[HEADER]" in upper
                 source = QUOTED_MESSAGE if self.scenario == "quoted-names" else MESSAGE
                 body = source.split(b"\r\n\r\n", 1)[0] + b"\r\n\r\n" if header else source
                 section = b"BODY[HEADER]" if header else b"BODY[]"
-                if self.scenario == "oversize":
+                if self.scenario.startswith("page-batch"):
+                    assert header and upper.split(b" ", 3)[2] == b"109:109,205:205,900:900", upper
+                    # Response order differs from the requested/newest-first order.
+                    for seq, uid in ((5, 205), (6, 900), (4, 109)):
+                        if self.scenario == "page-batch-vanished" and uid == 205: continue
+                        self.write(b"* " + str(seq).encode() + b" FETCH (FLAGS (\\Flagged) " + section + b" {" + str(len(body)).encode() + b"}\r\n" + body + b" UID " + str(uid).encode() + b")\r\n")
+                    self.write(tag + b" OK fetched\r\n")
+                elif self.scenario == "oversize":
                     self.write(b"* 2 FETCH (UID 102 " + section + b" {999999999}\r\n")
                 else:
                     # UID deliberately follows BODY/FLAGS: legal order exposed an upstream identity bug.
@@ -295,6 +304,15 @@ def main():
             assert any("BODY.PEEK[HEADER]" in cmd for cmd in server.commands), server.commands
             assert not any("STORE" in cmd or "SELECT " in cmd or "DELETE" in cmd for cmd in server.commands)
             passed += 1
+            for scenario in ("page-batch", "page-batch-vanished"):
+                batch, server = invoke("imap", good, ca, "page-batch", starttls, scenario)
+                assert batch["ok"], batch
+                assert [item["uid"] for item in batch["messages"]] == (["900", "109"] if scenario.endswith("vanished") else ["900", "205", "109"]), batch
+                assert batch["hasMore"] and batch["nextOffset"] == 3, batch
+                fetches = [cmd for cmd in server.commands if "UID FETCH " in cmd]
+                assert len(fetches) == 1 and "BODY.PEEK[HEADER]" in fetches[0], fetches
+                assert not any("STORE" in cmd or "SELECT " in cmd for cmd in server.commands), server.commands
+                passed += 1
             content, server = invoke("imap", good, ca, "content", starttls)
             assert content["ok"] and "你好 HTML" in content["text"], content
             assert "bad-script" not in content["text"] and "bad-style" not in content["text"], content

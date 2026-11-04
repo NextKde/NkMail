@@ -8,6 +8,8 @@
 #include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
+#include <QDebug>
+#include <QElapsedTimer>
 #include <QRegularExpression>
 #include <QStringConverter>
 #include <QTextDocument>
@@ -442,12 +444,20 @@ QList<Folder> MailioBackend::folders(const Account &a)
 }
 Page MailioBackend::page(const Account &a, const QString &folder, int offset, int limit)
 {
+    QElapsedTimer elapsed; elapsed.start();
+    const auto trace = [&](const char *phase) {
+        if (qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
+            qInfo().noquote() << "NkMail sync phase:" << phase << "elapsed-ms=" << elapsed.elapsed();
+    };
+    trace("page-start");
     try {
         accountValid(a, false); folderValid(folder);
         if (offset < 0 || limit < 1 || limit > 100) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Invalid page bounds."));
         Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        trace("page-authenticated");
         const auto stat = imap.select(utf8(folder), true);
         if (!stat.uid_validity) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Server did not provide UIDVALIDITY."));
+        trace("page-selected");
         Page p; p.folder = folder; p.uidValidity = QString::number(stat.uid_validity); p.nextOffset = offset;
         if (static_cast<unsigned long>(offset) >= stat.messages_no) return p;
         const auto end = stat.messages_no - static_cast<unsigned long>(offset);
@@ -457,16 +467,24 @@ Page MailioBackend::page(const Account &a, const QString &folder, int offset, in
         imap.search({Imap::search_condition_t(Imap::search_condition_t::SID_LIST,
                      std::list<Imap::messages_range_t>{{begin, end}})}, uids, true);
         if (uids.size() > static_cast<size_t>(limit)) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Server returned an invalid page."));
+        trace("page-searched");
         imap.literal_limit(256 * 1024);
+        std::list<Imap::messages_range_t> ranges;
+        for (const auto uid : uids) ranges.emplace_back(uid, uid);
+        // One bounded UID request per page. Keep the search's stable identity
+        // window and render newest first regardless of server response order.
+        const auto messages = ranges.empty() ? std::map<unsigned long, mailio::message>{}
+            : imap.fetch(ranges, options(true), mailio::codec::line_len_policy_t::NONE);
+        trace("page-headers-fetched");
         for (auto it = uids.rbegin(); it != uids.rend(); ++it) {
-            const auto messages = imap.fetch({{*it, *it}}, options(true), mailio::codec::line_len_policy_t::NONE);
             const auto found = messages.find(*it);
             if (found != messages.end()) p.messages << summary(found->second, folder, p.uidValidity, *it);
         }
         p.nextOffset = offset + int(end - begin + 1); p.hasMore = begin > 1;
+        trace("page-complete");
         return p;
-    } catch (const BackendError &) { throw; }
-      catch (...) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message headers. Check account, connection and trusted TLS certificate.")); }
+    } catch (const BackendError &) { trace("page-failed"); throw; }
+      catch (...) { trace("page-failed"); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message headers. Check account, connection and trusted TLS certificate.")); }
 }
 QList<QVariantMap> MailioBackend::search(const Account &a, const QString &folder, const QString &validity,
                                         const QString &query, int limit)

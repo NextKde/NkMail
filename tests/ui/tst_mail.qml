@@ -153,6 +153,29 @@ TestCase {
         app.requestActivate()
         wait(40)
     }
+    function test_empty_mail_sync_shows_the_current_phase() {
+        const original = []
+        for (let i = 0; i < messageModel.count; ++i) original.push(Object.assign({}, messageModel.get(i)))
+        const previousStatus = mock.status
+        const previousSelection = mock.selectedMessage
+        try {
+            mock.selectedMessage = ({})
+            mock.demo = false
+            mock.busy = true
+            mock.status = "Connecting securely…"
+            messageModel.clear()
+            const empty = findChild(app, "messageEmptyState")
+            verify(empty !== null)
+            tryCompare(empty, "description", mock.status)
+            mock.status = "Fetching message headers…"
+            tryCompare(empty, "description", mock.status)
+        } finally {
+            messageModel.clear()
+            for (const row of original) messageModel.append(row)
+            mock.status = previousStatus
+            mock.selectedMessage = previousSelection
+        }
+    }
     function test_empty_profile_uses_localized_title_and_sidebar_account_entry() {
         const folders = mock.folders
         const accounts = mock.accounts

@@ -43,8 +43,8 @@ int main(int argc, char **argv)
                 QJsonArray array;
                 for (const auto &f : folders) array.append(QJsonObject{{"id", f.id}, {"title", f.title}, {"total", f.total}, {"role", f.role}});
                 result = {{"folders", array}};
-            } else if (operation == QStringLiteral("page")) {
-                const auto p = nkmail::MailioBackend::page(a, QStringLiteral("INBOX"), 0, 1);
+            } else if ((operation == QStringLiteral("page") || operation == QStringLiteral("page-batch"))) {
+                const auto p = nkmail::MailioBackend::page(a, QStringLiteral("INBOX"), 0, operation == QStringLiteral("page-batch") ? 3 : 1);
                 QJsonArray array;
                 for (const auto &s : p.messages) array.append(QJsonObject{{"uid", s.uid}, {"subject", s.subject}, {"unread", s.unread}, {"flagged", s.flagged}});
                 result = {{"uidValidity", p.uidValidity}, {"messages", array}, {"hasMore", p.hasMore}, {"nextOffset", p.nextOffset}};
