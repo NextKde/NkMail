@@ -10,6 +10,11 @@ Rectangle {
     required property var mail
     property var message: ({})
     property bool hasMessage: false
+    readonly property bool bodyPending: message.bodyPending === true
+    readonly property bool bodyLoading: message.bodyLoading === true
+    readonly property string bodyError: message.bodyError || ""
+    readonly property bool hasHeader: !!(message.sender || message.senderAddress || message.subject || message.date || message.to)
+    readonly property bool renderingBody: browserBody.active && (!browserBody.item || !browserBody.item.documentReady)
     property bool draftsVisible: false
     property bool detailsVisible: false
     property bool showRichText: true
@@ -17,10 +22,10 @@ Rectangle {
     readonly property color ink: AppTheme.text
     readonly property color muted: AppTheme.mutedText
     readonly property color rule: AppTheme.border
+    signal reconnectRequested()
     signal closeDetailsRequested()
     signal detailsRequested()
     signal saveAttachmentRequested(int index)
-    signal addAccountRequested()
 
     objectName: "messageReader"
     color: "transparent"
@@ -31,9 +36,27 @@ Rectangle {
             objectName: "readerScroll"
             visible: root.hasMessage && !root.draftsVisible
             Layout.fillWidth: true; Layout.fillHeight: true
-            contentWidth: availableWidth; clip: true
+            contentWidth: availableWidth; contentHeight: readerColumn.implicitHeight; clip: true
+            MailWheelHandler {
+                flickable: readerScroll.contentItem
+                enabled: !browserBody.active
+            }
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ScrollBar.vertical: ScrollBar {
+                objectName: "readerVerticalScrollBar"
+                parent: readerScroll
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                width: 12
+                policy: readerScroll.contentHeight > readerScroll.availableHeight ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                active: size < 1
+                interactive: true
+                minimumSize: 0.06
+                z: 10
+            }
             ColumnLayout {
+                id: readerColumn
                 width: readerScroll.availableWidth
                 spacing: 0
                 ColumnLayout {
@@ -45,12 +68,13 @@ Rectangle {
                     spacing: 14
                     MailMessageHeader {
                         objectName: "mailMessageHeader"
+                        visible: root.hasHeader
                         Layout.fillWidth: true
                         Layout.minimumWidth: 0
                         Layout.topMargin: 12
                         message: root.message
                         localeName: root.localeName
-                        sourceLabel: (root.mail.account.name || root.mail.account.address || "") + " · " + (root.message.folder || root.mail.currentFolder)
+                        sourceLabel: (root.mail.account.name || root.mail.account.address || "") + " · " + MailLabels.mailboxTitle({id: root.message.folder || root.mail.currentFolder})
                         expanded: root.detailsVisible
                         onToggleDetails: root.detailsVisible ? root.closeDetailsRequested() : root.detailsRequested()
                     }
@@ -123,31 +147,166 @@ Rectangle {
                     }
 
                     RowLayout {
+                        objectName: "restoreFormattingBar"
+                        Layout.fillWidth: true
+                        spacing: 12
+                        visible: root.showRichText && !root.mail.demo
+                            && Number(MailLabels.value(root.message, "bodyFormatVersion") || 0) < 1
+                            && MailLabels.value(root.message, "html").length > 0
+                        Text {
+                            Layout.fillWidth: true
+                            text: qsTr("Connect to load the original message formatting.")
+                            color: root.muted; font.pixelSize: 12; wrapMode: Text.Wrap
+                        }
+                        KosButton {
+                            objectName: "restoreFormattingButton"
+                            text: qsTr("Connect account")
+                            secondary: true; implicitHeight: 30
+                            onClicked: root.reconnectRequested()
+                        }
+                    }
+                    RowLayout {
                         objectName: "blockedImagesBar"
                         Layout.fillWidth: true
                         spacing: 8
-                        visible: root.mail.blockedImageCount > 0
+                        visible: root.mail.blockedImageCount > 0 || root.mail.remoteImagesLoading === true
+                        MailActivityIndicator {
+                            objectName: "remoteImagesSpinner"
+                            visible: root.mail.remoteImagesLoading === true
+                            running: visible
+                            Layout.preferredWidth: 20; Layout.preferredHeight: 20
+                        }
                         Text {
-                            text: qsTr("%1 张远程图片已隐藏").arg(root.mail.blockedImageCount)
+                            text: root.mail.remoteImagesLoading === true ? qsTr("Loading images…")
+                                : root.mail.failedImageCount > 0 ? qsTr("Some images could not be loaded. Retry to load them again.")
+                                : qsTr("%1 张远程图片已隐藏").arg(root.mail.blockedImageCount)
                             color: root.muted; font.pixelSize: 11
                             Layout.fillWidth: true
                         }
-                        MailAction {
-                            stacked: true; stackedText: qsTr("显示图片"); iconName: "download"
-                            accessibleText: qsTr("Load remote images")
+                        KosButton {
+                            objectName: "remoteImagesButton"
+                            text: root.mail.failedImageCount > 0 ? qsTr("Retry") : qsTr("显示图片")
+                            secondary: true
+                            implicitHeight: 30
+                            enabled: root.mail.remoteImagesLoading !== true
+                            Accessible.name: qsTr("Load remote images")
                             onClicked: root.mail.loadRemoteImages()
                         }
                     }
+                    ColumnLayout {
+                        objectName: "messageBodyLoadingState"
+                        visible: root.bodyLoading || root.renderingBody || root.bodyError.length > 0
+                        Layout.fillWidth: true
+                        Layout.topMargin: 20; Layout.bottomMargin: 20
+                        spacing: 12
+                        RowLayout {
+                            Layout.alignment: Qt.AlignHCenter
+                            spacing: 12
+                            MailActivityIndicator {
+                                objectName: "messageBodySpinner"
+                                running: root.bodyLoading || root.renderingBody
+                                visible: running
+                                implicitWidth: 32; implicitHeight: 32
+                            }
+                            Text {
+                                text: root.bodyError.length ? qsTr("Could not load message")
+                                    : root.bodyLoading ? qsTr("Downloading message…") : qsTr("Rendering message…")
+                                color: root.ink; font.pixelSize: 14; font.weight: Font.DemiBold
+                            }
+                        }
+                        Text {
+                            visible: root.bodyError.length > 0
+                            text: root.bodyError
+                            Layout.fillWidth: true
+                            color: root.muted; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter
+                        }
+                        KosButton {
+                            objectName: "retryMessageBodyButton"
+                            secondary: true
+                            visible: root.bodyError.length > 0 && !root.bodyLoading
+                            Layout.alignment: Qt.AlignHCenter
+                            text: qsTr("Retry")
+                            onClicked: root.mail.openMessage(String(root.message.uid || ""), String(root.message.uidValidity || ""), String(root.message.folder || ""))
+                        }
+                    }
                     // Render only the backend-sanitized html field; fall back to plain text.
+                    Loader {
+                        id: browserBody
+                        objectName: "browserBodyLoader"
+                        readonly property string displayHtml: MailLabels.value(root.message, "displayHtml")
+                        active: !root.bodyPending && root.showRichText && displayHtml.length > 0
+                        visible: active
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: item ? item.implicitHeight : 0
+                        // The web view otherwise consumes wheel events even
+                        // when its measured document fits its own surface.
+                        // Leave capped documents their internal browser scroll.
+                        Item {
+                            anchors.fill: parent
+                            z: 1
+                            MailWheelHandler {
+                                flickable: readerScroll.contentItem
+                                enabled: !!browserBody.item && browserBody.item.documentHeight < 12000
+                            }
+                        }
+                        sourceComponent: Component {
+                            MailHtmlBody {
+                                html: browserBody.displayHtml
+                                onLinkActivated: function(link) {
+                                    linkClip.text = link
+                                    linkClip.selectAll(); linkClip.copy()
+                                    root.mail.clearError()
+                                    statusHint.show(qsTr("Link copied to clipboard"))
+                                }
+                            }
+                        }
+                    }
+                    // Keep formats fixed: switching a single TextEdit between
+                    // plain and rich modes can briefly parse plain mail as HTML.
                     TextEdit {
                         id: messageBody
                         objectName: "messageBody"
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
+                        visible: !root.bodyPending && !browserBody.active && !asRich
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.max(200, contentHeight)
                         readonly property string richHtml: MailLabels.value(root.message, "html") || ""
                         readonly property bool asRich: root.showRichText && String(richHtml).length > 0
-                        text: asRich ? ReaderLayout.fitImages(richHtml, width) : MailLabels.value(root.message, "text")
-                        textFormat: asRich ? TextEdit.RichText : TextEdit.PlainText
+                        text: MailLabels.value(root.message, "text")
+                        textFormat: TextEdit.PlainText
+                        readOnly: true; selectByMouse: true
+                        wrapMode: TextEdit.Wrap
+                        color: root.ink
+                        selectionColor: AppTheme.accent; selectedTextColor: "white"
+                        font.pixelSize: 14
+                        onLinkActivated: function(link) {
+                            if (!/^(https?:|mailto:)/i.test(String(link))) return
+                            linkClip.text = String(link)
+                            linkClip.selectAll(); linkClip.copy()
+                            mail.clearError()
+                            statusHint.show(qsTr("Link copied to clipboard"))
+                        }
+                    }
+                    TextEdit {
+                        id: legacyMessageBody
+                        objectName: "legacyMessageBody"
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
+                        visible: !root.bodyPending && !browserBody.active && asRich
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.max(200, contentHeight)
+                        readonly property string richHtml: MailLabels.value(root.message, "html") || ""
+                        readonly property bool asRich: root.showRichText && String(richHtml).length > 0
+                        // Defer width-dependent image fitting until the layout settles.
+                        // A synchronous text/implicit-width/layout binding forms a loop.
+                        function renderLegacy() { text = asRich ? ReaderLayout.readableHtml(richHtml, width) : "" }
+                        onRichHtmlChanged: legacyRenderTimer.restart()
+                        onAsRichChanged: legacyRenderTimer.restart()
+                        onWidthChanged: legacyRenderTimer.restart()
+                        Component.onCompleted: legacyRenderTimer.restart()
+                        Timer { id: legacyRenderTimer; interval: 0; onTriggered: legacyMessageBody.renderLegacy() }
+                        textFormat: TextEdit.RichText
                         readOnly: true; selectByMouse: true
                         wrapMode: TextEdit.Wrap
                         color: root.ink
@@ -196,7 +355,6 @@ Rectangle {
                 anchors.centerIn: parent; spacing: 12; width: Math.min(310, parent.width - 48)
                 Text { width: parent.width; text: root.draftsVisible ? qsTr("Pick up where you left off.") : qsTr("A moment of quiet."); color: root.muted; font.pixelSize: 22; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap }
                 Text { width: parent.width; text: root.draftsVisible ? qsTr("Choose a draft to continue writing.") : qsTr("Select a message to read it here."); color: root.muted; font.pixelSize: 12; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap }
-                MailAction { anchors.horizontalCenter: parent.horizontalCenter; visible: !mail.configured && !mail.demo; text: qsTr("Add an account"); onClicked: root.addAccountRequested() }
             }
         }
     }

@@ -23,8 +23,8 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="121" />
-            <source>Connect one account with an application password. TLS certificate verification is always enabled.</source>
-            <translation>使用应用专用密码连接账号。始终启用 TLS 证书验证。</translation>
+            <source>Use the password or app password required by your email provider.</source>
+            <translation>请使用邮箱服务商要求的密码、授权码或应用专用密码。</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="126" />
@@ -56,8 +56,8 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="131" />
-            <source>App password</source>
-            <translation>应用专用密码</translation>
+            <source>Password / app password</source>
+            <translation>密码 / 授权码</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="131" />
@@ -66,13 +66,13 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="132" />
-            <source>Application password</source>
-            <translation>应用专用密码</translation>
+            <source>Password or app password</source>
+            <translation>密码或应用专用密码</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="132" />
-            <source>Enter application password</source>
-            <translation>输入应用专用密码</translation>
+            <source>Enter password or app password</source>
+            <translation>输入密码、授权码或应用专用密码</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="135" />
@@ -223,6 +223,11 @@
             <location filename="../qml/AccountDialog.qml" line="232" />
             <source>Verify and save</source>
             <translation>验证并保存</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="192" />
+            <source>To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.</source>
+            <translation>如需将此账号改为应用专用密码登录，请在下方填写 Google 应用专用密码并验证。已缓存的邮件会保留。</translation>
         </message>
     </context>
     <context>
@@ -829,6 +834,18 @@
             <source>Draft not found or send state transition is unsafe</source>
             <translation>未找到草稿，或发送状态转换不安全</translation>
         </message>
+        <message>
+            <source>Google authorization needs attention. Enter a Google app password in account settings to reconnect.</source>
+            <translation>Google 授权需要处理。请在账号设置中填写 Google 应用专用密码以重新连接。</translation>
+        </message>
+        <message>
+            <source>Google authorization requires the standard secure Gmail servers.</source>
+            <translation>Google 授权必须使用标准的 Gmail 安全服务器。</translation>
+        </message>
+        <message>
+            <source>Unsupported account authentication method.</source>
+            <translation>不支持此账号的认证方式。</translation>
+        </message>
     </context>
     <context>
         <name>MailLabels</name>
@@ -1103,11 +1120,6 @@
             <translation>草稿箱</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="108" />
-            <source>Inbox</source>
-            <translation>收件箱</translation>
-        </message>
-        <message>
             <location filename="../qml/Main.qml" line="129" />
             <source>A few thoughts for Friday</source>
             <translation>关于周五的一些想法</translation>
@@ -1312,6 +1324,10 @@ Alex
     <context>
         <name>MessagePane</name>
         <message>
+            <source>Add an account</source>
+            <translation>添加账号</translation>
+        </message>
+        <message>
             <location filename="../qml/MessagePane.qml" line="123" />
             <source>打开</source>
             <translation>打开</translation>
@@ -1437,11 +1453,6 @@ Alex
             <translation>显示全部缓存邮件</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="252" />
-            <source>Add an account</source>
-            <translation>添加账号</translation>
-        </message>
-        <message>
             <location filename="../qml/MessagePane.qml" line="267" />
             <location filename="../qml/MessagePane.qml" line="272" />
             <source>Untitled draft</source>
@@ -1480,6 +1491,14 @@ Alex
     </context>
     <context>
         <name>MessageReader</name>
+        <message>
+            <source>Connect to load the original message formatting.</source>
+            <translation>连接邮箱以加载这封邮件的原始排版。</translation>
+        </message>
+        <message>
+            <source>Connect account</source>
+            <translation>连接邮箱</translation>
+        </message>
         <message>
             <location filename="../qml/MessageReader.qml" line="77" />
             <source>Message details</source>
@@ -1571,9 +1590,28 @@ Alex
             <translation>选择一封邮件，在这里阅读。</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="199" />
-            <source>Add an account</source>
-            <translation>添加账号</translation>
+            <source>Could not load message</source>
+            <translation>无法加载邮件</translation>
+        </message>
+        <message>
+            <source>Downloading message…</source>
+            <translation>正在下载邮件正文…</translation>
+        </message>
+        <message>
+            <source>Rendering message…</source>
+            <translation>正在渲染邮件正文…</translation>
+        </message>
+        <message>
+            <source>Retry</source>
+            <translation>重试</translation>
+        </message>
+        <message>
+            <source>Loading images…</source>
+            <translation>正在加载图片…</translation>
+        </message>
+        <message>
+            <source>Some images could not be loaded. Retry to load them again.</source>
+            <translation>部分图片加载失败，可点击重试。</translation>
         </message>
     </context>
     <context>
@@ -1592,11 +1630,6 @@ Alex
             <location filename="../qml/ProviderPicker.qml" line="13" />
             <source>Microsoft OAuth and native Exchange are not available yet. Browser sign-in requires an application registration.</source>
             <translation>暂未提供 Microsoft OAuth 和原生 Exchange 接入，浏览器登录需要先注册应用。</translation>
-        </message>
-        <message>
-            <location filename="../qml/ProviderPicker.qml" line="14" />
-            <source>Use a Google app password with two-step verification. Some managed accounts require OAuth, which is not available yet.</source>
-            <translation>使用开启两步验证后生成的 Google 应用密码。部分受管理账户必须使用 OAuth，目前暂不支持。</translation>
         </message>
         <message>
             <location filename="../qml/ProviderPicker.qml" line="16" />
@@ -1622,6 +1655,11 @@ Alex
             <location filename="../qml/ProviderPicker.qml" line="40" />
             <source> · Not available yet</source>
             <translation> · 暂未支持</translation>
+        </message>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="15" />
+            <source>Enable two-step verification in your Google account and generate an app password. Use that app password here, not your Google account password.</source>
+            <translation>请在 Google 账号中开启两步验证并生成应用专用密码，在此填写该专用密码，而非 Google 账号的登录密码。</translation>
         </message>
     </context>
     <context>
@@ -2040,6 +2078,17 @@ Alex
             <source>Updating messages…</source>
             <translation>正在更新邮件…</translation>
         </message>
+        <message>
+            <source>Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting.</source>
+            <translation>请使用 QQ 邮箱授权码重新连接，并勾选“记住密码”，以便重启后从系统钥匙串恢复。</translation>
+        </message>
+        <message>
+            <location filename="../src/MailController.cpp" line="134" />
+            <location filename="../src/MailController.cpp" line="471" />
+            <location filename="../src/MailController.cpp" line="781" />
+            <source>Enter a Google app password in account settings to reconnect this account.</source>
+            <translation>请在账号设置中填写 Google 应用专用密码，以重新连接此账号。</translation>
+        </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
@@ -2187,6 +2236,76 @@ Alex
             <location filename="../src/services/SendService.cpp" line="93" />
             <source>Send cancelled</source>
             <translation>已撤销发送</translation>
+        </message>
+    </context>
+    <context>
+        <name>GoogleOAuth</name>
+        <message>
+            <source>Authorization received. You may return to NkMail.</source>
+            <translation>已收到授权，请返回 NkMail。</translation>
+        </message>
+        <message>
+            <source>Could not contact Google securely. Check your connection and try again.</source>
+            <translation>无法安全连接 Google，请检查网络后重试。</translation>
+        </message>
+        <message>
+            <source>Could not open the local Google sign-in callback.</source>
+            <translation>无法启动本地 Google 登录回调。</translation>
+        </message>
+        <message>
+            <source>Could not open the system browser for Google sign-in.</source>
+            <translation>无法打开系统浏览器进行 Google 登录。</translation>
+        </message>
+        <message>
+            <source>Google authorization has expired or was revoked. Sign in with Google again.</source>
+            <translation>Google 授权已过期或被撤销，请重新使用 Google 账号登录。</translation>
+        </message>
+        <message>
+            <source>Google did not authorize this account. Check the account or organization policy and try again.</source>
+            <translation>Google 未授权此账号，请检查账号或组织政策后重试。</translation>
+        </message>
+        <message>
+            <source>Google did not return a verified email address.</source>
+            <translation>Google 未返回已验证的邮箱地址。</translation>
+        </message>
+        <message>
+            <source>Google rejected this application's sign-in configuration. Contact the application distributor.</source>
+            <translation>Google 拒绝了此应用的登录配置，请联系应用发布者。</translation>
+        </message>
+        <message>
+            <source>Google returned an invalid authorization response.</source>
+            <translation>Google 返回的授权响应无效。</translation>
+        </message>
+        <message>
+            <source>Google sign-in is unavailable in this build. Contact the application distributor.</source>
+            <translation>此版本尚未配置 Google 登录，请联系应用发布者。</translation>
+        </message>
+        <message>
+            <source>Google sign-in timed out. Try again.</source>
+            <translation>Google 登录已超时，请重试。</translation>
+        </message>
+        <message>
+            <source>Google sign-in was cancelled.</source>
+            <translation>已取消 Google 登录。</translation>
+        </message>
+        <message>
+            <source>This sign-in response could not be accepted.</source>
+            <translation>无法接受此登录响应。</translation>
+        </message>
+        <message>
+            <source>Gmail mail access was not granted. Sign in again and allow Gmail mail access on Google's consent page.</source>
+            <translation>尚未授予 Gmail 邮件访问权限。请重新登录，并在 Google 授权页面允许访问 Gmail 邮件。</translation>
+        </message>
+        <message>
+            <source>Google did not return offline access. Sign in again and complete the consent process; if this persists, contact the application distributor.</source>
+            <translation>Google 未返回离线访问权限。请重新登录并完成授权；如仍失败，请联系应用发布者。</translation>
+        </message>
+    </context>
+    <context>
+        <name>MailActivityIndicator</name>
+        <message>
+            <source>Loading…</source>
+            <translation>正在加载…</translation>
         </message>
     </context>
 </TS>

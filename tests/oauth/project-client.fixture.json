@@ -1,0 +1,9 @@
+{
+  "installed": {
+    "client_id": "nkmail-project-fixture.apps.googleusercontent.com",
+    "client_secret": "synthetic-public-desktop-client-fixture",
+    "auth_uri": "http://attacker.invalid/ignored",
+    "token_uri": "http://attacker.invalid/ignored",
+    "redirect_uris": ["http://attacker.invalid/ignored"]
+  }
+}

@@ -195,6 +195,23 @@ Item {
                     objectName: "favoritesList"
                     model: mail.favorites || []
                     delegate: MailboxAction {
+                        id: favoriteRow
+                        TapHandler {
+                            acceptedButtons: Qt.RightButton
+                            onTapped: favoriteMenu.openAtAnchor()
+                        }
+                        LiquidPopover {
+                            id: favoriteMenu
+                            sourceItem: root.surface
+                            anchorItem: favoriteRow
+                            LiquidPopoverItem {
+                                text: qsTr("从收藏移除"); iconName: "heart"
+                                onTriggered: {
+                                    favoriteMenu.close()
+                                    mail.toggleFavorite(favoriteRow.modelData.accountId, favoriteRow.modelData.folderId, favoriteRow.modelData.title)
+                                }
+                            }
+                        }
                         required property var modelData
                         text: modelData.title
                         iconName: MailLabels.folderIcon(modelData.folderId)
@@ -250,14 +267,7 @@ Item {
                             text: accountSection.modelData.address || accountSection.modelData.name
                             Accessible.name: text
                             onClicked: {
-                                if (accountSection.current) {
-                                    root.toggleAccountCollapsed(accountSection.accountId)
-                                } else {
-                                    root.navigationOrigin = "account"
-                                    root.mail.switchAccount(accountSection.accountId)
-                                    if (accountSection.collapsed)
-                                        root.toggleAccountCollapsed(accountSection.accountId)
-                                }
+                                root.toggleAccountCollapsed(accountSection.accountId)
                             }
                             TapHandler {
                                 acceptedButtons: Qt.RightButton
@@ -285,15 +295,25 @@ Item {
                                 }
                             }
                         }
-                        Text {
-                            objectName: "accountSyncStatus_" + accountSection.accountId
+                        RowLayout {
                             visible: accountSection.current && (mail.busy || !!mail.error)
-                            text: mail.error ? mail.error : mail.status
                             Layout.fillWidth: true
                             Layout.leftMargin: 24
-                            font.pixelSize: 10
-                            color: mail.error ? AppTheme.destructive : AppTheme.mutedText
-                            wrapMode: Text.Wrap
+                            spacing: 6
+                            MailActivityIndicator {
+                                objectName: "accountSyncSpinner_" + accountSection.accountId
+                                visible: mail.busy
+                                running: mail.busy
+                                Layout.preferredWidth: 14; Layout.preferredHeight: 14
+                            }
+                            Text {
+                                objectName: "accountSyncStatus_" + accountSection.accountId
+                                text: mail.error ? mail.error : mail.status
+                                Layout.fillWidth: true
+                                font.pixelSize: 10
+                                color: mail.error ? AppTheme.destructive : AppTheme.mutedText
+                                wrapMode: Text.Wrap
+                            }
                         }
                         Repeater {
                             // Synchronous cache read; it is not re-evaluated when
@@ -302,6 +322,7 @@ Item {
                             model: accountSection.collapsed ? [] : (root.unreadRevision, Navigation.ordered(accountSection.current ? root.mail.folders : (root.mail.foldersFor(accountSection.accountId) || [])))
                             delegate: MailboxAction {
                                 id: folderRow
+                                Layout.leftMargin: 18
                                 required property var modelData
                                 // Keep the historical name for the active account; scope
                                 // other accounts so their identical folder ids stay unique.

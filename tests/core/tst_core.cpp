@@ -1,4 +1,5 @@
 #include "MailTypes.h"
+#include "mail/HtmlSanitizer.h"
 #include "MessageListModel.h"
 #include "FolderListModel.h"
 #include "storage/MailDatabase.h"
@@ -47,6 +48,51 @@ Page page(QList<Summary> messages, QString generation = QStringLiteral("100"))
 class CoreTests : public QObject {
     Q_OBJECT
 private slots:
+    void oauthAccountMetadataNeverSerializesRefreshCredentials() {
+        Account account; account.authMethod = "google_oauth";
+        account.address = account.username = "reader@example.invalid";
+        account.password = R"({"type":"google_oauth","refresh_token":"SYNTHETIC-REFRESH-MUST-NOT-REACH-SQLITE"})";
+        const auto serialized = accountMap(account);
+        QCOMPARE(serialized.value("authMethod").toString(), "google_oauth");
+        QVERIFY(!QJsonDocument::fromVariant(serialized).toJson().contains("SYNTHETIC-REFRESH"));
+        const auto restored = accountFromMap(serialized);
+        QVERIFY(restored.password.isEmpty()); QCOMPARE(restored.authMethod, account.authMethod);
+        QTemporaryDir root(temporaryTemplate()); MailDatabase db; QVERIFY(db.open(root.path()));
+        QVERIFY(db.saveAccount(account)); QCOMPARE(db.account().authMethod, account.authMethod);
+        QVERIFY(db.account().password.isEmpty());
+    }
+    void browserHtmlPreservesLayoutButNotActiveContent() {
+        const auto html = sanitizeBrowserMailHtml(QStringLiteral(
+            "<style>.card{padding:24px;background:#f5f5f5}</style>"
+            "<table class='card' width='600'><tr><td style='font-size:24px' onclick='bad()'>Title</td></tr></table>"
+            "<a class='button' style='padding:12px' href='https://example.invalid'>Open</a>"
+            "<img width='80' style='width:80px' src='https://example.invalid/logo'>"
+            "<script>bad()</script><iframe src='file:///private'>bad()</iframe><base href='file:///'>"));
+        QVERIFY(html.contains(QStringLiteral("<style>.card{padding:24px;background:#f5f5f5}</style>")));
+        QVERIFY(html.contains(QStringLiteral("<table ")));
+        QVERIFY(html.contains(QStringLiteral("font-size:24px")));
+        QVERIFY(html.contains(QStringLiteral("class=\"button\"")));
+        QVERIFY(html.contains(QStringLiteral("data-nkmail-layout=\"1\"")));
+        QVERIFY(!html.contains(QStringLiteral("onclick")));
+        QVERIFY(!html.contains(QStringLiteral("bad()")));
+        QVERIFY(!html.contains(QStringLiteral("file:///")));
+        QVERIFY(!html.contains(QStringLiteral("<img src=")));
+        QVERIFY(sanitizeBrowserMailHtml(QStringLiteral("<style>unterminated")).isEmpty());
+    }
+    void notificationTablesDoNotInventTextOrExposeRemoteImages() {
+        const auto html = sanitizeMailHtml(QStringLiteral(
+            "<table width='900'><tr><td><p>Activity</p></td></tr>"
+            "<tr><td height='200'>&nbsp;</td></tr>"
+            "<tr><td>Device</td><td>Example browser</td></tr></table>"
+            "<img src='https://example.invalid/logo' onerror='bad()'>"
+            "<script>bad()</script><pre>A | B</pre>"));
+        QCOMPARE(html.count(QStringLiteral(" | ")), 1);
+        QVERIFY(html.contains(QStringLiteral("<div>Device Example browser </div>")));
+        QVERIFY(html.contains(QStringLiteral("data-nkmail-src=\"https://example.invalid/logo\"")));
+        QVERIFY(!html.contains(QStringLiteral("<img src=")));
+        QVERIFY(!html.contains(QStringLiteral("bad()")));
+        QVERIFY(html.contains(QStringLiteral("<pre>A | B</pre>")));
+    }
     void smartMailboxesPreserveScopeIdentityAndPagination() {
         QTemporaryDir dir(temporaryTemplate());
         MailDatabase db;
@@ -130,6 +176,8 @@ void CoreTests::flagsUpdateSummaryAndBodyTogether()
     auto summary = message("1");
     QVERIFY(db.savePage(page({summary})));
     Content body; body.summary = summary; body.html = "<p>synthetic</p>";
+    body.displayHtml = "<table><tr><td style=\"padding:24px\">synthetic</td></tr></table>";
+    body.bodyFormatVersion = 1;
     QVERIFY(db.saveContent(body));
     summary.unread = true; summary.flagged = true;
     QVERIFY(db.updateFlags({summary}));
@@ -139,6 +187,8 @@ void CoreTests::flagsUpdateSummaryAndBodyTogether()
     QVERIFY(cached.has_value());
     QVERIFY(cached->summary.unread && cached->summary.flagged);
     QCOMPARE(cached->html, body.html);
+    QCOMPARE(cached->displayHtml, body.displayHtml);
+    QCOMPARE(cached->bodyFormatVersion, 1);
     summary.uidValidity = "stale";
     QVERIFY(!db.updateFlags({summary}));
 }

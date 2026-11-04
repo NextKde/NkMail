@@ -70,12 +70,17 @@ LiquidDialog {
         smtpTls.checked = !!original.smtpStartTls
         caField.text = field(original, "caFile")
         passwordField.text = ""
-        providerChoice.currentIndex = Profiles.indexForAddress(addressField.text)
+        providerChoice.currentIndex = original.authMethod === "google_oauth" ? Profiles.ids.indexOf("google") : Profiles.indexForAddress(addressField.text)
         serverSavesSent.checked = !!original.serverSavesSent
         rememberPassword.checked = false
         submitting = false
-        setupError = ""; advanced = false; step = 1
+        setupError = ""; advanced = false
+        step = 1
         open()
+    }
+    // Synthetic capture helper, never available to real account sessions.
+    function showGooglePasswordReview() {
+        if (mail.demo) providerChoice.currentIndex = Profiles.ids.indexOf("google")
     }
     function addAccount() {
         editAccount({id: "new"})
@@ -107,12 +112,16 @@ LiquidDialog {
         if (saved) step = 2
         else setupError = mail.error || qsTr("Account could not be saved. Please retry.")
     }
-    onClosed: { passwordField.text = ""; submitting = false }
+    onClosed: {
+        passwordField.text = ""; submitting = false
+    }
     Connections {
         target: root.setup
         function onFinished(success, error) {
             if (!root.submitting) return
-            if (success) root.save()
+            if (success) {
+                root.save()
+            }
             else { root.submitting = false; root.setupError = error; passwordField.text = "" }
         }
     }
@@ -128,8 +137,9 @@ LiquidDialog {
             width: accountScroll.availableWidth
             spacing: 10
             Text {
+                visible: root.step < 2
                 text: root.mail.demo ? qsTr("Example account · synthetic data only. Account changes and sending are disabled in demo mode.")
-                    : qsTr("Connect one account with an application password. TLS certificate verification is always enabled.")
+                    : qsTr("Use the password or app password required by your email provider.")
                 color: AppTheme.mutedText; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap
             }
             Text {
@@ -160,8 +170,8 @@ LiquidDialog {
                 SettingsItem { visible: root.step === 1; title: qsTr("Name"); KosTextField { id: nameField; objectName: "accountName"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Name") } }
                 SettingsItem { visible: root.step === 1; title: qsTr("Username"); KosTextField { id: usernameField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Username") } }
                 SettingsItem {
-                    visible: root.step === 1; title: qsTr("App password"); description: qsTr("Stored passwords are never displayed.")
-                    KosTextField { id: passwordField; objectName: "accountPassword"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; echoMode: TextInput.Password; enabled: !root.mail.demo && !root.submitting; Accessible.name: qsTr("Application password"); placeholderText: qsTr("Enter application password") }
+                    visible: root.step === 1; title: qsTr("Password / app password"); description: qsTr("Stored passwords are never displayed.")
+                    KosTextField { id: passwordField; objectName: "accountPassword"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; echoMode: TextInput.Password; enabled: !root.mail.demo && !root.submitting; Accessible.name: qsTr("Password or app password"); placeholderText: qsTr("Enter password or app password") }
                 }
                 SettingsItem {
                     visible: root.step === 1; title: qsTr("Remember password"); description: qsTr("Use the system keychain; no plaintext fallback.")
@@ -178,6 +188,12 @@ LiquidDialog {
             Text {
                 visible: root.step === 1
                 text: providerChoice.guidance
+                Layout.fillWidth: true; wrapMode: Text.Wrap; font.pixelSize: 11; color: AppTheme.mutedText
+            }
+            Text {
+                objectName: "googlePasswordMigrationHint"
+                visible: root.step === 1 && root.original.authMethod === "google_oauth"
+                text: qsTr("To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.")
                 Layout.fillWidth: true; wrapMode: Text.Wrap; font.pixelSize: 11; color: AppTheme.mutedText
             }
             LiquidCheckBox {
@@ -199,10 +215,19 @@ LiquidDialog {
                 color: AppTheme.text; font.pixelSize: 18
                 Layout.fillWidth: true; wrapMode: Text.Wrap
             }
-            Text {
+            RowLayout {
                 visible: root.submitting
-                text: root.setup && root.setup.stage === "smtp" ? qsTr("Checking outgoing server…") : qsTr("Checking incoming server…")
-                color: AppTheme.mutedText; Layout.fillWidth: true
+                Layout.fillWidth: true
+                spacing: 10
+                MailActivityIndicator {
+                    objectName: "accountSetupSpinner"
+                    running: root.submitting
+                    Layout.preferredWidth: 20; Layout.preferredHeight: 20
+                }
+                Text {
+                    text: root.setup && root.setup.stage === "smtp" ? qsTr("Checking outgoing server…") : qsTr("Checking incoming server…")
+                    color: AppTheme.mutedText; Layout.fillWidth: true; wrapMode: Text.Wrap
+                }
             }
             Text { visible: root.setupError.length > 0; text: root.setupError; color: AppTheme.destructive; Layout.fillWidth: true; wrapMode: Text.Wrap }
             SettingsGroup {
@@ -253,9 +278,10 @@ LiquidDialog {
                 onClicked: root.step = 0
             }
             LiquidDialogButton {
+                objectName: "continueAccountButton"
                 text: qsTr("Continue")
                 visible: root.step === 0
-                enabled: providerChoice.available && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addressField.text.trim())
+                enabled: !root.submitting && !root.mail.busy && !root.mail.sending && providerChoice.available && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addressField.text.trim())
                 onClicked: root.nextStep()
             }
             LiquidDialogButton {

@@ -1,4 +1,5 @@
 #include "AccountSession.h"
+#include "auth/GoogleOAuth.h"
 #include "storage/CredentialStore.h"
 #include <QCryptographicHash>
 #include <QDir>
@@ -20,13 +21,23 @@ AccountSession::AccountSession(const QString &root, QObject *parent)
         emit error(key, message);
     });
     connect(m_store, &CredentialStore::passwordSaved, this, &AccountSession::passwordSaved);
+    GoogleTokens::observeRotation(this, [this](const QString &before, const QString &after) {
+        QStringList changed;
+        for (auto it = m_passwords.begin(); it != m_passwords.end(); ++it)
+            if (it.value() == before) { it.value() = after; changed.append(it.key()); }
+        QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
+        for (const auto &id : changed) {
+            if (settings.value(id + "/restoreAllowed", false).toBool()) m_store->write(id, after);
+            emit passwordReady(id, after);
+        }
+    });
 }
 QString AccountSession::key(const Account &account) const {
     const QFileInfo root(m_root);
     QString path = root.canonicalFilePath();
     if (path.isEmpty()) path = root.absoluteFilePath();
     const QByteArray scope = path.toUtf8() + '\0' + account.id.toUtf8();
-    return account.id + QStringLiteral(":profile-") + QString::fromLatin1(QCryptographicHash::hash(scope, QCryptographicHash::Sha256).toHex());
+    return account.id + (account.authMethod == "google_oauth" ? QStringLiteral(":google-oauth") : QString()) + QStringLiteral(":profile-") + QString::fromLatin1(QCryptographicHash::hash(scope, QCryptographicHash::Sha256).toHex());
 }
 void AccountSession::read(const QString &key) {
     if (m_passwords.contains(key)) {
@@ -62,9 +73,9 @@ void AccountSession::suspend(const Account &account) {
     settings.setValue(key(account) + "/restoreAllowed", false);
 }
 void AccountSession::forget(const Account &account) {
-    const auto id = key(account); m_passwords.remove(id); remove(id);
+    const auto id = key(account); GoogleTokens::forget(m_passwords.value(id)); m_passwords.remove(id); remove(id);
 }
-void AccountSession::clear() { m_passwords.clear(); m_waiters.clear(); }
+void AccountSession::clear() { for (const auto &secret : m_passwords) GoogleTokens::forget(secret); m_passwords.clear(); m_waiters.clear(); }
 void AccountSession::resolve(const Account &account, std::function<void(Account)> completion) {
     const auto id = key(account);
     auto done = [account, completion = std::move(completion)](const QString &password) mutable {

@@ -22,7 +22,7 @@ MESSAGE = (b"From: =?UTF-8?B?5rWL6K+V?= <author@fixture.invalid>\r\n"
            b"MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=fixture\r\n\r\n"
            b"--fixture\r\nContent-Type: text/html; charset=UTF-8\r\n"
            b"Content-Transfer-Encoding: base64\r\n\r\n" +
-           base64.b64encode('<html><head><style>bad-style</style></head><body><p>你好 HTML</p><script>bad-script</script><img src="file:///fixture-must-not-read"><img src="https://fixture.invalid/pixel"></body></html>'.encode()) +
+           base64.b64encode('<html><head><style>bad-style</style></head><body><table style="width:480px"><tr><td style="padding:24px">你好 HTML</td></tr></table><script>bad-script</script><img src="file:///fixture-must-not-read"><img src="https://fixture.invalid/pixel"></body></html>'.encode()) +
            b"\r\n--fixture\r\nContent-Type: application/octet-stream\r\n"
            b"Content-Disposition: attachment; filename=\"../../evil.txt\"\r\n"
            b"Content-Transfer-Encoding: base64\r\n\r\n" + base64.b64encode(b"fixture\x00attachment") +
@@ -98,6 +98,17 @@ class Server:
                 if self.scenario == "refuse-starttls": self.write(tag + b" NO unavailable\r\n"); continue
                 self.write(tag + b" OK begin TLS\r\n"); self.upgrade(); continue
             if upper.startswith(b"LOGIN "): self.write(tag + b" OK logged in\r\n")
+            elif upper.startswith(b"AUTHENTICATE XOAUTH2"):
+                parts = cmd.split(b" ", 2)
+                if len(parts) == 3: response = parts[2]
+                else:
+                    self.write(b"+ continue\r\n"); response = self.line()
+                assert base64.b64decode(response) == b"user=fixture-user\x01auth=Bearer fixture-access\x01\x01"
+                if self.scenario == "oauth-error":
+                    self.write(b"+ " + base64.b64encode(b'{"status":"401"}') + b"\r\n")
+                    assert self.line() == b""
+                    self.write(tag + b" NO authentication rejected\r\n")
+                else: self.write(tag + b" OK authenticated\r\n")
             elif upper.startswith(b"ID "):
                 assert cmd == b'ID ("name" "NkMail")', cmd
                 identified = True
@@ -105,6 +116,9 @@ class Server:
             elif upper == b"CAPABILITY":
                 capabilities = b"IMAP4rev1" if self.scenario == "no-uidplus" else b"IMAP4rev1 UIDPLUS"
                 if self.scenario in ("require-id", "reject-id"): capabilities += b" ID"
+                if self.scenario.startswith("oauth") and self.scenario != "oauth-unsupported":
+                    capabilities += b" AUTH=XOAUTH2"
+                    if self.scenario != "oauth-continuation": capabilities += b" SASL-IR"
                 self.write(b"* CAPABILITY " + capabilities + b"\r\n" + tag + b" OK capabilities\r\n")
             elif upper.startswith(b"SELECT "):
                 self.write(b"* 2 EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n" + tag + b" OK [READ-WRITE] selected\r\n")
@@ -117,17 +131,26 @@ class Server:
                 self.write(b"* 2 EXPUNGE\r\n" + tag + b" OK expunged\r\n")
             elif upper.startswith(b"EXAMINE "):
                 if self.scenario == "require-id": assert identified
-                self.write(b"* 2 EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n* OK [UIDNEXT 103] next\r\n" + tag + b" OK [READ-ONLY] examined\r\n")
+                count = b"6" if self.scenario.startswith("page-batch") else b"2"
+                next_uid = b"901" if self.scenario.startswith("page-batch") else b"103"
+                self.write(b"* " + count + b" EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n* OK [UIDNEXT " + next_uid + b"] next\r\n" + tag + b" OK [READ-ONLY] examined\r\n")
             elif upper.startswith(b"UID SEARCH "):
-                assert upper == b"UID SEARCH 2:2", upper
-                self.write(b"* SEARCH 102\r\n" + tag + b" OK search done\r\n")
+                assert upper == (b"UID SEARCH 4:6" if self.scenario.startswith("page-batch") else b"UID SEARCH 2:2"), upper
+                self.write((b"* SEARCH 109 205 900\r\n" if self.scenario.startswith("page-batch") else b"* SEARCH 102\r\n") + tag + b" OK search done\r\n")
             elif upper.startswith(b"UID FETCH "):
                 assert b"BODY.PEEK[" in upper, upper
                 header = b"BODY.PEEK[HEADER]" in upper
                 source = QUOTED_MESSAGE if self.scenario == "quoted-names" else MESSAGE
                 body = source.split(b"\r\n\r\n", 1)[0] + b"\r\n\r\n" if header else source
                 section = b"BODY[HEADER]" if header else b"BODY[]"
-                if self.scenario == "oversize":
+                if self.scenario.startswith("page-batch"):
+                    assert header and upper.split(b" ", 3)[2] == b"109:109,205:205,900:900", upper
+                    # Response order differs from the requested/newest-first order.
+                    for seq, uid in ((5, 205), (6, 900), (4, 109)):
+                        if self.scenario == "page-batch-vanished" and uid == 205: continue
+                        self.write(b"* " + str(seq).encode() + b" FETCH (FLAGS (\\Flagged) " + section + b" {" + str(len(body)).encode() + b"}\r\n" + body + b" UID " + str(uid).encode() + b")\r\n")
+                    self.write(tag + b" OK fetched\r\n")
+                elif self.scenario == "oversize":
                     self.write(b"* 2 FETCH (UID 102 " + section + b" {999999999}\r\n")
                 else:
                     # UID deliberately follows BODY/FLAGS: legal order exposed an upstream identity bug.
@@ -163,6 +186,13 @@ class Server:
             elif upper == b"STARTTLS":
                 if self.scenario == "refuse-starttls": self.write(b"454 unavailable\r\n"); continue
                 self.write(b"220 begin TLS\r\n"); self.upgrade()
+            elif upper.startswith(b"AUTH XOAUTH2 "):
+                assert base64.b64decode(line.split(b" ", 2)[2]) == b"user=fixture-user\x01auth=Bearer fixture-access\x01\x01"
+                if self.scenario == "oauth-error":
+                    self.write(b"334 " + base64.b64encode(b'{"status":"401"}') + b"\r\n")
+                    assert self.line() == b""
+                    self.write(b"535 authentication rejected\r\n")
+                else: self.write(b"235 authenticated\r\n")
             elif upper == b"AUTH LOGIN": auth_step = 1; self.write(b"334 VXNlcm5hbWU6\r\n")
             elif upper.startswith(b"MAIL FROM:"): self.write(b"250 sender ok\r\n")
             elif upper.startswith(b"RCPT TO:"):
@@ -250,6 +280,18 @@ def main():
         assert result["ok"] and result["folder"] == "CustomOutbox", result
         passed += 1
         for starttls in (False, True):
+            for protocol in ("imap", "smtp"):
+                for scenario in ("oauth", "oauth-error"):
+                    result, server = invoke(protocol, good, ca, "oauth-" + protocol, starttls, scenario)
+                    assert result["ok"] == (scenario == "oauth"), result
+                    assert not any("LOGIN" in command or "MAIL FROM" in command or command == "DATA" for command in server.commands), server.commands
+                    passed += 1
+            for scenario in ("oauth-continuation", "oauth-unsupported"):
+                result, server = invoke("imap", good, ca, "oauth-imap", starttls, scenario)
+                assert result["ok"] == (scenario == "oauth-continuation"), result
+                assert not any("LOGIN" in command for command in server.commands), server.commands
+                if scenario == "oauth-unsupported": assert not any("AUTHENTICATE" in command for command in server.commands), server.commands
+                passed += 1
             folders, server = invoke("imap", good, ca, "folders", starttls)
             assert folders["ok"] and len(folders["folders"]) == 2, folders
             assert folders["folders"][0]["title"] == "Archive/测试", folders
@@ -262,9 +304,21 @@ def main():
             assert any("BODY.PEEK[HEADER]" in cmd for cmd in server.commands), server.commands
             assert not any("STORE" in cmd or "SELECT " in cmd or "DELETE" in cmd for cmd in server.commands)
             passed += 1
+            for scenario in ("page-batch", "page-batch-vanished"):
+                batch, server = invoke("imap", good, ca, "page-batch", starttls, scenario)
+                assert batch["ok"], batch
+                assert [item["uid"] for item in batch["messages"]] == (["900", "109"] if scenario.endswith("vanished") else ["900", "205", "109"]), batch
+                assert batch["hasMore"] and batch["nextOffset"] == 3, batch
+                fetches = [cmd for cmd in server.commands if "UID FETCH " in cmd]
+                assert len(fetches) == 1 and "BODY.PEEK[HEADER]" in fetches[0], fetches
+                assert not any("STORE" in cmd or "SELECT " in cmd for cmd in server.commands), server.commands
+                passed += 1
             content, server = invoke("imap", good, ca, "content", starttls)
             assert content["ok"] and "你好 HTML" in content["text"], content
             assert "bad-script" not in content["text"] and "bad-style" not in content["text"], content
+            assert content["bodyFormatVersion"] == 1 and "<table " in content["displayHtml"], content
+            assert "padding:24px" in content["displayHtml"] and "bad-script" not in content["displayHtml"], content
+            assert "file:///" not in content["displayHtml"] and "data-nkmail-src=" in content["displayHtml"], content
             assert content["attachments"] == [{"name": "evil.txt", "bytes": base64.b64encode(b"fixture\x00attachment").decode(), "path": ""}], content
             assert any("BODY.PEEK[]" in cmd for cmd in server.commands)
             passed += 1

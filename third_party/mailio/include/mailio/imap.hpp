@@ -138,7 +138,7 @@ public:
     The following mechanisms are allowed:
     - LOGIN: The username and password are sent in plain format.
     **/
-    enum class auth_method_t {LOGIN};
+    enum class auth_method_t {LOGIN, XOAUTH2};
 
 
     /**
@@ -872,6 +872,9 @@ protected:
     @todo             Add server error messages to exceptions.
     **/
     void auth_login(const std::string& username, const std::string& password);
+
+    // SASL XOAUTH2 with a bearer access token; never retries with LOGIN.
+    void auth_xoauth2(const std::string& username, const std::string& access_token);
 
     /**
     Searching a mailbox.

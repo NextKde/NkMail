@@ -1,0 +1,150 @@
+diff --git a/third_party/mailio/include/mailio/imap.hpp b/third_party/mailio/include/mailio/imap.hpp
+index 5a9b6b6..6609686 100644
+--- a/third_party/mailio/include/mailio/imap.hpp
++++ b/third_party/mailio/include/mailio/imap.hpp
+@@ -138,7 +138,7 @@ public:
+     The following mechanisms are allowed:
+     - LOGIN: The username and password are sent in plain format.
+     **/
+-    enum class auth_method_t {LOGIN};
++    enum class auth_method_t {LOGIN, XOAUTH2};
+ 
+ 
+     /**
+@@ -873,6 +873,9 @@ protected:
+     **/
+     void auth_login(const std::string& username, const std::string& password);
+ 
++    // SASL XOAUTH2 with a bearer access token; never retries with LOGIN.
++    void auth_xoauth2(const std::string& username, const std::string& access_token);
++
+     /**
+     Searching a mailbox.
+ 
+diff --git a/third_party/mailio/include/mailio/smtp.hpp b/third_party/mailio/include/mailio/smtp.hpp
+index 9c7a965..49000f3 100644
+--- a/third_party/mailio/include/mailio/smtp.hpp
++++ b/third_party/mailio/include/mailio/smtp.hpp
+@@ -59,7 +59,7 @@ public:
+       mechanism is allowed.
+     - LOGIN: The username and password are sent in Base64 format.
+     **/
+-    enum class auth_method_t {NONE, LOGIN};
++    enum class auth_method_t {NONE, LOGIN, XOAUTH2};
+ 
+     /**
+     Making a connection to the server.
+@@ -172,6 +172,9 @@ protected:
+     **/
+     void auth_login(const std::string& username, const std::string& password);
+ 
++    // SASL XOAUTH2 with a bearer access token; never retries with LOGIN.
++    void auth_xoauth2(const std::string& username, const std::string& access_token);
++
+     /**
+     Issuing `EHLO` and/or `HELO` commands.
+ 
+diff --git a/third_party/mailio/src/imap.cpp b/third_party/mailio/src/imap.cpp
+index 85153a8..5b4d20c 100644
+--- a/third_party/mailio/src/imap.cpp
++++ b/third_party/mailio/src/imap.cpp
+@@ -25,6 +25,7 @@ copy at http://www.freebsd.org/copyright/freebsd-license.html.
+ #include <boost/range/adaptor/transformed.hpp>
+ #include <boost/regex.hpp>
+ #include <mailio/imap.hpp>
++#include <mailio/base64.hpp>
+ 
+ 
+ using std::find_if;
+@@ -232,6 +233,8 @@ string imap::authenticate(const string& username, const string& password, auth_m
+ 
+     if (method == auth_method_t::LOGIN)
+         auth_login(username, password);
++    else if (method == auth_method_t::XOAUTH2)
++        auth_xoauth2(username, password);
+     return greeting;
+ }
+ 
+@@ -1258,6 +1261,40 @@ void imap::switch_tls()
+ }
+ 
+ 
++void imap::auth_xoauth2(const string& username, const string& access_token)
++{
++    if (username.empty() || access_token.empty() || username.find_first_of("\r\n\1") != string::npos
++        || access_token.find_first_of("\r\n\1") != string::npos)
++        throw imap_error("Invalid XOAUTH2 credentials.", "");
++    const auto caps = capabilities();
++    if (!caps.count("AUTH=XOAUTH2")) throw imap_error("XOAUTH2 is not supported.", "");
++    const string payload = "user=" + username + '\1' + "auth=Bearer " + access_token + '\1' + '\1';
++    mailio::base64 codec(76, 76);
++    string encoded;
++    for (const auto& part : codec.encode(payload)) encoded += part;
++    bool sent = caps.count("SASL-IR") != 0, rejected = false;
++    dlg_->send(format("AUTHENTICATE XOAUTH2" + (sent ? " " + encoded : "")));
++    int continuations = 0;
++    while (true)
++    {
++        const string line = dlg_->receive();
++        if (!line.empty() && line.front() == '+')
++        {
++            if (++continuations > 2) throw imap_error("Invalid XOAUTH2 challenge.", "");
++            if (!sent) { dlg_->send(encoded); sent = true; }
++            else { dlg_->send(""); rejected = true; } // Acknowledge Google's error challenge.
++            continue;
++        }
++        const auto response = parse_tag_result(line);
++        if (response.tag == UNTAGGED_RESPONSE) continue;
++        if (response.tag != to_string(tag_) || !response.result.has_value()
++            || response.result.value() != tag_result_response_t::OK || !sent || rejected)
++            throw imap_error("XOAUTH2 authentication rejected.", "");
++        return;
++    }
++}
++
++
+ void imap::auth_login(const string& username, const string& password)
+ {
+     auto user_esc = to_astring(username);
+diff --git a/third_party/mailio/src/smtp.cpp b/third_party/mailio/src/smtp.cpp
+index 37ae329..1661595 100644
+--- a/third_party/mailio/src/smtp.cpp
++++ b/third_party/mailio/src/smtp.cpp
+@@ -84,6 +84,8 @@ string smtp::authenticate(const string& username, const string& password, auth_m
+         ;
+     else if (method == auth_method_t::LOGIN)
+         auth_login(username, password);
++    else if (method == auth_method_t::XOAUTH2)
++        auth_xoauth2(username, password);
+     return greeting;
+ }
+ 
+@@ -212,6 +214,28 @@ string smtp::connect()
+ }
+ 
+ 
++void smtp::auth_xoauth2(const string& username, const string& access_token)
++{
++    if (username.empty() || access_token.empty() || username.find_first_of("\r\n\1") != string::npos
++        || access_token.find_first_of("\r\n\1") != string::npos)
++        throw smtp_error("Invalid XOAUTH2 credentials.", "");
++    const string payload = "user=" + username + '\1' + "auth=Bearer " + access_token + '\1' + '\1';
++    base64 codec(76, 76);
++    string encoded;
++    for (const auto& part : codec.encode(payload)) encoded += part;
++    dlg_->send("AUTH XOAUTH2 " + encoded);
++    auto response = parse_line(dlg_->receive());
++    if (std::get<0>(response) == 334)
++    {
++        dlg_->send(""); // SASL requires an empty acknowledgement of the error.
++        response = parse_line(dlg_->receive());
++        throw smtp_error("XOAUTH2 authentication rejected.", "", true);
++    }
++    if (std::get<0>(response) != 235 || !std::get<1>(response))
++        throw smtp_error("XOAUTH2 authentication rejected.", "", permanent_negative(std::get<0>(response)) || transient_negative(std::get<0>(response)));
++}
++
++
+ void smtp::auth_login(const string& username, const string& password)
+ {
+     dlg_->send("AUTH LOGIN");

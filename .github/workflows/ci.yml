@@ -27,8 +27,8 @@ jobs:
     steps:
       - name: Install dependencies and print versions
         run: |
-          pacman -Syu --noconfirm --needed base-devel git ca-certificates cmake ninja boost openssl dbus python qt6-base qt6-tools qt6-translations qt6-declarative qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring fontconfig noto-fonts
-          pacman -Q base-devel git ca-certificates cmake ninja boost openssl dbus python qt6-base qt6-tools qt6-translations qt6-declarative qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring fontconfig noto-fonts
+          pacman -Syu --noconfirm --needed base-devel git ca-certificates cmake ninja boost openssl dbus python qt6-base qt6-tools qt6-translations qt6-declarative qt6-webengine xorg-server-xvfb xorg-xauth mesa qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring fontconfig noto-fonts
+          pacman -Q base-devel git ca-certificates cmake ninja boost openssl dbus python qt6-base qt6-tools qt6-translations qt6-declarative qt6-webengine xorg-server-xvfb xorg-xauth mesa qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring fontconfig noto-fonts
 
       - name: Check out source and pinned submodules
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -57,7 +57,7 @@ jobs:
         run: |
           test ! -e build/ci-release
           test -z "${NKMAIL_UI_SOURCE_DIR:-}"
-          cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DNKMAIL_BUILD_TESTS=ON
+          cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DNKMAIL_BUILD_TESTS=ON -DNKMAIL_REQUIRE_GOOGLE_OAUTH=ON -DNKMAIL_GOOGLE_OAUTH_CLIENT_FILE="$GITHUB_WORKSPACE/tests/oauth/project-client.fixture.json"
           python - <<'PY'
           import os
           from pathlib import Path
@@ -72,7 +72,7 @@ jobs:
           actual_ui = Path(cache["NKMAIL_UI_SOURCE_DIR:PATH"]).resolve(strict=True)
           if actual_ui != expected_ui:
               raise SystemExit(f"Unexpected UI source: {actual_ui}; expected {expected_ui}")
-          for key, expected in {"CMAKE_BUILD_TYPE:STRING": "Release", "NKMAIL_BUILD_TESTS:BOOL": "ON"}.items():
+          for key, expected in {"CMAKE_BUILD_TYPE:STRING": "Release", "NKMAIL_BUILD_TESTS:BOOL": "ON", "NKMAIL_REQUIRE_GOOGLE_OAUTH:BOOL": "ON"}.items():
               if cache.get(key) != expected:
                   raise SystemExit(f"Unexpected {key}: {cache.get(key)!r}; expected {expected!r}")
           print(f"Verified Release tests enabled with canonical UI source: {actual_ui}")
@@ -90,7 +90,7 @@ jobs:
           listing = json.loads(subprocess.check_output(
               ["ctest", "--test-dir", "build/ci-release", "--show-only=json-v1"], text=True
           ))
-          required = {"nkmail_i18n", "nkmail_translations", "nkmail_cli", "nkmail_ui", "nkmail_tray", "nkmail_core", "nkmail_controller", "loopback-protocol"}
+          required = {"nkmail_i18n", "nkmail_translations", "nkmail_cli", "nkmail_ui", "nkmail_tray", "nkmail_core", "nkmail_controller", "loopback-protocol", "nkmail_reader", "nkmail_google_oauth"}
           registered = {test["name"] for test in listing["tests"]}
           missing = required - registered
           if missing:
@@ -98,5 +98,8 @@ jobs:
           print(f"Verified required tests: {', '.join(sorted(required))}")
           PY
 
-      - name: Run Release tests
-        run: ctest --test-dir build/ci-release --output-on-failure --no-tests=error --timeout 120
+      - name: Run Release tests with Chromium sandbox enabled
+        run: |
+          useradd --create-home nkmail-ci
+          chown -R nkmail-ci:nkmail-ci "$GITHUB_WORKSPACE" "$XDG_RUNTIME_DIR"
+          runuser -u nkmail-ci -- env XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" ctest --test-dir build/ci-release --output-on-failure --no-tests=error --timeout 120

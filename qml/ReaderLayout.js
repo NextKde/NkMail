@@ -10,3 +10,31 @@ function fitImages(html, availableWidth) {
                 + '" src="' + source + '">'
         })
 }
+
+// Presentation only: stored HTML and remote-image placeholders stay intact.
+// Qt's text renderer must not see an img with no src: it draws a broken image.
+function readableHtml(html, availableWidth) {
+    const text = String(html).split(/(<pre\b[^>]*>[\s\S]*?<\/pre>)/gi).map(function(part) {
+        if (/^<pre\b/i.test(part)) return part
+        return compactHtml(part)
+    }).join('')
+    return fitImages(text, availableWidth)
+}
+
+function compactHtml(html) {
+    let text = String(html).replace(/<img\b[^>]*\bdata-nkmail-src="[^"]*"[^>]*>/gi, function(tag) {
+        const alt = /\balt="([^"]*)"/i.exec(tag)
+        return alt && alt[1].trim() ? '<span>' + alt[1] + '</span>' : ''
+    })
+    // Older cached sanitizer output used standalone pipe text nodes for cells.
+    // Preserve ordinary inline pipes and everything inside preformatted blocks.
+    text = text.replace(/(^|>)[ \t\r\n]+(?:\|[ \t\r\n]+)+(?=<|$)/g, '$1')
+        .replace(/[ \t\r\n]+/g, ' ')
+    for (let i = 0; i < 64; ++i) {
+        const compact = text.replace(/<(div|p|span)>(?:[ \t\r\n]|&nbsp;|\u00a0|<br\s*\/?>)*<\/\1>/gi, '')
+        if (compact === text) break
+        text = compact
+    }
+    text = text.replace(/(?:<br\s*\/?>\s*){3,}/gi, '<br><br>')
+    return text
+}

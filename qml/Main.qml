@@ -105,11 +105,11 @@ ApplicationWindow {
         const folders = mail.folders || []
         for (let i = 0; i < folders.length; ++i)
             if (folders[i].id === mail.currentFolder) return mailboxTitle(folders[i])
-        return mail.currentFolder || qsTr("Inbox")
+        return mailboxTitle({id: mail.currentFolder || "INBOX"})
     }
     function dateLabel(date) { return MailLabels.dateLabel(date) }
     function compose(mode) {
-        if (mail.sending) return
+        if (mail.sending || ((mode || "new") !== "new" && window.message.bodyPending === true)) return
         composer.editDraft(mail.newDraft(mode || "new"))
     }
     // Capture helper is deliberately unavailable for real accounts.
@@ -119,6 +119,13 @@ ApplicationWindow {
         if (composer.visible && !composer.finishEditing()) return
         draftsVisible = false
         if (scenario === "account-add") { accountDialog.addAccount(); return }
+        if (scenario === "account-google") {
+            accountDialog.editAccount({id: "demo-google", name: "Alex Example", address: "alex@example.invalid",
+                username: "alex@example.invalid", imapHost: "imap.gmail.com", smtpHost: "smtp.gmail.com",
+                imapPort: 993, smtpPort: 465, serverSavesSent: true})
+            accountDialog.showGooglePasswordReview()
+            return
+        }
         if (scenario === "flagged") { mail.selectSmartMailbox("flagged"); return }
         if (scenario === "avatars") { window.showAvatars = true; return }
         if (scenario === "more-menu") { moreMenu.openAtAnchor(); return }
@@ -348,7 +355,7 @@ ApplicationWindow {
                 readerVisible: window.readerVisible
                 draftsVisible: window.draftsVisible
                 liquidControls: window.liquidControls
-                hasMessage: window.hasMessage
+                hasMessage: window.hasMessage && window.message.bodyPending !== true
                 visible: reader.visible || readerHeader.searching
                 x: contentScene.x + (window.narrow ? 0 : reader.x)
                 width: Math.max(0, windowChrome.controlsLeft - x)
@@ -449,9 +456,9 @@ ApplicationWindow {
                 Layout.maximumWidth: window.narrow ? -1 : window.listWidth
                 Layout.fillWidth: window.narrow
                 Layout.fillHeight: true
+                onAddAccountRequested: accountDialog.addAccount()
                 onMessageOpened: window.readerVisible = true
                 onComposeRequested: function(mode) { window.compose(mode) }
-                onAddAccountRequested: accountDialog.editAccount()
                 onEditDraftRequested: function(draftId) { composer.editDraft(mail.loadDraft(draftId)) }
             }
 
@@ -467,10 +474,10 @@ ApplicationWindow {
                 compact: window.width < 1100
                 visible: !window.narrow || window.readerVisible
                 Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumWidth: 0
+                onReconnectRequested: accountDialog.editAccount(window.mail.account)
                 onDetailsRequested: window.detailsVisible = !window.detailsVisible
                 onCloseDetailsRequested: window.detailsVisible = false
                 onSaveAttachmentRequested: function(index) { saveAttachmentDialog.attachmentIndex = index; saveAttachmentDialog.open() }
-                onAddAccountRequested: accountDialog.editAccount()
             }
 
         }

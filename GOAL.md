@@ -388,7 +388,9 @@ This file is a recoverable work ledger, not a native Codex Goal. Work requires a
 - First public milestone successfully pushed: `4e4dfea7b51690e01b7ecf8be3c823c0b079529b`, including six reviewed synthetic screenshots.
 - A single controlled read-only provider attempt failed before the header/content slice completed; no alternate password was tried. A separate no-login connection verified system CA/hostname TLS and an IMAP greeting, but fixed backend diagnostics do not identify the failed authenticated phase, so this is not proof of an authentication failure. Provider compatibility remains unverified. No real SMTP submission or mailbox mutation has occurred.
 
-## Remaining work / known limits
+## Historical remaining work / known limits (superseded)
+
+This section records the 2026-10-29 baseline, not current missing features. Multiaccount, Sent APPEND, flags/move/delete and legacy Google OAuth were subsequently implemented. See the current queue below.
 - Controlled provider read-only verification after the now-passing TLS/PEEK suite; never publish account data or raw output, never cycle password alternatives automatically.
 - Controller-level workflow regression added: 23 passed including init/cleanup; reproduced and fixed offline paging, UIDVALIDITY append reset, stale attachments, visible cache on transport change, profile keychain isolation and reply recipient handling.
 - Column resizing, window geometry persistence and keyboard/focus checks implemented; pointer-test scene-coordinate issue fixed with unchanged strict assertions, three consecutive UI runs passed.
@@ -432,3 +434,159 @@ The scoped local implementation is substantially complete, but real-provider rea
 - Reduced the sidebar Mail heading from 24px Bold to 15px DemiBold; aligned it with the existing top-row controls and reserved space for the shared sidebar toggle. No dependency or mail behavior changes.
 - Fresh default pinned-source VM build succeeded. VM CTest `nkmail_ui`, `nkmail_i18n`, and `nkmail_translations`: 3/3 passed. Actual synthetic X11/GPU screenshots inspected at 1240px light/Chinese and dark/English, plus 900px Chinese. No heading/control overlap observed. Nested Wayland screenshot attempts returned “Preview window is not exposed”; Wayland visual acceptance is not claimed. No real mailbox was accessed.
 - Rebuilt the existing host `build-clean/nkmail` entry without launching it or running tests. Its existing sibling Kos.Ui development override was preserved; default-source validation refers to the separate VM build. No commit, publication or dependency upgrade performed.
+
+## Empty inbox review · 2026-11-03
+
+- Fixed the header fallback to resolve `INBOX` through the existing localized mailbox labels when the folder list is empty. Custom folder names remain unchanged.
+- Kept account creation in the sidebar and removed duplicate account buttons and unused signals from the message list and reader. The list's cached-unread reset action remains available. Removed obsolete translation entries from both catalogs.
+- Added a UI regression for the empty-account folder fallback, sidebar add-account dialog opening, absence of the list add-account action, and custom folder naming. VM default pinned-source build succeeded; UI/i18n/catalog checks passed 3/3 in 38.55 seconds (48 UI cases including init/cleanup). No host build, tests or GUI execution performed.
+
+## Inbox account entry follow-up · 2026-11-03
+
+- User requested an additional account entry in the inbox empty state. Added a canonical KosButton with the neutral secondary solid style (30px, no liquid rendering or raised surface). Sidebar entry remains; reader duplicate remains removed. Both entries open addAccount().
+- VM build passed. Final UI regression passed 48 cases including init/cleanup in 37.65s; i18n and catalog checks passed (0.04s / 0.10s). The first UI attempt checked visibility before the empty list updated; now the regression waits for the list count and button visibility before clicking.
+- At the user's explicit request, rebuilt and replaced the host's normal Chinese-mode NkMail process without modifying account/mail data. Automated tests ran only in the VM.
+
+## Reader layout correction · 2026-11-03
+
+- Corrected table fallback separators, blocked-image broken icons, empty layout blocks and source whitespace in the rich-text reader; old cached presentation is normalized without rewriting mail data. Inline pipes/preformatted text are preserved. Header mailbox labels are translated. Full browser/CSS fidelity remains out of scope for this Qt rich-text correction.
+- VM final UI/core checks passed 2/2 in 39.05s (49 UI / 22 core cases including init/cleanup). i18n/catalog and loopback protocol passed. Synthetic software capture inspected; see docs/progress/2026-11-03-reader-layout/. The initial UI assertion compared serialized rich HTML and was replaced with rendered-text/geometry assertions.
+- Host rebuilt and normal Chinese-mode process replaced for requested manual inspection. No host automated tests. No real email or screenshot published.
+
+## Browser mail layout · 2026-11-03
+
+- Replaced simplified rich-text display for newly fetched HTML mail with an isolated Qt WebEngine Quick reader, preserving passive CSS/table layout in a separate `displayHtml` field. Simplified HTML remains separate for quoting and offline fallback. Old selected cached bodies upgrade once using existing IMAP PEEK, with an account-reconnection action for offline profiles.
+- Browser profiles are off-the-record, cookie-free, sandboxed and network-blocked. CSP/page settings disallow active content and local access; inline images arrive only through the opt-in loader. Current-only opaque memory documents avoid encoded loadHtml size limits. Application-owned isolated-world code measures height.
+- Fixed plain/rich fallback switching and synchronous width/text binding hazards found by strict regression checks. Final VM browser/UI checks passed 2/2 in 42.35s (6 browser / 50 UI cases including init/cleanup). Core/controller/CLI/tray/i18n/catalog/protocol checks passed during staged regression; controller 37 cases. Reviewed synthetic integrated screenshot at docs/progress/2026-11-03-browser-reader/.
+- No host automated tests; host build/relaunch for requested manual inspection. Qt compatibility-profile deprecation and expected attack-fixture CSP diagnostics remain. No Chromium sandbox bypass, real mail publication or remote mailbox mutation. Hosted gate pending on the updated PR.
+
+## Gmail setup diagnosis and screenshot publication · 2026-11-04
+
+- Browser-reader commit 5dc43594f72f16713a98681e5583426c25cca7fa passed hosted release-gate (run 41640362986). The PR description now embeds the reviewed synthetic browser-reader screenshot directly. No real account screenshot or credentials are published.
+- Clarified generic password labels and provider-specific Gmail guidance: NkMail currently uses IMAP/password authentication, supports Google app passwords where allowed, and has no Google OAuth or POP implementation. The ordinary Google password path is not supported by Google's current policy. Updated English/Chinese catalogs and docs/PROVIDERS.md with official sources.
+- VM no-auth connectivity probes for imap.gmail.com:993 and pop.gmail.com:995 timed out in TCP connect. No TLS/authentication attempt or mailbox action occurred, and no account-password validity conclusion is supported by this probe. VM connectivity is not proof of the host's exact failure.
+- VM UI/i18n/catalog checks passed 3/3 in 40.18s. Host guidance build succeeded; normal-mode relaunch for manual use. Hosted check for the new guidance commit remains separate from the passed browser-reader check.
+
+
+## Project-managed Google OAuth · 2026-11-04
+
+- Implemented system-browser authorization with PKCE S256, one-use validated IPv4 loopback callbacks, verified email identity, cancellation/timeouts, fixed Google endpoints, offline refresh and rotation through QtKeychain. No tokens in account metadata/QML/SQLite, no per-user client configuration, no password fallback for Google OAuth accounts.
+- Project Desktop OAuth client is created and stored outside the repository; Gmail API enabled, required scopes declared, test user saved by owner. The project remains Testing. Production branding/privacy/domain verification and applicable Google restricted-scope review remain outstanding; public availability is not claimed.
+- Added mailio IMAP/SMTP XOAUTH2 with SASL-IR/continuations/error acknowledgment and no real sending. Account setup saves verified Google identities independently of mail-port reachability; failed persistence can retry without new consent. Standard-password providers retain auth-only IMAP/SMTP checks.
+- VM pinned-source Release build with bundled synthetic client configuration passed 10/10 CTest suites in 86.23s. New OAuth fixtures cover callback/state/PKCE/identity/refresh/concurrency/rotation/cancellation/redirects; controller tests assert keychain persistence without token serialization. UI save retry and one-click login pass. Reader timing regression fixed by waiting for complete Chromium parsing, retaining its 300,000-character assertion.
+- Curated synthetic screenshot: docs/progress/2026-11-04-google-oauth/sign-in.png. Host configured build launched for the user's real manual Google consent; automated tests ran only in VM. User reported that real account addition failed; the reported message combined missing mail scope and missing offline access, and the user sees two previously granted permissions without a checkbox. The actual missing part is not yet established. Split those error branches and added consent guidance without assuming a checkbox is shown. Real acceptance remains unresolved. Code and synthetic screenshot are pushed as 3c7d70a in PR #18; hosted release-gate for 3c7d70a passed (run 41752702276). No real mail writes, password use or public credentials.
+
+- Consent follow-up: supplied permission descriptions include full Gmail mail access, so a missing-checkbox explanation is not established. A later attempt reports secure-connection failure. Added credential-free request diagnostics limited to fixed stage, network enum, HTTP status and allowlisted provider error code; no URLs, responses, headers or token values are logged. Diagnostic build is running for manual retry. VM UI/i18n/catalog/OAuth checks passed 4/4 in 43.08s; the final diagnostic OAuth rebuild/check passed again. Real acceptance remains unresolved.
+
+- Latest real retry: credential-free journal diagnostic reports authorization-code exchange closed by remote peer before any HTTP reply (Qt network enum 2, HTTP status 0). This establishes a transport failure for that attempt, not an OAuth policy denial. No token or response body was read into diagnostic output. Browser/application routing differences are being checked; no system network settings were changed. Awaiting the user's choice before trying an existing local proxy for this process.
+
+- User authorized a temporary process-only proxy. The next live attempt passed token exchange but the additional UserInfo connection closed before an HTTP response. Replaced the unnecessary UserInfo request with private identity extraction from Google's TLS-authenticated token response, following OIDC Core 3.1.3.7 step 6 / Google server-flow guidance. This does not accept externally supplied JWTs or serve as a general signature verifier. Validate RS256 structure, Google issuer, audience/azp, fresh per-flow nonce, subject, expiry/issued-at, verified email and optional access-token hash. ID token is discarded, never persisted or exposed. VM OAuth/controller checks passed 2/2 in 7.68s; final pinned-source Release suite passed 10/10 in 86.50s. Host updated for the authorized manual retry; system settings remain unchanged.
+
+
+## Real Google sign-in accepted · 2026-11-04
+
+- User confirmed that the configured build successfully added the real Google account after the backchannel identity change, using the explicitly authorized temporary process proxy. This verifies browser authorization, token exchange, identity acceptance and account addition. It does not establish mailbox synchronization, restart/refresh-token restoration, SMTP submission or delivery. No real mail write was performed.
+- Implementation and synthetic screenshots are pushed in PR #18; code commit 2e82bc5 passed final VM Release 10/10 suites in 86.50s. Hosted release-gate for this code remains pending at the time of this record (run 41755614217). Google project remains Testing; public branding/privacy/domain and applicable verification work are still required for general distribution. System network settings were not changed.
+
+
+## Google mail-list wait · 2026-11-04
+
+- User reports indefinite “Getting your mail” after successful account addition. Read-only cache diagnostics established that Google folders were saved but no message page was cached; a momentary socket snapshot alone does not establish the full cause.
+- Replaced up to 50 sequential header requests with one bounded UID FETCH. Preserve newest-first search UID order, tolerate vanished messages and keep sequence-window pagination; retain EXAMINE/BODY.PEEK and literal limits. Loading UI now shows the current localized phase. Opt-in diagnostics output only fixed stage names and elapsed milliseconds, never wire data or private identities.
+- VM build and UI/i18n/catalog/protocol checks passed 4/4 in 66.11s; controller checks passed separately. Sparse/out-of-order/vanished-header cases exercise TLS and STARTTLS, assert a single bounded request, and prohibit writes. Synthetic phase screenshot: docs/progress/2026-11-04-mail-sync/loading.png. Host rebuilt/relaunched with existing authorized process-only proxy and sync diagnostics. User confirmed the Google mail list appeared. Fixed-stage diagnostics recorded authenticated/select/search/header-fetch completion in approximately 7.9s for this page. This accepts live header-list retrieval, not body rendering, background token refresh, restart restoration or sending.
+
+
+## Message body wait and empty header · 2026-11-04
+
+- User reports slow Google body opening, no visible loading and a question-mark/no-subject/empty-recipient header. Confirmed that openMessage cleared current presentation before asynchronous content completed, even though the selected list already had header metadata. This UI bug is independent of any network latency.
+- Present list summary immediately; use transient bodyPending/bodyLoading/bodyError fields, visible download/render indicators and local Retry. Hide unknown headers/missing recipients. Preserve cached bodies during legacy-format upgrades; block reply/forward while a new body is pending. Generation checks and clearing previous attachments remain in place.
+- Added credential/content-free phase timing around content authentication, folder selection, fetch/parse and preparation. VM browser/protocol/i18n/catalog passed; corrected UI/controller fixture setups, then final UI/controller checks passed 2/2 in 49.14s. Reviewed synthetic capture at docs/progress/2026-11-04-body-loading/loading.png. Host updated with existing authorized process proxy and diagnostics; user asked to open an uncached Google message. Real body timing and visual result remain pending; no network-cause claim yet.
+
+
+## Follow-up body timing and QQ credential state · 2026-11-04
+
+- User confirms the body loading indicator is visible but opening remains slow. Fixed-stage live diagnostics show two content operations completing in ~11.73s and ~3.48s. Authentication/connection took ~7.09s/~2.40s; fetch/protocol parsing ended at ~11.72s/~3.47s, with subsequent local preparation ~8ms/~6ms. This identifies connection/protocol waits as the dominant measured cost, not an isolated renderer benchmark. Each uncached body currently creates a fresh IMAP connection; connection reuse remains an optimization opportunity. No raw diagnostics or mail data are published.
+- QQ's “application password before changing messages” prompt is a local missing-credential guard, not evidence of server rejection. A session-only credential cannot survive application restart while restore permission is disabled. Clarified missing-credential prompts for QQ authorization codes and Google sign-in, preserving restore permissions and the no-credential write guard. User chose to handle QQ re-entry/keychain remembering later; do not change that permission or request the code in chat.
+- VM i18n/catalog checks passed; final controller rerun passed in 5.87s after correcting the new fixture to populate the QQ-bound cache after its account identity change. Host compilation is allowed, but the current process is kept running so this copy-only prompt update does not discard session credentials. Real QQ credential restoration is deferred by the user; no QQ password validity claim or real mailbox write.
+
+
+## Actual loading animation · 2026-11-04
+
+- User reports several loading indicators remain static. The list used a literal ellipsis; other states used native Basic indicators or text-only feedback. Introduced an app-local explicit scene-item activity animation without modifying the pinned component library. Reader, list, search, sidebar, account setup and sending use it.
+- Normal motion rotates; reduced motion breathes opacity slowly. Hidden/stopped feedback ceases animation. Tests now verify actual different pixels over time, not merely running=true; normal/reduced motion, hide/stop/resume and integrated body/list views pass on both software and Xvfb/OpenGL. Direct clipped-subitem captures were found unsuitable for the integration assertion, so final tests capture the enclosing views. Do not claim that those initial subitem grabs isolate a Qt rendering defect.
+- VM full reader/UI/i18n/catalog suite passed 4/4 in 49.40s; OpenGL targeted animation checks and software targeted checks passed. Reviewed 12 separately captured synthetic frames and assembled docs/progress/2026-11-04-animated-loading/loading.gif; every neighboring frame differs. Host rebuilt/relaunched with the previously authorized temporary process proxy, no host automated checks. QQ credential recovery remains deferred by the user; no restoration settings were changed.
+
+
+## Reader scrollbar and remote image retry · 2026-11-04
+
+- User reports no body scrollbar and remote images still absent after clicking Load images. Added explicit scrollbar sizing/anchoring and overflow policy, bound content height, and routed embedded-browser wheel events to the reader for normally measured documents. Retain internal browser scrolling for the existing 12,000px capped surfaces, while avoiding redundant native bars for normal documents; height measurement now includes the document element.
+- Remote image work is four-way concurrent with existing 20-URL/2MiB limits, a 16MP image bound and 30s active-batch deadline. Show actual animated pending state and disable duplicate clicks. Preserve failed sanitized URLs with a failure marker so Retry can succeed; successful image display styles remain intact. Cookie/Referer-free requests, TLS verification and opt-in behavior remain unchanged. Fixed image diagnostics expose only network enum/HTTP status.
+- VM reader/UI/controller/i18n/catalog passed 5/5 in 58.17s; final anchoring/measurement reader and full UI follow-ups are recorded separately. Tests prove visible scrollbar geometry, wheel movement, actual thumb dragging, four concurrent fixture requests, failure preservation and retry without re-fetching successful images. Reviewed synthetic capture at docs/progress/2026-11-04-scroll-images/reader.png.
+- User explicitly confirmed scrolling and images both work in the updated host run. The earlier real image failure's precise network/server cause was not captured; do not claim one. Host uses the previously authorized process-only proxy, no global network or image privacy settings changed. No host automated tests or real mailbox writes.
+
+
+## Gmail app passwords instead of browser sign-in · 2026-11-04
+
+- User chose to hide OAuth onboarding rather than manage public Google OAuth verification. Removed account-dialog browser sign-in state/actions/hints and switched Gmail onboarding to the ordinary email/app-password path. Provider instructions require two-step verification and distinguish an app password from the main Google password. No Google Cloud setup is required for this path.
+- Retained the existing OAuth backend and optional project client configuration for compatibility with accounts already added. No token/account deletion, automatic credential conversion, console mutation or access revocation. Editing an existing OAuth account accepts a verified app password under the same ID; regression fixtures prove cached body retention. Missing/expired legacy authorization guidance directs users to account settings.
+- VM build and UI/controller/i18n/catalog checks passed 4/4 in 53.80s after the final UI/migration changes. Reviewed actual synthetic screenshot docs/progress/2026-11-04-google-app-password/setup.png; demo disables fields/saving, so it is visual evidence only. No host launch/tests and no real mailbox writes or password submissions for this iteration. The currently running host binary has not been replaced.
+- Final backend prompt build and controller/i18n/catalog follow-up passed 3/3 in 6.23s. Hosted release-gate remains the merge requirement.
+
+
+## Ordinary reader actions and account hierarchy · 2026-11-04
+
+- Replaced the remote-image load/retry LiquidActionButton adapter with canonical ordinary KosButton, using its neutral secondary material. Body-download Retry also uses neutral secondary material. Actions and pending-state disabling remain intact.
+- Indented every account folder row by 18px relative to its account header, including inactive accounts; favorites and smart mailboxes retain their existing alignment.
+- VM Release build passed; UI/i18n/catalog checks passed 3/3 in 47.43s. Updated the existing remote-image behavior assertion for the ordinary button text. Optional VM screenshot attempt did not run because xvfb-run was absent from the default PATH; no new visual-capture claim. No host build/launch/tests or real mailbox writes. Running host binary remains unchanged.
+
+
+## Scrolling, account disclosure and favorites · 2026-11-04
+
+- Mouse wheel scrolling in message lists and ordinary-height reader content now uses a 160ms easing transition; touchpad pixel deltas remain direct. Capped WebEngine documents retain their internal scrolling. Shared handler respects reduced motion and interrupts animation for dragging.
+- Account headers only expand/collapse. Selecting a child folder performs account navigation. Added a UI regression for a non-current account header preserving current account identity.
+- Custom favorites have a remove context action. Successful account removal clears corresponding persisted favorites; older orphan entries are filtered from display.
+- VM controller/i18n/catalog passed; initial reader/UI load found a handler object-property error, fixed before delivery. Final reader/UI passed 2/2 in 52.66s. Host compiled and relaunched under the user's existing authorization, preserving process environment; no host automated tests or real mailbox mutation. Perceived scrolling smoothness awaits user feedback.
+
+
+## Reader surface on window restore · 2026-11-04
+
+- User reports a black HTML body after minimizing/restoring, recovering on scrolling. This suggests a stale rendered surface; the host-specific GPU/compositor cause has not been isolated.
+- Bind WebEngine item visibility to its containing window's minimized/hidden state, explicitly notifying the browser renderer through suspend/resume without replacing the document or resetting scrolling.
+- VM reader suite passed in 2.89s, including new minimize/restore and hide/show pixel checks without user input, with document URL/readiness preserved. This VM result does not establish reproduction or resolution on the user's compositor.
+- Host rebuilt/relaunched with prior process environment under existing authorization. No host automated tests or mailbox mutations. Await user confirmation of the original minimize/restore symptom.
+
+
+## Restore follow-up: visibility synchronization insufficient · 2026-11-04
+
+- User reports the black surface still occurs. Prior VM success did not reproduce or resolve the host symptom. Host session is Wayland; no explicit Qt renderer override was present. No definitive GPU/compositor cause established.
+- Replace ineffective view-visibility workaround with a debounced local-document reload on restore/reactivation. Reload uses the existing isolated in-memory URL, not mail transport; preserve document dimensions, outer reader position and internal browser scrolling. New mail cancels pending restoration. This is a rendering recovery workaround; browser text selection can reset on reactivation.
+- VM reader suite passed in 4.08s, with pixels checked after queued restoration and a long-document regression confirming internal scroll restoration. Host rebuilt/restarted with original process environment. No host automated tests, mailbox writes, global renderer changes or credential changes. Actual host symptom confirmation remains pending.
+
+
+## Cover transient restore frames · 2026-11-04
+
+- User confirmed local-document recovery fixes the persistent black body, but black content remains during the minimize/restore animation.
+- Cover the embedded renderer with its normal white document background while suspended/recovering. Keep rendering active underneath; remove the cover 120ms after load completion when the window is no longer suspended. This hides transient black content rather than preserving a screenshot of mail; a brief plain background may be visible during recovery. Native compositor animation behavior still requires user confirmation.
+- VM reader checks passed in 4.12s, including pixel checks for the cover, cover removal, restored content, and retained internal scrolling. Host rebuilt/restarted with original process environment. No host automated tests or mailbox mutation.
+
+
+## Retained reader surface: final compatibility adapter · 2026-11-04
+
+- User confirmed the targeted texture-lifetime intervention resolves the native Wayland minimize/restore black region. Passive lifecycle evidence showed render-loop suspension without scene-graph invalidation. An initial QObject-tree probe never attached and is not valid evidence; the corrected visual-tree probe confirmed attachment before the successful comparison.
+- Removed all focus-reload, visibility/cover workarounds and host-only diagnostic instrumentation. MailRenderLifecycle observes the reader's visual children/window changes through queued event-driven scans. It preserves the delegate's front-buffer resources on suspension while retaining actual invalidation/destruction cleanup. No polling or global Qt modification.
+- The adapter deliberately depends on Qt's private render delegate identity using public QObject APIs. Regression requires successful attachment, no document reload/scroll loss, and fresh attachment after reparenting. Revisit this compatibility adapter on Qt upgrades. No upstream issue was submitted.
+- VM full suite passed 10/10 in 95.52s. Isolated KWin Wayland reader suite passed 8/8; graphics diagnostics during image capture mean this is not artifact-free animation acceptance. Final attachment-state/reparent regression passed in 3.97s. Earlier capture-only assertions were insufficient to prove passive animation correctness.
+- No host automated tests or mailbox mutation. Diagnostic comparison was user-confirmed; final event-driven adapter uses the same scoped disconnection and is prepared for host manual acceptance.
+
+
+## Current delivery queue · 2026-11-04
+
+1. Event-driven retained-surface adapter and VM regressions are complete; final native desktop manual acceptance and PR #18 release-gate remain.
+2. Provider/testing documentation reconciled; merge the final PR only after its own required release-gate passes.
+3. Optimize uncached body latency through a separately designed IMAP session reuse strategy; retain account/session cancellation and TLS/PEEK guarantees.
+4. Cross-account unified inbox and read-only aggregates with explicit account/folder/UIDVALIDITY/UID routing.
+5. Favorite ordering and unknown/stale unread-count semantics; complete copy-to/junk workflows and message/rfc822 attachment forwarding.
+6. CID embedded images; controlled provider/app-password acceptance. QQ credential restoration remains user-deferred.
+7. Deferred product scope: IDLE/background service, Microsoft/Exchange, colored flags/reminders/muting/blocking/rules. Public Google OAuth onboarding/review remains deliberately deferred, not an app-password release blocker.
+
+Old unchecked lists and provider statements above are historical evidence, not an additional duplicate backlog.

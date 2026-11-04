@@ -48,6 +48,7 @@ GridLayout {
                 color: AppTheme.text; wrapMode: Text.Wrap; textFormat: Text.PlainText
             }
             Text {
+                visible: MailLabels.value(root.message, "to").length > 0
                 text: qsTr("To: ") + MailLabels.value(root.message, "to")
                 Layout.fillWidth: true; Layout.minimumWidth: 0
                 font.pixelSize: 11; color: AppTheme.mutedText

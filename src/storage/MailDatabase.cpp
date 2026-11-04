@@ -644,6 +644,8 @@ std::optional<Content> MailDatabase::content(const QString &folder, const QStrin
     c.summary = summaryFromMap(m.value("summary").toMap());
     c.text = m.value("text").toString();
     c.html = m.value("html").toString();
+    c.displayHtml = m.value("displayHtml").toString();
+    c.bodyFormatVersion = m.value("bodyFormatVersion").toInt();
     c.messageId = m.value("messageId").toString();
     c.replyTo = m.value("replyTo").toString();
     c.to = m.value("to").toString();

@@ -59,7 +59,7 @@ public:
       mechanism is allowed.
     - LOGIN: The username and password are sent in Base64 format.
     **/
-    enum class auth_method_t {NONE, LOGIN};
+    enum class auth_method_t {NONE, LOGIN, XOAUTH2};
 
     /**
     Making a connection to the server.
@@ -171,6 +171,9 @@ protected:
     @throw *          `parse_line(const string&)`, `dialog::send(const string&)`, `dialog::receive()`.
     **/
     void auth_login(const std::string& username, const std::string& password);
+
+    // SASL XOAUTH2 with a bearer access token; never retries with LOGIN.
+    void auth_xoauth2(const std::string& username, const std::string& access_token);
 
     /**
     Issuing `EHLO` and/or `HELO` commands.

@@ -25,6 +25,7 @@ copy at http://www.freebsd.org/copyright/freebsd-license.html.
 #include <boost/range/adaptor/transformed.hpp>
 #include <boost/regex.hpp>
 #include <mailio/imap.hpp>
+#include <mailio/base64.hpp>
 
 
 using std::find_if;
@@ -232,6 +233,8 @@ string imap::authenticate(const string& username, const string& password, auth_m
 
     if (method == auth_method_t::LOGIN)
         auth_login(username, password);
+    else if (method == auth_method_t::XOAUTH2)
+        auth_xoauth2(username, password);
     return greeting;
 }
 
@@ -1255,6 +1258,40 @@ void imap::switch_tls()
         throw imap_error("Start TLS refused by server.", "");
 
     dlg_ = dialog_ssl::to_ssl(dlg_, *ssl_options_);
+}
+
+
+void imap::auth_xoauth2(const string& username, const string& access_token)
+{
+    if (username.empty() || access_token.empty() || username.find_first_of("\r\n\1") != string::npos
+        || access_token.find_first_of("\r\n\1") != string::npos)
+        throw imap_error("Invalid XOAUTH2 credentials.", "");
+    const auto caps = capabilities();
+    if (!caps.count("AUTH=XOAUTH2")) throw imap_error("XOAUTH2 is not supported.", "");
+    const string payload = "user=" + username + '\1' + "auth=Bearer " + access_token + '\1' + '\1';
+    mailio::base64 codec(76, 76);
+    string encoded;
+    for (const auto& part : codec.encode(payload)) encoded += part;
+    bool sent = caps.count("SASL-IR") != 0, rejected = false;
+    dlg_->send(format("AUTHENTICATE XOAUTH2" + (sent ? " " + encoded : "")));
+    int continuations = 0;
+    while (true)
+    {
+        const string line = dlg_->receive();
+        if (!line.empty() && line.front() == '+')
+        {
+            if (++continuations > 2) throw imap_error("Invalid XOAUTH2 challenge.", "");
+            if (!sent) { dlg_->send(encoded); sent = true; }
+            else { dlg_->send(""); rejected = true; } // Acknowledge Google's error challenge.
+            continue;
+        }
+        const auto response = parse_tag_result(line);
+        if (response.tag == UNTAGGED_RESPONSE) continue;
+        if (response.tag != to_string(tag_) || !response.result.has_value()
+            || response.result.value() != tag_result_response_t::OK || !sent || rejected)
+            throw imap_error("XOAUTH2 authentication rejected.", "");
+        return;
+    }
 }
 
 

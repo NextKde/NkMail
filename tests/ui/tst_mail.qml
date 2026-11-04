@@ -26,6 +26,8 @@ TestCase {
         property var selectedMessage: ({uid: "1", uidValidity: "1", sender: "Studio Example", senderAddress: "studio@example.invalid", subject: "A quieter inbox", date: "2026-10-29T09:00:00Z", to: "alex@example.invalid", cc: "", messageId: "<one@example.invalid>", text: "<img src=https://example.invalid/tracker>\nPlain text only.", attachments: []})
         property string selectedUid: "1"
         property int blockedImageCount: 0
+        property bool remoteImagesLoading: false
+        property int failedImageCount: 0
         function loadRemoteImages() {}
         property string currentFolder: "INBOX"
         property string smartMailbox: ""
@@ -67,6 +69,8 @@ TestCase {
         }
         property var accountSetup: setupMock
         function configureAccount(config, password, remember) { return !busy }
+        property int googleSaveCount: 0
+        function configureGoogleAccount(existingId) { googleSaveCount++; if (busy) return false; setupMock.googleAuthorized = false; return true }
         function refresh() { refreshCount++ }
         function selectFolder(folder) { smartMailbox = ""; currentFolder = folder }
         function foldersFor(accountId) { return folders }
@@ -110,6 +114,13 @@ TestCase {
         id: setupMock
         property bool busy: false
         property string stage: ""
+        property bool googleConfigured: false
+        property bool googleAuthorized: false
+        property var googleAccount: ({address: "google-user@example.invalid"})
+        property int googleStarts: 0
+        property int googleCancels: 0
+        function beginGoogleSignIn(hint) { googleStarts++; stage = "google"; busy = true }
+        function cancelGoogleSignIn() { googleCancels++; busy = false; stage = ""; googleAuthorized = false }
         signal finished(bool success, string error)
         function verify(config, password) { stage = "imap"; busy = true }
     }
@@ -118,6 +129,7 @@ TestCase {
         property int hides: 0
         function hideToTray() { hides++; app.hide(); return true }
     }
+    Component { id: activityComponent; App.MailActivityIndicator {} }
     Component { id: readerComponent; App.MessageReader {} }
     Component { id: sidebarComponent; App.MailSidebar {} }
     Component { id: paneComponent; App.MessagePane { selection: App.MailSelection {} } }
@@ -126,10 +138,12 @@ TestCase {
         AppTheme.reduceMotion = true
         AppTheme.appearanceMode = "light"
         failOnWarning(/.*/)
+        mock.blockedImageCount = 0; mock.remoteImagesLoading = false; mock.failedImageCount = 0
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
+        mock.googleSaveCount = 0; setupMock.googleConfigured = false; setupMock.googleStarts = 0; setupMock.googleCancels = 0; setupMock.googleAuthorized = false; setupMock.busy = false; setupMock.stage = ""
         mock.refreshCount = 0; mock.search = ""
         mock.drafts = []; mock.sendPending = false
-        mock.smartMailbox = ""; mock.sending = false; mock.busy = false; mock.demo = true; mock.error = ""
+        mock.configured = true; mock.smartMailbox = ""; mock.sending = false; mock.busy = false; mock.demo = true; mock.error = ""
         app = createTemporaryObject(appComponent, testCase, {mail: mock})
         verify(app !== null)
         wait(80)
@@ -142,6 +156,137 @@ TestCase {
     function activateApp() {
         app.requestActivate()
         wait(40)
+    }
+    function verifyActivityPixelsMove(indicator, surface) {
+        const target = surface || indicator
+        waitForRendering(target)
+        const before = grabImage(target)
+        wait(180)
+        verify(!before.equals(grabImage(target)), "The visible activity pixels must change over time")
+    }
+    function test_activity_animates_in_normal_and_reduced_motion_and_stops_when_hidden() {
+        const indicator = createTemporaryObject(activityComponent, app.contentItem,
+            {x: 400, y: 300, width: 40, height: 40, running: true, reducedMotion: false})
+        verify(indicator !== null)
+        verifyActivityPixelsMove(indicator)
+        indicator.reducedMotion = true
+        verifyActivityPixelsMove(indicator)
+        indicator.visible = false
+        wait(50)
+        const paused = indicator.phase
+        wait(180)
+        compare(indicator.phase, paused)
+        verify(!indicator.animating)
+        indicator.visible = true
+        verifyActivityPixelsMove(indicator)
+        indicator.running = false
+        wait(50)
+        const stopped = grabImage(indicator)
+        wait(180)
+        verify(stopped.equals(grabImage(indicator)))
+    }
+    function test_remote_image_loading_and_retry_are_visible() {
+        mock.blockedImageCount = 1
+        const reader = createTemporaryObject(readerComponent, app.contentItem, {mail: mock,
+            message: {sender: "Example sender", subject: "Images", text: "Body"}, hasMessage: true,
+            width: 700, height: 600})
+        const button = findChild(reader, "remoteImagesButton")
+        verify(button.enabled)
+        mock.remoteImagesLoading = true
+        tryCompare(button, "enabled", false)
+        verify(findChild(reader, "remoteImagesSpinner").running)
+        verifyActivityPixelsMove(findChild(reader, "remoteImagesSpinner"), reader)
+        mock.remoteImagesLoading = false
+        mock.failedImageCount = 1
+        tryCompare(button, "enabled", true)
+        compare(button.text, "Retry")
+        verify(findChild(reader, "blockedImagesBar").visible)
+    }
+    function test_reader_preserves_header_with_visible_loading_and_retry() {
+        const pending = {uid: "pending", uidValidity: "42", folder: "INBOX", sender: "Studio Example",
+            subject: "A message on its way", to: "alex@example.invalid", bodyPending: true, bodyLoading: true}
+        const reader = createTemporaryObject(readerComponent, app.contentItem, {mail: mock, message: pending,
+            hasMessage: true, width: 700, height: 600})
+        verify(reader !== null)
+        tryCompare(findChild(reader, "readerSubject"), "text", pending.subject)
+        verify(findChild(reader, "messageBodyLoadingState").visible)
+        verify(findChild(reader, "messageBodySpinner").running)
+        verifyActivityPixelsMove(findChild(reader, "messageBodySpinner"), reader)
+        verify(!findChild(reader, "messageBody").visible)
+        verify(!findChild(reader, "browserBodyLoader").active)
+        reader.message = Object.assign({}, pending, {bodyLoading: false, bodyError: "Synthetic connection failure"})
+        verify(!findChild(reader, "messageBodySpinner").running)
+        verify(findChild(reader, "retryMessageBodyButton").visible)
+        compare(findChild(reader, "readerSubject").text, pending.subject)
+        reader.message = Object.assign({}, pending, {bodyPending: false, bodyLoading: false, text: "Ready body"})
+        verify(!findChild(reader, "messageBodyLoadingState").visible)
+        verify(findChild(reader, "messageBody").visible)
+    }
+    function test_empty_mail_sync_shows_the_current_phase() {
+        const original = []
+        for (let i = 0; i < messageModel.count; ++i) original.push(Object.assign({}, messageModel.get(i)))
+        const previousStatus = mock.status
+        const previousSelection = mock.selectedMessage
+        try {
+            mock.selectedMessage = ({})
+            mock.demo = false
+            mock.busy = true
+            mock.status = "Connecting securely…"
+            messageModel.clear()
+            const empty = findChild(app, "messageEmptyState")
+            verify(empty !== null)
+            tryCompare(empty, "description", mock.status)
+            verifyActivityPixelsMove(findChild(app, "messageListSpinner"), findChild(app, "messagePane"))
+            mock.status = "Fetching message headers…"
+            tryCompare(empty, "description", mock.status)
+        } finally {
+            messageModel.clear()
+            for (const row of original) messageModel.append(row)
+            mock.status = previousStatus
+            mock.selectedMessage = previousSelection
+        }
+    }
+    function test_empty_profile_uses_localized_title_and_sidebar_account_entry() {
+        const folders = mock.folders
+        const accounts = mock.accounts
+        const selectedUid = mock.selectedUid
+        const messages = []
+        for (let i = 0; i < mock.messages.count; ++i)
+            messages.push(JSON.parse(JSON.stringify(mock.messages.get(i))))
+        try {
+            mock.configured = false
+            mock.demo = false
+            mock.folders = []
+            mock.accounts = []
+            mock.selectedUid = ""
+            mock.messages.clear()
+            compare(app.folderTitle(), App.MailLabels.mailboxTitle({id: "INBOX"}))
+            verify(app.folderTitle() !== "INBOX")
+            compare(findChild(app, "messageEmptyState").actionText, "")
+            const addAccount = findChild(app, "addAccountButton")
+            verify(addAccount.visible)
+            mouseClick(addAccount)
+            tryCompare(findChild(app, "accountDialog"), "visible", true)
+            const dialog = findChild(app, "accountDialog")
+            dialog.close()
+            tryCompare(dialog, "visible", false)
+            const inboxAdd = findChild(app, "inboxAddAccountButton")
+            tryCompare(findChild(app, "messageList"), "count", 0)
+            tryCompare(inboxAdd, "visible", true)
+            compare(inboxAdd.secondary, true)
+            mouseClick(inboxAdd)
+            tryCompare(dialog, "visible", true)
+            mock.currentFolder = "Projects"
+            compare(app.folderTitle(), "Projects")
+        } finally {
+            mock.configured = true
+            mock.demo = true
+            mock.folders = folders
+            mock.accounts = accounts
+            mock.selectedUid = selectedUid
+            for (const message of messages) mock.messages.append(message)
+            mock.currentFolder = "INBOX"
+        }
     }
     function test_local_draft_delete_cancel_and_confirm() {
         activateApp()
@@ -350,6 +495,38 @@ TestCase {
         const blocked = '<img data-nkmail-src="https://example.invalid/image">'
         compare(ReaderLayout.fitImages(blocked, 300), blocked)
     }
+    function test_legacy_html_offers_account_reconnection_for_formatting() {
+        const original = mock.selectedMessage
+        try {
+            mock.demo = false
+            mock.selectedMessage = Object.assign({}, original, {html: "<p>Cached fallback</p>", bodyFormatVersion: 0})
+            tryCompare(findChild(app, "restoreFormattingBar"), "visible", true)
+            findChild(app, "restoreFormattingButton").clicked()
+            tryCompare(findChild(app, "accountDialog"), "visible", true)
+        } finally { mock.selectedMessage = original; mock.demo = true }
+    }
+    function test_reader_notification_layout_and_blocked_images() {
+        const html = '<div>Account activity</div>\n    <br><div> </div><div><span>&nbsp;</span></div>'
+            + '<img data-nkmail-src="https://example.invalid/logo" alt=""> | | <br><br><br><br>'
+            + '<p>Device: Example browser | Example OS</p><pre>  code | \n  line</pre>'
+        const rendered = ReaderLayout.readableHtml(html, 320)
+        verify(!rendered.includes('<img'))
+        verify(!rendered.includes(' | | '))
+        verify(!rendered.includes('<br><br><br>'))
+        verify(rendered.includes('Example browser | Example OS'))
+        verify(rendered.includes('<pre>  code | \n  line</pre>'))
+        const original = mock.selectedMessage
+        try {
+            mock.selectedMessage = Object.assign({}, original, {html: html})
+            const body = findChild(app, "legacyMessageBody")
+            tryVerify(() => body.getText(0, body.length).includes("Account activity"))
+            const plain = body.getText(0, body.length)
+            verify(!plain.includes("\uFFFC"), "Blocked images must not produce broken image objects")
+            verify(!plain.includes(" | | "))
+            verify(plain.includes("Example browser | Example OS"))
+            verify(body.contentHeight < 280, "Notification must not grow into pages of empty space")
+        } finally { mock.selectedMessage = original }
+    }
     function test_smart_loading_does_not_select_same_uid_in_other_folder() {
         const original = mock.selectedMessage
         mock.smartMailbox = "flagged"
@@ -364,6 +541,21 @@ TestCase {
         wait(30)
         verify(row.selected)
         mock.selectedMessage = original
+    }
+    function test_account_header_only_toggles_children() {
+        const sidebar = createTemporaryObject(sidebarComponent, testCase, {
+            mail: mock, surface: testCase, sidebarAccounts: [{id: "another", address: "other@example.invalid"}],
+            width: 240, height: 500
+        })
+        const original = mock.currentAccountId
+        const header = findChild(sidebar, "accountHeader_another")
+        verify(header !== null)
+        header.clicked()
+        compare(mock.currentAccountId, original)
+        verify(sidebar.collapsedAccounts.another)
+        header.clicked()
+        compare(mock.currentAccountId, original)
+        verify(!sidebar.collapsedAccounts.another)
     }
     function test_sidebar_sections_and_smart_navigation() {
         const sidebar = findChild(app, "sidebarBody")
@@ -1035,6 +1227,50 @@ TestCase {
         picker.currentIndex = 1
         mouseClick(manual)
         compare(picker.currentIndex, 0)
+        dialog.close()
+    }
+    function test_google_setup_uses_app_password_even_with_oauth_configuration() {
+        mock.demo = false
+        setupMock.googleConfigured = true
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("google")
+        const next = findChild(dialog, "continueAccountButton")
+        verify(!next.enabled)
+        verify(findChild(dialog, "accountAddress").visible)
+        findChild(dialog, "accountAddress").text = "google-user@example.invalid"
+        tryCompare(next, "enabled", true)
+        next.clicked()
+        compare(dialog.step, 1)
+        compare(dialog.configuration().imapHost, "imap.gmail.com")
+        compare(dialog.configuration().smtpHost, "smtp.gmail.com")
+        compare(setupMock.googleStarts, 0)
+        const connectButton = findChild(dialog, "connectAccountButton")
+        verify(!connectButton.enabled)
+        findChild(dialog, "accountPassword").text = "synthetic-app-password"
+        tryCompare(connectButton, "enabled", true)
+        connectButton.clicked()
+        compare(setupMock.stage, "imap")
+        setupMock.finished(true, "")
+        compare(dialog.step, 2)
+        compare(mock.googleSaveCount, 0)
+        dialog.close()
+    }
+    function test_existing_google_oauth_account_can_switch_to_app_password() {
+        mock.demo = false
+        const dialog = findChild(app, "accountDialog")
+        dialog.editAccount({id: "existing-google", authMethod: "google_oauth",
+            address: "google-user@example.invalid", username: "google-user@example.invalid",
+            imapHost: "imap.gmail.com", smtpHost: "smtp.gmail.com"})
+        compare(dialog.step, 1)
+        verify(findChild(dialog, "googlePasswordMigrationHint").visible)
+        compare(dialog.configuration().id, "existing-google")
+        verify(!dialog.valid())
+        findChild(dialog, "accountPassword").text = "synthetic-app-password"
+        verify(dialog.valid())
+        dialog.validateConnection()
+        compare(setupMock.stage, "imap")
+        compare(setupMock.googleStarts, 0)
         dialog.close()
     }
     function test_provider_presets_and_no_false_oauth_support() {

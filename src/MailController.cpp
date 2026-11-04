@@ -50,8 +50,13 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     connect(m_send, &SendService::status, this, &MailController::setStatus);
     m_images = new RemoteImageLoader(this);
     connect(m_images, &RemoteImageLoader::loaded, this, [this](const QString &key, const QString &html) {
-        if (key != RemoteImageLoader::key(m_account.id, m_content.summary)) return;
-        m_content.html = html; m_selected = contentMap(m_content); emit selectionChanged();
+        if (key != RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion)) return;
+        if (!m_content.displayHtml.isEmpty()) m_content.displayHtml = html;
+        else m_content.html = html;
+        m_selected = contentMap(m_content); emit selectionChanged();
+    });
+    connect(m_images, &RemoteImageLoader::loadingChanged, this, [this](const QString &key) {
+        if (key == RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion)) emit selectionChanged();
     });
     m_commands = new MailboxCommands(*m_database, m_transport, this);
     connect(m_commands, &MailboxCommands::completed, this, [this](const QList<Summary> &messages, bool removed, const QString &error) {
@@ -103,7 +108,11 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         }
     });
     connect(m_credentials, &AccountSession::passwordReady, this, [this](const QString &id, const QString &password) {
-        if (id != credentialKey() || m_demo || !m_restorePending || !m_account.password.isEmpty()) return;
+        if (id != credentialKey() || m_demo) return;
+        if (m_account.authMethod == "google_oauth" && !m_restorePending && !m_account.password.isEmpty()) {
+            m_account.password = password; return; // Rotated refresh token, already persisted by AccountSession.
+        }
+        if (!m_restorePending || !m_account.password.isEmpty()) return;
         m_restorePending = false;
         m_switchCredentialPending = false;
         m_account.password = password;
@@ -122,7 +131,9 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
             // Stay on the newly selected account and ask for its password.
             m_switchCredentialPending = false;
             m_account.password.clear();
-            setStatus(tr("Account needs a password"), tr("Enter an application password for this account."));
+            if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Enter a Google app password in account settings to reconnect this account."));
+            else if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
+            else setStatus(tr("Account needs a password"), tr("Enter an application password for this account."));
             return;
         }
         setStatus(tr("System keychain needs attention"), tr("Credential storage or removal could not be completed. The local restore permission is authoritative; no plaintext fallback is used."));
@@ -171,6 +182,10 @@ QVariantList MailController::favorites() const {
         // still resolve to a usable folder.
         const auto parts = entry.split(QLatin1Char('\t'));
         if (parts.size() < 2 || parts.at(0).isEmpty() || parts.at(1).isEmpty()) continue;
+        bool accountExists = false;
+        for (const auto &account : m_database->accounts())
+            if (account.id == parts.at(0)) { accountExists = true; break; }
+        if (!accountExists) continue;
         QString accountName = parts.size() > 3 ? parts.at(3) : QString{};
         if (accountName.isEmpty()) accountName = favoriteAccountName(parts.at(0));
         out.append(QVariantMap{{"accountId", parts.at(0)},
@@ -270,7 +285,27 @@ void MailController::seedDemo() {
     setStatus(tr("Preview · synthetic mail · not connected"));
     if (!page.messages.isEmpty()) openMessage(page.messages.first().uid, page.uidValidity);
 }
+bool MailController::configureGoogleAccount(const QString &existingId) {
+    if (m_demo || m_busy || sending() || m_commands->busy()) return false;
+    auto *setup = static_cast<AccountSetup *>(m_accountSetup);
+    auto next = setup->authorizedGoogleAccount();
+    if (next.authMethod != "google_oauth" || next.password.isEmpty()) return false;
+    if (!existingId.isEmpty()) for (const auto &known : m_database->accounts())
+        if (known.id == existingId && known.address.compare(next.address, Qt::CaseInsensitive) == 0 && !known.name.isEmpty()) next.name = known.name;
+    auto configuration = accountMap(next);
+    configuration.insert("id", existingId.isEmpty() ? next.address.toLower() : existingId);
+    const bool saved = configureAccountImpl(configuration, next.password, true);
+    if (saved) {
+        setup->takeGoogleAccount();
+        if (m_account.id == configuration.value("id").toString()) QTimer::singleShot(0, this, &MailController::refresh);
+    }
+    return saved;
+}
 bool MailController::configureAccount(const QVariantMap &configuration, const QString &password, bool remember) {
+    auto ordinary = configuration; ordinary.insert("authMethod", "password");
+    return configureAccountImpl(ordinary, password, remember);
+}
+bool MailController::configureAccountImpl(const QVariantMap &configuration, const QString &password, bool remember) {
     if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return false; }
     if (m_busy || sending() || m_commands->busy()) return false;
     Account next = accountFromMap(configuration);
@@ -295,8 +330,9 @@ bool MailController::configureAccount(const QVariantMap &configuration, const QS
         setStatus(tr("Account change requires a separate data directory"), tr("Remove and re-add the account to change its email address, username or IMAP host.")); return false;
     }
     // Only the live account may reuse the session-only password held in memory.
-    next.password = password.isEmpty() ? (editingCurrent ? m_account.password : QString{}) : password;
+    next.password = password.isEmpty() ? (editingCurrent && next.authMethod == m_account.authMethod ? m_account.password : QString{}) : password;
     if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return false; }
+    if (editingCurrent && next.authMethod != m_account.authMethod) m_credentials->forget(m_account);
     m_credentials->setPassword(next);
     if (!editingCurrent) {
         // Adding or editing a background account must not disturb the live mailbox.
@@ -417,6 +453,11 @@ void MailController::removeAccount(const QString &id) {
         if (account.id == accountId) { target = account; found = true; break; }
     if (!found) return;
     if (!m_database->removeAccount(accountId)) { setStatus(tr("Could not remove account"), m_database->error()); return; }
+    QStringList retainedFavorites;
+    for (const auto &entry : favoriteEntries())
+        if (entry.section(QLatin1Char('\t'), 0, 0) != accountId) retainedFavorites.append(entry);
+    saveFavoriteEntries(retainedFavorites);
+    emit favoritesChanged();
     m_credentials->forget(target);
     emit accountsChanged();
     if (accountId != m_account.id) return;
@@ -434,7 +475,12 @@ void MailController::refresh() {
     if (!m_smartMailbox.isEmpty()) { loadCached(); setStatus(tr("Smart mailbox · current account cached messages")); return; }
     if (m_demo) { setStatus(tr("Preview · synthetic mail · not connected")); return; }
     if (m_busy || sending() || m_commands->busy()) return;
-    if (!configured() || m_account.password.isEmpty()) { setStatus(tr("Account needs attention"), tr("Add an account and enter an application password before connecting.")); return; }
+    if (!configured() || m_account.password.isEmpty()) {
+        if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
+        else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Enter a Google app password in account settings to reconnect this account."));
+        else setStatus(tr("Account needs attention"), tr("Add an account and enter an application password before connecting."));
+        return;
+    }
     const auto generation = ++m_generation; const auto account = m_account;
     m_busy = true; setStatus(tr("Connecting securely…"));
     m_sync->folders(account, [this, generation](const QList<Folder> &folders, const QString &error) {
@@ -626,30 +672,63 @@ void MailController::fetchPage(bool append, bool quiet) {
 
 void MailController::present(const Content &content) {
     m_content = content;
-    m_content.html = m_images->cached(RemoteImageLoader::key(m_account.id, content.summary), content.html);
+    const auto key = RemoteImageLoader::key(m_account.id, content.summary, content.bodyFormatVersion);
+    if (!content.displayHtml.isEmpty()) m_content.displayHtml = m_images->cached(key, content.displayHtml);
+    else m_content.html = m_images->cached(key, content.html);
     m_selectedUid = content.summary.uid; m_selected = contentMap(m_content);
     emit selectionChanged();
 }
 int MailController::blockedImageCount() const {
-    return int(m_content.html.count(QStringLiteral("data-nkmail-src=\"")));
+    const auto &html = m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml;
+    return int(html.count(QStringLiteral("data-nkmail-src=\"")));
+}
+bool MailController::remoteImagesLoading() const {
+    return m_images->loading(RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion));
+}
+int MailController::failedImageCount() const {
+    const auto &html = m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml;
+    return int(html.count(QStringLiteral("data-nkmail-failed=\"1\"")));
 }
 void MailController::loadRemoteImages() {
-    m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary), m_content.html);
+    m_images->load(RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion), m_content.displayHtml.isEmpty() ? m_content.html : m_content.displayHtml);
 }
 void MailController::openMessage(const QString &uid, const QString &validity, const QString &sourceFolder) {
     const auto folder = sourceFolder.isEmpty() ? m_folder : sourceFolder;
     if (!m_smartMailbox.isEmpty() && m_messages->indexOf(folder, validity, uid) < 0) return;
     if (m_commands->busy()) return;
     const auto selectionGeneration = ++m_selectionGeneration;
-    if (auto cached = m_database->content(folder, validity, uid)) { present(*cached); return; }
-    m_selectedUid = uid; m_selected.clear(); m_content = {}; emit selectionChanged();
-    if (m_demo || m_account.password.isEmpty()) { setStatus(tr("This message is not cached"), tr("Connect to download its content.")); return; }
+    bool upgrading = false;
+    if (auto cached = m_database->content(folder, validity, uid)) {
+        present(*cached);
+        if (cached->bodyFormatVersion >= 1 || m_demo || m_account.password.isEmpty()) return;
+        upgrading = true; // Re-read only this selected message with PEEK; keep cache visible.
+    }
+    if (!upgrading) {
+        m_selectedUid = uid; m_content = {};
+        const int row = m_messages->indexOf(folder, validity, uid);
+        if (row >= 0) m_content.summary = summaryFromMap(m_messages->get(row));
+        else { m_content.summary.uid = uid; m_content.summary.uidValidity = validity; m_content.summary.folder = folder; }
+        m_content.to = m_content.summary.recipients;
+        m_selected = contentMap(m_content); m_selected.insert("bodyPending", true);
+    }
+    m_selected.insert("bodyLoading", !m_demo && !m_account.password.isEmpty());
+    m_selected.insert("bodyError", QString{});
+    if (m_demo || m_account.password.isEmpty()) {
+        m_selected.insert("bodyError", tr("Connect to download its content.")); emit selectionChanged();
+        setStatus(tr("This message is not cached"), tr("Connect to download its content.")); return;
+    }
+    emit selectionChanged();
     const auto generation = m_generation; const auto account = m_account;
     setStatus(tr("Loading message without changing server flags…"));
     m_sync->content(account, folder, validity, uid, [this, generation, selectionGeneration](const Content &content, const QString &error) {
         if (generation != m_generation || selectionGeneration != m_selectionGeneration) return;
-        if (!error.isEmpty()) { setStatus(tr("Could not load message"), error); return; }
-        if (!m_database->saveContent(content)) { setStatus(tr("Could not cache content"), m_database->error()); return; }
+        const auto failed = [this](const QString &message) {
+            m_selected.insert("bodyLoading", false);
+            m_selected.insert("bodyError", QCoreApplication::translate("MailErrors", message.toUtf8().constData()));
+            emit selectionChanged();
+        };
+        if (!error.isEmpty()) { failed(error); setStatus(tr("Could not load message"), error); return; }
+        if (!m_database->saveContent(content)) { failed(m_database->error()); setStatus(tr("Could not cache content"), m_database->error()); return; }
         present(content); setStatus(tr("Message cached · remote content blocked"));
     });
 }
@@ -707,7 +786,10 @@ void MailController::executeCommand(const QVariantList &indices, MailboxCommands
                                      bool value, const QString &destination) {
     if (m_commands->busy() || m_busy || sending() || sendPending()) { setStatus(tr("Another mail operation is in progress")); return; }
     if (!m_demo && (!configured() || m_account.password.isEmpty())) {
-        setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages.")); return;
+        if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
+        else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Enter a Google app password in account settings to reconnect this account."));
+        else setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages."));
+        return;
     }
     QList<Summary> selected;
     QSet<QString> seen;

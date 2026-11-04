@@ -23,8 +23,8 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="121" />
-            <source>Connect one account with an application password. TLS certificate verification is always enabled.</source>
-            <translation>Connect one account with an application password. TLS certificate verification is always enabled.</translation>
+            <source>Use the password or app password required by your email provider.</source>
+            <translation>Use the password or app password required by your email provider.</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="126" />
@@ -56,8 +56,8 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="131" />
-            <source>App password</source>
-            <translation>App password</translation>
+            <source>Password / app password</source>
+            <translation>Password / app password</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="131" />
@@ -66,13 +66,13 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="132" />
-            <source>Application password</source>
-            <translation>Application password</translation>
+            <source>Password or app password</source>
+            <translation>Password or app password</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="132" />
-            <source>Enter application password</source>
-            <translation>Enter application password</translation>
+            <source>Enter password or app password</source>
+            <translation>Enter password or app password</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="135" />
@@ -223,6 +223,11 @@
             <location filename="../qml/AccountDialog.qml" line="232" />
             <source>Verify and save</source>
             <translation>Verify and save</translation>
+        </message>
+        <message>
+            <location filename="../qml/AccountDialog.qml" line="192" />
+            <source>To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.</source>
+            <translation>To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.</translation>
         </message>
     </context>
     <context>
@@ -829,6 +834,18 @@
             <source>Draft not found or send state transition is unsafe</source>
             <translation>Draft not found or send state transition is unsafe</translation>
         </message>
+        <message>
+            <source>Google authorization needs attention. Enter a Google app password in account settings to reconnect.</source>
+            <translation>Google authorization needs attention. Enter a Google app password in account settings to reconnect.</translation>
+        </message>
+        <message>
+            <source>Google authorization requires the standard secure Gmail servers.</source>
+            <translation>Google authorization requires the standard secure Gmail servers.</translation>
+        </message>
+        <message>
+            <source>Unsupported account authentication method.</source>
+            <translation>Unsupported account authentication method.</translation>
+        </message>
     </context>
     <context>
         <name>MailLabels</name>
@@ -1103,11 +1120,6 @@
             <translation>Drafts</translation>
         </message>
         <message>
-            <location filename="../qml/Main.qml" line="108" />
-            <source>Inbox</source>
-            <translation>Inbox</translation>
-        </message>
-        <message>
             <location filename="../qml/Main.qml" line="129" />
             <source>A few thoughts for Friday</source>
             <translation>A few thoughts for Friday</translation>
@@ -1312,6 +1324,10 @@ Synthetic demo draft. Sending is disabled.</translation>
     <context>
         <name>MessagePane</name>
         <message>
+            <source>Add an account</source>
+            <translation>Add an account</translation>
+        </message>
+        <message>
             <location filename="../qml/MessagePane.qml" line="123" />
             <source>打开</source>
             <translation>Open</translation>
@@ -1437,11 +1453,6 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation>Show all cached messages</translation>
         </message>
         <message>
-            <location filename="../qml/MessagePane.qml" line="252" />
-            <source>Add an account</source>
-            <translation>Add an account</translation>
-        </message>
-        <message>
             <location filename="../qml/MessagePane.qml" line="267" />
             <location filename="../qml/MessagePane.qml" line="272" />
             <source>Untitled draft</source>
@@ -1480,6 +1491,14 @@ Synthetic demo draft. Sending is disabled.</translation>
     </context>
     <context>
         <name>MessageReader</name>
+        <message>
+            <source>Connect to load the original message formatting.</source>
+            <translation>Connect to load the original message formatting.</translation>
+        </message>
+        <message>
+            <source>Connect account</source>
+            <translation>Connect account</translation>
+        </message>
         <message>
             <location filename="../qml/MessageReader.qml" line="77" />
             <source>Message details</source>
@@ -1571,9 +1590,28 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation>Select a message to read it here.</translation>
         </message>
         <message>
-            <location filename="../qml/MessageReader.qml" line="199" />
-            <source>Add an account</source>
-            <translation>Add an account</translation>
+            <source>Could not load message</source>
+            <translation>Could not load message</translation>
+        </message>
+        <message>
+            <source>Downloading message…</source>
+            <translation>Downloading message…</translation>
+        </message>
+        <message>
+            <source>Rendering message…</source>
+            <translation>Rendering message…</translation>
+        </message>
+        <message>
+            <source>Retry</source>
+            <translation>Retry</translation>
+        </message>
+        <message>
+            <source>Loading images…</source>
+            <translation>Loading images…</translation>
+        </message>
+        <message>
+            <source>Some images could not be loaded. Retry to load them again.</source>
+            <translation>Some images could not be loaded. Retry to load them again.</translation>
         </message>
     </context>
     <context>
@@ -1592,11 +1630,6 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../qml/ProviderPicker.qml" line="13" />
             <source>Microsoft OAuth and native Exchange are not available yet. Browser sign-in requires an application registration.</source>
             <translation>Microsoft OAuth and native Exchange are not available yet. Browser sign-in requires an application registration.</translation>
-        </message>
-        <message>
-            <location filename="../qml/ProviderPicker.qml" line="14" />
-            <source>Use a Google app password with two-step verification. Some managed accounts require OAuth, which is not available yet.</source>
-            <translation>Use a Google app password with two-step verification. Some managed accounts require OAuth, which is not available yet.</translation>
         </message>
         <message>
             <location filename="../qml/ProviderPicker.qml" line="16" />
@@ -1622,6 +1655,11 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../qml/ProviderPicker.qml" line="40" />
             <source> · Not available yet</source>
             <translation> · Not available yet</translation>
+        </message>
+        <message>
+            <location filename="../qml/ProviderPicker.qml" line="15" />
+            <source>Enable two-step verification in your Google account and generate an app password. Use that app password here, not your Google account password.</source>
+            <translation>Enable two-step verification in your Google account and generate an app password. Use that app password here, not your Google account password.</translation>
         </message>
     </context>
     <context>
@@ -2040,6 +2078,17 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Updating messages…</source>
             <translation>Updating messages…</translation>
         </message>
+        <message>
+            <source>Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting.</source>
+            <translation>Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting.</translation>
+        </message>
+        <message>
+            <location filename="../src/MailController.cpp" line="134" />
+            <location filename="../src/MailController.cpp" line="471" />
+            <location filename="../src/MailController.cpp" line="781" />
+            <source>Enter a Google app password in account settings to reconnect this account.</source>
+            <translation>Enter a Google app password in account settings to reconnect this account.</translation>
+        </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
@@ -2187,6 +2236,76 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../src/services/SendService.cpp" line="93" />
             <source>Send cancelled</source>
             <translation>Send cancelled</translation>
+        </message>
+    </context>
+    <context>
+        <name>GoogleOAuth</name>
+        <message>
+            <source>Authorization received. You may return to NkMail.</source>
+            <translation>Authorization received. You may return to NkMail.</translation>
+        </message>
+        <message>
+            <source>Could not contact Google securely. Check your connection and try again.</source>
+            <translation>Could not contact Google securely. Check your connection and try again.</translation>
+        </message>
+        <message>
+            <source>Could not open the local Google sign-in callback.</source>
+            <translation>Could not open the local Google sign-in callback.</translation>
+        </message>
+        <message>
+            <source>Could not open the system browser for Google sign-in.</source>
+            <translation>Could not open the system browser for Google sign-in.</translation>
+        </message>
+        <message>
+            <source>Google authorization has expired or was revoked. Sign in with Google again.</source>
+            <translation>Google authorization has expired or was revoked. Sign in with Google again.</translation>
+        </message>
+        <message>
+            <source>Google did not authorize this account. Check the account or organization policy and try again.</source>
+            <translation>Google did not authorize this account. Check the account or organization policy and try again.</translation>
+        </message>
+        <message>
+            <source>Google did not return a verified email address.</source>
+            <translation>Google did not return a verified email address.</translation>
+        </message>
+        <message>
+            <source>Google rejected this application's sign-in configuration. Contact the application distributor.</source>
+            <translation>Google rejected this application's sign-in configuration. Contact the application distributor.</translation>
+        </message>
+        <message>
+            <source>Google returned an invalid authorization response.</source>
+            <translation>Google returned an invalid authorization response.</translation>
+        </message>
+        <message>
+            <source>Google sign-in is unavailable in this build. Contact the application distributor.</source>
+            <translation>Google sign-in is unavailable in this build. Contact the application distributor.</translation>
+        </message>
+        <message>
+            <source>Google sign-in timed out. Try again.</source>
+            <translation>Google sign-in timed out. Try again.</translation>
+        </message>
+        <message>
+            <source>Google sign-in was cancelled.</source>
+            <translation>Google sign-in was cancelled.</translation>
+        </message>
+        <message>
+            <source>This sign-in response could not be accepted.</source>
+            <translation>This sign-in response could not be accepted.</translation>
+        </message>
+        <message>
+            <source>Gmail mail access was not granted. Sign in again and allow Gmail mail access on Google's consent page.</source>
+            <translation>Gmail mail access was not granted. Sign in again and allow Gmail mail access on Google's consent page.</translation>
+        </message>
+        <message>
+            <source>Google did not return offline access. Sign in again and complete the consent process; if this persists, contact the application distributor.</source>
+            <translation>Google did not return offline access. Sign in again and complete the consent process; if this persists, contact the application distributor.</translation>
+        </message>
+    </context>
+    <context>
+        <name>MailActivityIndicator</name>
+        <message>
+            <source>Loading…</source>
+            <translation>Loading…</translation>
         </message>
     </context>
 </TS>

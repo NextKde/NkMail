@@ -5,6 +5,8 @@
 #include <QJsonObject>
 #include <QTextStream>
 #include <thread>
+#include <mailio/imap.hpp>
+#include <mailio/smtp.hpp>
 
 int main(int argc, char **argv)
 {
@@ -22,7 +24,17 @@ int main(int argc, char **argv)
     QJsonObject result;
     std::thread worker([&] {
         try {
-            if (operation == QStringLiteral("remove") || operation == QStringLiteral("move")) {
+            if (operation == "oauth-imap") {
+                mailio::imap connection(a.imapHost.toStdString(), a.imapPort, std::chrono::milliseconds(5000));
+                connection.ssl_options(mailio::dialog_ssl::ssl_options_t{boost::asio::ssl::context::tls_client, boost::asio::ssl::verify_peer, a.caFile.toStdString()});
+                connection.start_tls(a.imapStartTls);
+                connection.authenticate("fixture-user", "fixture-access", mailio::imap::auth_method_t::XOAUTH2);
+            } else if (operation == "oauth-smtp") {
+                mailio::smtp connection(a.smtpHost.toStdString(), a.smtpPort, std::chrono::milliseconds(5000));
+                connection.ssl_options(mailio::dialog_ssl::ssl_options_t{boost::asio::ssl::context::tls_client, boost::asio::ssl::verify_peer, a.caFile.toStdString()});
+                connection.start_tls(a.smtpStartTls); connection.source_hostname("nkmail.invalid");
+                connection.authenticate("fixture-user", "fixture-access", mailio::smtp::auth_method_t::XOAUTH2);
+            } else if (operation == QStringLiteral("remove") || operation == QStringLiteral("move")) {
                 nkmail::MailioBackend::removeOrMove(a, "INBOX", "42", {"102"}, operation == "move" ? "Archive" : "");
             } else if (operation == QStringLiteral("sent-folder")) {
                 result = {{"folder", nkmail::MailioBackend::sentFolder(a)}};
@@ -31,8 +43,8 @@ int main(int argc, char **argv)
                 QJsonArray array;
                 for (const auto &f : folders) array.append(QJsonObject{{"id", f.id}, {"title", f.title}, {"total", f.total}, {"role", f.role}});
                 result = {{"folders", array}};
-            } else if (operation == QStringLiteral("page")) {
-                const auto p = nkmail::MailioBackend::page(a, QStringLiteral("INBOX"), 0, 1);
+            } else if ((operation == QStringLiteral("page") || operation == QStringLiteral("page-batch"))) {
+                const auto p = nkmail::MailioBackend::page(a, QStringLiteral("INBOX"), 0, operation == QStringLiteral("page-batch") ? 3 : 1);
                 QJsonArray array;
                 for (const auto &s : p.messages) array.append(QJsonObject{{"uid", s.uid}, {"subject", s.subject}, {"unread", s.unread}, {"flagged", s.flagged}});
                 result = {{"uidValidity", p.uidValidity}, {"messages", array}, {"hasMore", p.hasMore}, {"nextOffset", p.nextOffset}};
@@ -40,7 +52,7 @@ int main(int argc, char **argv)
                 const auto c = nkmail::MailioBackend::content(a, QStringLiteral("INBOX"), scenario == QStringLiteral("stale") ? QStringLiteral("99") : QStringLiteral("42"), QStringLiteral("102"));
                 QJsonArray attachments;
                 for (const auto &at : c.attachments) attachments.append(QJsonObject{{"name", at.name}, {"bytes", QString::fromLatin1(at.bytes.toBase64())}, {"path", at.path}});
-                result = {{"uidValidity", c.summary.uidValidity}, {"uid", c.summary.uid}, {"subject", c.summary.subject}, {"text", c.text}, {"attachments", attachments}, {"to", c.to}, {"cc", c.cc}, {"replyTo", c.replyTo}};
+                result = {{"uidValidity", c.summary.uidValidity}, {"uid", c.summary.uid}, {"subject", c.summary.subject}, {"text", c.text}, {"displayHtml", c.displayHtml}, {"bodyFormatVersion", c.bodyFormatVersion}, {"attachments", attachments}, {"to", c.to}, {"cc", c.cc}, {"replyTo", c.replyTo}};
             } else if (operation == QStringLiteral("verify-smtp")) {
                 nkmail::MailioBackend::verifySmtp(a);
             } else if (operation == QStringLiteral("send")) {

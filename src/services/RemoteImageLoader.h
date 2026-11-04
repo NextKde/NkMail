@@ -12,11 +12,13 @@ class RemoteImageLoader final : public QObject {
 public:
     explicit RemoteImageLoader(QObject *parent = nullptr) : QObject(parent), m_cache(8 * 1024 * 1024) {}
     ~RemoteImageLoader() override { m_cancelled->store(true); m_tasks.finish(); }
-    static QString key(const QString &accountId, const Summary &summary);
+    static QString key(const QString &accountId, const Summary &summary, int formatVersion = 0);
     QString cached(const QString &key, const QString &fallback) const;
     void load(const QString &key, const QString &html);
+    bool loading(const QString &key) const { return m_pending.contains(key); }
 signals:
     void loaded(const QString &key, const QString &html);
+    void loadingChanged(const QString &key);
 private:
     QCache<QString, QString> m_cache;
     QSet<QString> m_pending;

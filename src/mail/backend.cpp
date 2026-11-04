@@ -2,11 +2,14 @@
 #include "backend.h"
 
 #include "HtmlSanitizer.h"
+#include "auth/GoogleOAuth.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
+#include <QDebug>
+#include <QElapsedTimer>
 #include <QRegularExpression>
 #include <QStringConverter>
 #include <QTextDocument>
@@ -53,6 +56,12 @@ void singleLine(const QString &s)
 void accountValid(const Account &a, bool smtp)
 {
     workerOnly();
+    if (a.authMethod != "password" && a.authMethod != "google_oauth")
+        throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unsupported account authentication method."));
+    if (a.authMethod == "google_oauth" && (!a.caFile.isEmpty()
+        || a.imapHost != "imap.gmail.com" || a.imapPort != 993 || a.imapStartTls
+        || a.smtpHost != "smtp.gmail.com" || !((a.smtpPort == 465 && !a.smtpStartTls) || (a.smtpPort == 587 && a.smtpStartTls))))
+        throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization requires the standard secure Gmail servers."));
     const QString host = smtp ? a.smtpHost : a.imapHost;
     const int port = smtp ? a.smtpPort : a.imapPort;
     singleLine(host); singleLine(a.username); singleLine(a.password);
@@ -100,11 +109,23 @@ mailio::dialog_ssl::ssl_options_t tlsOptions(const Account &a)
 {
     return {boost::asio::ssl::context::tls_client, boost::asio::ssl::verify_peer, utf8(a.caFile)};
 }
+void smtpLogin(mailio::smtp &smtp, const Account &a)
+{
+    if (a.authMethod == "google_oauth") {
+        try { smtp.authenticate(utf8(a.username), utf8(GoogleTokens::accessToken(a.password, a.username)), mailio::smtp::auth_method_t::XOAUTH2); }
+        catch (const GoogleOAuthError &) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Enter a Google app password in account settings to reconnect.")); }
+        catch (const mailio::smtp_error &) { GoogleTokens::invalidateAccess(a.password); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Enter a Google app password in account settings to reconnect.")); }
+    } else smtp.authenticate(utf8(a.username), utf8(a.password), mailio::smtp::auth_method_t::LOGIN);
+}
 void login(Imap &imap, const Account &a)
 {
     imap.ssl_options(tlsOptions(a));
     imap.start_tls(a.imapStartTls);
-    imap.authenticate(utf8(a.username), utf8(a.password), Imap::auth_method_t::LOGIN);
+    if (a.authMethod == "google_oauth") {
+        try { imap.authenticate(utf8(a.username), utf8(GoogleTokens::accessToken(a.password, a.username)), Imap::auth_method_t::XOAUTH2); }
+        catch (const GoogleOAuthError &) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Enter a Google app password in account settings to reconnect.")); }
+        catch (const mailio::imap_error &) { GoogleTokens::invalidateAccess(a.password); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Enter a Google app password in account settings to reconnect.")); }
+    } else imap.authenticate(utf8(a.username), utf8(a.password), Imap::auth_method_t::LOGIN);
     if (imap.capabilities().count("ID")) imap.client_id("NkMail");
 }
 Imap::fetch_options_t options(bool headers)
@@ -423,12 +444,20 @@ QList<Folder> MailioBackend::folders(const Account &a)
 }
 Page MailioBackend::page(const Account &a, const QString &folder, int offset, int limit)
 {
+    QElapsedTimer elapsed; elapsed.start();
+    const auto trace = [&](const char *phase) {
+        if (qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
+            qInfo().noquote() << "NkMail sync phase:" << phase << "elapsed-ms=" << elapsed.elapsed();
+    };
+    trace("page-start");
     try {
         accountValid(a, false); folderValid(folder);
         if (offset < 0 || limit < 1 || limit > 100) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Invalid page bounds."));
         Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        trace("page-authenticated");
         const auto stat = imap.select(utf8(folder), true);
         if (!stat.uid_validity) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Server did not provide UIDVALIDITY."));
+        trace("page-selected");
         Page p; p.folder = folder; p.uidValidity = QString::number(stat.uid_validity); p.nextOffset = offset;
         if (static_cast<unsigned long>(offset) >= stat.messages_no) return p;
         const auto end = stat.messages_no - static_cast<unsigned long>(offset);
@@ -438,16 +467,24 @@ Page MailioBackend::page(const Account &a, const QString &folder, int offset, in
         imap.search({Imap::search_condition_t(Imap::search_condition_t::SID_LIST,
                      std::list<Imap::messages_range_t>{{begin, end}})}, uids, true);
         if (uids.size() > static_cast<size_t>(limit)) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Server returned an invalid page."));
+        trace("page-searched");
         imap.literal_limit(256 * 1024);
+        std::list<Imap::messages_range_t> ranges;
+        for (const auto uid : uids) ranges.emplace_back(uid, uid);
+        // One bounded UID request per page. Keep the search's stable identity
+        // window and render newest first regardless of server response order.
+        const auto messages = ranges.empty() ? std::map<unsigned long, mailio::message>{}
+            : imap.fetch(ranges, options(true), mailio::codec::line_len_policy_t::NONE);
+        trace("page-headers-fetched");
         for (auto it = uids.rbegin(); it != uids.rend(); ++it) {
-            const auto messages = imap.fetch({{*it, *it}}, options(true), mailio::codec::line_len_policy_t::NONE);
             const auto found = messages.find(*it);
             if (found != messages.end()) p.messages << summary(found->second, folder, p.uidValidity, *it);
         }
         p.nextOffset = offset + int(end - begin + 1); p.hasMore = begin > 1;
+        trace("page-complete");
         return p;
-    } catch (const BackendError &) { throw; }
-      catch (...) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message headers. Check account, connection and trusted TLS certificate.")); }
+    } catch (const BackendError &) { trace("page-failed"); throw; }
+      catch (...) { trace("page-failed"); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message headers. Check account, connection and trusted TLS certificate.")); }
 }
 QList<QVariantMap> MailioBackend::search(const Account &a, const QString &folder, const QString &validity,
                                         const QString &query, int limit)
@@ -490,14 +527,23 @@ QList<QVariantMap> MailioBackend::search(const Account &a, const QString &folder
 }
 Content MailioBackend::content(const Account &a, const QString &folder, const QString &validity, const QString &uid)
 {
+    QElapsedTimer elapsed; elapsed.start();
+    const auto trace = [&](const char *phase) {
+        if (qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
+            qInfo().noquote() << "NkMail sync phase:" << phase << "elapsed-ms=" << elapsed.elapsed();
+    };
+    trace("content-start");
     try {
         accountValid(a, false); folderValid(folder);
         const auto expected = identity(validity), id = identity(uid);
         Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        trace("content-authenticated");
         const auto stat = imap.select(utf8(folder), true);
         if (stat.uid_validity != expected) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Folder identity changed. Refresh the message list."));
+        trace("content-selected");
         imap.literal_limit(MaxMessage);
         const auto messages = imap.fetch({{id, id}}, options(false), mailio::codec::line_len_policy_t::NONE);
+        trace("content-downloaded");
         const auto found = messages.find(id);
         if (found == messages.end()) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Message no longer exists."));
         const auto &m = found->second;
@@ -508,12 +554,15 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
         Decoded decoded; decodePart(m, decoded);
         c.text = (decoded.plain.isEmpty() ? decoded.html : decoded.plain).join(QStringLiteral("\n\n"));
         c.html = sanitizeMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
+        c.displayHtml = sanitizeBrowserMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
+        c.bodyFormatVersion = 1;
         c.attachments = std::move(decoded.attachments);
         c.summary.hasAttachments = !c.attachments.isEmpty();
         c.summary.preview = c.text.simplified().left(160);
+        trace("content-complete");
         return c;
-    } catch (const BackendError &) { throw; }
-      catch (...) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate.")); }
+    } catch (const BackendError &) { trace("content-failed"); throw; }
+      catch (...) { trace("content-failed"); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate.")); }
 }
 void MailioBackend::verifySmtp(const Account &a)
 {
@@ -521,7 +570,7 @@ void MailioBackend::verifySmtp(const Account &a)
     mailio::smtp smtp(utf8(a.smtpHost), a.smtpPort, Timeout);
     smtp.ssl_options(tlsOptions(a)); smtp.start_tls(a.smtpStartTls);
     smtp.source_hostname("nkmail.invalid");
-    smtp.authenticate(utf8(a.username), utf8(a.password), mailio::smtp::auth_method_t::LOGIN);
+    smtpLogin(smtp, a);
 }
 SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *raw)
 {
@@ -537,7 +586,7 @@ SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *raw
         mailio::smtp smtp(utf8(a.smtpHost), a.smtpPort, Timeout);
         smtp.ssl_options(tlsOptions(a)); smtp.start_tls(a.smtpStartTls);
         smtp.source_hostname("nkmail.invalid");
-        smtp.authenticate(utf8(a.username), utf8(a.password), mailio::smtp::auth_method_t::LOGIN);
+        smtpLogin(smtp, a);
         submitting = true;
         smtp.submit(m);
         return {SendResult::Accepted, QCoreApplication::translate("MailErrors", "SMTP server accepted the message; delivery is not confirmed.")};

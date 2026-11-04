@@ -245,7 +245,7 @@ Item {
                         name: "search"; size: 14; color: searchField.textColor
                         opacity: mail.busy ? 0 : 1
                     }
-                    BusyIndicator {
+                    MailActivityIndicator {
                         x: 5; anchors.verticalCenter: parent.verticalCenter
                         width: 20; height: 20
                         visible: mail.busy
