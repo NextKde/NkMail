@@ -653,3 +653,6 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - Address placeholder follow-up: the new-account email hint is a real placeholder, now hidden whenever the field has active input focus and restored on blur while empty. Existing/typed address text is preserved. Validation uses the existing VM account editing and wizard regressions; no new style-only test was added.
 
 - Grouped input follow-up: MailSettingsInput is a thin preset of canonical SettingsTextField (filled, white in light mode, dark-theme surface retained). Account row editors share its compact 24px/6px style; standalone email block stays unchanged. VM account editing/binding and wizard failure regressions passed (4/4 including lifecycle); host preview rebuilt and replaced for manual use.
+
+- Grouped input sizing: reduced MailSettingsInput from 24px to 20px and vertical padding to 1px, retaining 12px text and the existing row layout.
+  VM account editing/binding regression passed (3/3 including lifecycle). Host preview rebuilt and replaced for user inspection.
