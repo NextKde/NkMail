@@ -131,7 +131,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
             // Stay on the newly selected account and ask for its password.
             m_switchCredentialPending = false;
             m_account.password.clear();
-            if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Sign in with Google to reconnect this account."));
+            if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Enter a Google app password in account settings to reconnect this account."));
             else if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
             else setStatus(tr("Account needs a password"), tr("Enter an application password for this account."));
             return;
@@ -468,7 +468,7 @@ void MailController::refresh() {
     if (m_busy || sending() || m_commands->busy()) return;
     if (!configured() || m_account.password.isEmpty()) {
         if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
-        else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Sign in with Google to reconnect this account."));
+        else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Enter a Google app password in account settings to reconnect this account."));
         else setStatus(tr("Account needs attention"), tr("Add an account and enter an application password before connecting."));
         return;
     }
@@ -778,7 +778,7 @@ void MailController::executeCommand(const QVariantList &indices, MailboxCommands
     if (m_commands->busy() || m_busy || sending() || sendPending()) { setStatus(tr("Another mail operation is in progress")); return; }
     if (!m_demo && (!configured() || m_account.password.isEmpty())) {
         if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
-        else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Sign in with Google to reconnect this account."));
+        else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Enter a Google app password in account settings to reconnect this account."));
         else setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages."));
         return;
     }

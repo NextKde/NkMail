@@ -225,32 +225,9 @@
             <translation>验证并保存</translation>
         </message>
         <message>
-            <source>Finish signing in with Google in your browser…</source>
-            <translation>请在浏览器中完成 Google 登录…</translation>
-        </message>
-        <message>
-            <source>Sign in with Google</source>
-            <translation>使用 Google 账号登录</translation>
-        </message>
-        <message>
-            <source>Signed in as %1</source>
-            <translation>已登录：%1</translation>
-        </message>
-        <message>
-            <source>Use a Google app password generated after enabling two-step verification.</source>
-            <translation>请使用开启两步验证后生成的 Google 应用专用密码。</translation>
-        </message>
-        <message>
-            <source>Use an app password instead</source>
-            <translation>改用应用专用密码</translation>
-        </message>
-        <message>
-            <source>Save account</source>
-            <translation>保存账号</translation>
-        </message>
-        <message>
-            <source>Allow Gmail mail access on Google's consent page to connect your mailbox.</source>
-            <translation>请在 Google 授权页面允许访问 Gmail 邮件，以连接邮箱。</translation>
+            <location filename="../qml/AccountDialog.qml" line="192" />
+            <source>To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.</source>
+            <translation>如需将此账号改为应用专用密码登录，请在下方填写 Google 应用专用密码并验证。已缓存的邮件会保留。</translation>
         </message>
     </context>
     <context>
@@ -858,8 +835,8 @@
             <translation>未找到草稿，或发送状态转换不安全</translation>
         </message>
         <message>
-            <source>Google authorization needs attention. Sign in with Google again.</source>
-            <translation>Google 授权需要处理，请重新使用 Google 账号登录。</translation>
+            <source>Google authorization needs attention. Enter a Google app password in account settings to reconnect.</source>
+            <translation>Google 授权需要处理。请在账号设置中填写 Google 应用专用密码以重新连接。</translation>
         </message>
         <message>
             <source>Google authorization requires the standard secure Gmail servers.</source>
@@ -1680,8 +1657,9 @@ Alex
             <translation> · 暂未支持</translation>
         </message>
         <message>
-            <source>Sign in with Google in your system browser. NkMail does not receive your Google password.</source>
-            <translation>请在系统浏览器中使用 Google 账号登录。NkMail 不会接收你的 Google 密码。</translation>
+            <location filename="../qml/ProviderPicker.qml" line="15" />
+            <source>Enable two-step verification in your Google account and generate an app password. Use that app password here, not your Google account password.</source>
+            <translation>请在 Google 账号中开启两步验证并生成应用专用密码，在此填写该专用密码，而非 Google 账号的登录密码。</translation>
         </message>
     </context>
     <context>
@@ -2101,12 +2079,15 @@ Alex
             <translation>正在更新邮件…</translation>
         </message>
         <message>
-            <source>Sign in with Google to reconnect this account.</source>
-            <translation>请使用 Google 账号登录以重新连接此邮箱。</translation>
-        </message>
-        <message>
             <source>Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting.</source>
             <translation>请使用 QQ 邮箱授权码重新连接，并勾选“记住密码”，以便重启后从系统钥匙串恢复。</translation>
+        </message>
+        <message>
+            <location filename="../src/MailController.cpp" line="134" />
+            <location filename="../src/MailController.cpp" line="471" />
+            <location filename="../src/MailController.cpp" line="781" />
+            <source>Enter a Google app password in account settings to reconnect this account.</source>
+            <translation>请在账号设置中填写 Google 应用专用密码，以重新连接此账号。</translation>
         </message>
     </context>
     <context>

@@ -6,7 +6,7 @@ A native Qt Quick mail client for NextKde. The interface takes cues from macOS M
 
 ## Current scope
 
-Multiple accounts with Google OAuth or application-password authentication, folders, paginated headers,
+Multiple accounts with password or application-password authentication, folders, paginated headers,
 on-demand sanitized reading, opt-in remote images, cached/server search, attachments,
 durable drafts, compose/reply/reply-all/forward, delayed SMTP submission and Sent copies.
 Flag changes and targeted delete/move commands are supported. Delete/move requires
@@ -16,19 +16,20 @@ daemon. Server acceptance is not delivery; uncertain sends remain non-resendable
 
 Mailio is a protocol/MIME library, not a complete application backend. NkMail supplies the application state, cache, credentials, UI and workflows. The vendored dependency includes the documented [TLS verification and PEEK patch](patches/mailio/0001-verified-tls-peek-timeouts.patch); its loopback acceptance tests do not by themselves prove real-provider compatibility.
 
-## Google sign-in
+## Gmail accounts
 
-Choose Google and click **Sign in with Google**. Authorization opens in the system browser;
-NkMail receives a verified email identity and tokens, never the Google password. The refresh
-credential is stored through the existing system keychain. Google mail uses IMAP/SMTP
-XOAUTH2; POP is not implemented. Account creation does not require the mail ports to be
-reachable during browser authorization; subsequent synchronization reports network errors.
+Choose **Google / Gmail**, enter your email address, and continue with a Google
+**app password** generated after enabling two-step verification. The normal Google
+account password is not supported. Some organization/security policies disable app
+passwords. See [Google's instructions](https://support.google.com/accounts/answer/185833).
+NkMail uses Gmail IMAP/SMTP; POP is not implemented. Remembering credentials uses
+the system keychain, with no plaintext fallback.
 
-Distributors configure one project-owned Desktop OAuth client at build time, shared by
-all users. Users never register Google Cloud projects or enter client IDs. See
-[project setup and release requirements](docs/GOOGLE_OAUTH.md). A build without project
-configuration clearly disables Google sign-in. Google testing mode and public verification
-remain separate from the implemented client flow.
+Browser OAuth sign-in is hidden from account setup. The existing OAuth backend is
+retained for compatibility with previously added accounts; new users do not need
+Google Cloud configuration. Existing OAuth accounts can switch to an app password
+through account settings without removing their cached mail. The earlier
+[OAuth distributor notes](docs/GOOGLE_OAUTH.md) are retained for future development.
 
 ## Languages
 

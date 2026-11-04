@@ -1,3 +1,9 @@
+> Archived integration notes: the account UI no longer exposes browser OAuth sign-in.
+> Gmail setup now uses an app password. OAuth code and optional build configuration
+> remain only for existing accounts and future development; they are not required
+> for the current app-password workflow. The instructions below describe that
+> retained integration, not the current account-setup UI.
+
 # Project-managed Google sign-in
 
 Users select Google and click **Sign in with Google**. NkMail opens the system browser,

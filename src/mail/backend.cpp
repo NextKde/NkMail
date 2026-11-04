@@ -113,8 +113,8 @@ void smtpLogin(mailio::smtp &smtp, const Account &a)
 {
     if (a.authMethod == "google_oauth") {
         try { smtp.authenticate(utf8(a.username), utf8(GoogleTokens::accessToken(a.password, a.username)), mailio::smtp::auth_method_t::XOAUTH2); }
-        catch (const GoogleOAuthError &) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Sign in with Google again.")); }
-        catch (const mailio::smtp_error &) { GoogleTokens::invalidateAccess(a.password); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Sign in with Google again.")); }
+        catch (const GoogleOAuthError &) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Enter a Google app password in account settings to reconnect.")); }
+        catch (const mailio::smtp_error &) { GoogleTokens::invalidateAccess(a.password); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Enter a Google app password in account settings to reconnect.")); }
     } else smtp.authenticate(utf8(a.username), utf8(a.password), mailio::smtp::auth_method_t::LOGIN);
 }
 void login(Imap &imap, const Account &a)
@@ -123,8 +123,8 @@ void login(Imap &imap, const Account &a)
     imap.start_tls(a.imapStartTls);
     if (a.authMethod == "google_oauth") {
         try { imap.authenticate(utf8(a.username), utf8(GoogleTokens::accessToken(a.password, a.username)), Imap::auth_method_t::XOAUTH2); }
-        catch (const GoogleOAuthError &) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Sign in with Google again.")); }
-        catch (const mailio::imap_error &) { GoogleTokens::invalidateAccess(a.password); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Sign in with Google again.")); }
+        catch (const GoogleOAuthError &) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Enter a Google app password in account settings to reconnect.")); }
+        catch (const mailio::imap_error &) { GoogleTokens::invalidateAccess(a.password); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Enter a Google app password in account settings to reconnect.")); }
     } else imap.authenticate(utf8(a.username), utf8(a.password), Imap::auth_method_t::LOGIN);
     if (imap.capabilities().count("ID")) imap.client_id("NkMail");
 }

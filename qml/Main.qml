@@ -119,6 +119,13 @@ ApplicationWindow {
         if (composer.visible && !composer.finishEditing()) return
         draftsVisible = false
         if (scenario === "account-add") { accountDialog.addAccount(); return }
+        if (scenario === "account-google") {
+            accountDialog.editAccount({id: "demo-google", name: "Alex Example", address: "alex@example.invalid",
+                username: "alex@example.invalid", imapHost: "imap.gmail.com", smtpHost: "smtp.gmail.com",
+                imapPort: 993, smtpPort: 465, serverSavesSent: true})
+            accountDialog.showGooglePasswordReview()
+            return
+        }
         if (scenario === "flagged") { mail.selectSmartMailbox("flagged"); return }
         if (scenario === "avatars") { window.showAvatars = true; return }
         if (scenario === "more-menu") { moreMenu.openAtAnchor(); return }

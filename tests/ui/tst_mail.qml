@@ -1214,57 +1214,48 @@ TestCase {
         compare(picker.currentIndex, 0)
         dialog.close()
     }
-    function test_google_sign_in_needs_only_project_configuration_and_browser_authorization() {
+    function test_google_setup_uses_app_password_even_with_oauth_configuration() {
         mock.demo = false
+        setupMock.googleConfigured = true
         const dialog = findChild(app, "accountDialog")
         dialog.addAccount()
         findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("google")
-        const signIn = findChild(dialog, "googleSignInButton")
-        compare(signIn.enabled, false)
-        verify(findChild(dialog, "googleUnavailableHint").visible)
-        setupMock.googleConfigured = true
-        tryCompare(signIn, "enabled", true) // No email or password required to open Google.
-        verify(findChild(dialog, "googleMailPermissionHint").visible)
-        signIn.clicked()
-        compare(setupMock.googleStarts, 1)
-        verify(dialog.submitting)
-        setupMock.googleAuthorized = true
-        setupMock.busy = false
+        const next = findChild(dialog, "continueAccountButton")
+        verify(!next.enabled)
+        verify(findChild(dialog, "accountAddress").visible)
+        findChild(dialog, "accountAddress").text = "google-user@example.invalid"
+        tryCompare(next, "enabled", true)
+        next.clicked()
+        compare(dialog.step, 1)
+        compare(dialog.configuration().imapHost, "imap.gmail.com")
+        compare(dialog.configuration().smtpHost, "smtp.gmail.com")
+        compare(setupMock.googleStarts, 0)
+        const connectButton = findChild(dialog, "connectAccountButton")
+        verify(!connectButton.enabled)
+        findChild(dialog, "accountPassword").text = "synthetic-app-password"
+        tryCompare(connectButton, "enabled", true)
+        connectButton.clicked()
+        compare(setupMock.stage, "imap")
         setupMock.finished(true, "")
-        compare(mock.googleSaveCount, 1)
         compare(dialog.step, 2)
-        compare(dialog.googleIdentity, "google-user@example.invalid")
+        compare(mock.googleSaveCount, 0)
         dialog.close()
-        dialog.addAccount()
-        findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("google")
-        signIn.clicked()
-        const cancellations = setupMock.googleCancels
-        dialog.close()
-        tryVerify(() => setupMock.googleCancels > cancellations)
-        verify(!dialog.submitting)
     }
-    function test_google_authorization_can_retry_save_without_reopening_browser() {
+    function test_existing_google_oauth_account_can_switch_to_app_password() {
         mock.demo = false
-        setupMock.googleConfigured = true
         const dialog = findChild(app, "accountDialog")
-        dialog.addAccount()
-        findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("google")
-        const signIn = findChild(dialog, "googleSignInButton")
-        signIn.clicked()
-        mock.busy = true
-        setupMock.busy = false
-        setupMock.googleAuthorized = true
-        setupMock.finished(true, "")
-        compare(dialog.step, 0)
-        verify(dialog.googleSavePending)
-        verify(!signIn.enabled)
-        mock.busy = false
-        tryCompare(signIn, "enabled", true)
-        signIn.clicked()
-        compare(setupMock.googleStarts, 1)
-        compare(mock.googleSaveCount, 2)
-        compare(dialog.step, 2)
-        verify(!setupMock.googleAuthorized)
+        dialog.editAccount({id: "existing-google", authMethod: "google_oauth",
+            address: "google-user@example.invalid", username: "google-user@example.invalid",
+            imapHost: "imap.gmail.com", smtpHost: "smtp.gmail.com"})
+        compare(dialog.step, 1)
+        verify(findChild(dialog, "googlePasswordMigrationHint").visible)
+        compare(dialog.configuration().id, "existing-google")
+        verify(!dialog.valid())
+        findChild(dialog, "accountPassword").text = "synthetic-app-password"
+        verify(dialog.valid())
+        dialog.validateConnection()
+        compare(setupMock.stage, "imap")
+        compare(setupMock.googleStarts, 0)
         dialog.close()
     }
     function test_provider_presets_and_no_false_oauth_support() {

@@ -225,32 +225,9 @@
             <translation>Verify and save</translation>
         </message>
         <message>
-            <source>Finish signing in with Google in your browser…</source>
-            <translation>Finish signing in with Google in your browser…</translation>
-        </message>
-        <message>
-            <source>Sign in with Google</source>
-            <translation>Sign in with Google</translation>
-        </message>
-        <message>
-            <source>Signed in as %1</source>
-            <translation>Signed in as %1</translation>
-        </message>
-        <message>
-            <source>Use a Google app password generated after enabling two-step verification.</source>
-            <translation>Use a Google app password generated after enabling two-step verification.</translation>
-        </message>
-        <message>
-            <source>Use an app password instead</source>
-            <translation>Use an app password instead</translation>
-        </message>
-        <message>
-            <source>Save account</source>
-            <translation>Save account</translation>
-        </message>
-        <message>
-            <source>Allow Gmail mail access on Google's consent page to connect your mailbox.</source>
-            <translation>Allow Gmail mail access on Google's consent page to connect your mailbox.</translation>
+            <location filename="../qml/AccountDialog.qml" line="192" />
+            <source>To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.</source>
+            <translation>To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.</translation>
         </message>
     </context>
     <context>
@@ -858,8 +835,8 @@
             <translation>Draft not found or send state transition is unsafe</translation>
         </message>
         <message>
-            <source>Google authorization needs attention. Sign in with Google again.</source>
-            <translation>Google authorization needs attention. Sign in with Google again.</translation>
+            <source>Google authorization needs attention. Enter a Google app password in account settings to reconnect.</source>
+            <translation>Google authorization needs attention. Enter a Google app password in account settings to reconnect.</translation>
         </message>
         <message>
             <source>Google authorization requires the standard secure Gmail servers.</source>
@@ -1680,8 +1657,9 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation> · Not available yet</translation>
         </message>
         <message>
-            <source>Sign in with Google in your system browser. NkMail does not receive your Google password.</source>
-            <translation>Sign in with Google in your system browser. NkMail does not receive your Google password.</translation>
+            <location filename="../qml/ProviderPicker.qml" line="15" />
+            <source>Enable two-step verification in your Google account and generate an app password. Use that app password here, not your Google account password.</source>
+            <translation>Enable two-step verification in your Google account and generate an app password. Use that app password here, not your Google account password.</translation>
         </message>
     </context>
     <context>
@@ -2101,12 +2079,15 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation>Updating messages…</translation>
         </message>
         <message>
-            <source>Sign in with Google to reconnect this account.</source>
-            <translation>Sign in with Google to reconnect this account.</translation>
-        </message>
-        <message>
             <source>Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting.</source>
             <translation>Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting.</translation>
+        </message>
+        <message>
+            <location filename="../src/MailController.cpp" line="134" />
+            <location filename="../src/MailController.cpp" line="471" />
+            <location filename="../src/MailController.cpp" line="781" />
+            <source>Enter a Google app password in account settings to reconnect this account.</source>
+            <translation>Enter a Google app password in account settings to reconnect this account.</translation>
         </message>
     </context>
     <context>

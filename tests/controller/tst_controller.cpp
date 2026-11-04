@@ -388,6 +388,20 @@ private slots:
         MailDatabase db; QVERIFY(db.open(root.path(), "oauth-user@example.invalid"));
         const auto saved = db.account(); QCOMPARE(saved.authMethod, QString("google_oauth"));
         QVERIFY(saved.password.isEmpty());
+
+        // Switching credentials keeps the account identity and cached body intact.
+        Content cached; cached.summary = synthetic::page(saved, "INBOX", 0, 1).messages.first();
+        cached.text = "Synthetic cached body before password migration";
+        QVERIFY(db.saveContent(cached));
+        QTRY_VERIFY(!controller.busy());
+        QVERIFY(controller.configureAccount(metadata, "synthetic-app-password", true));
+        QCOMPARE(controller.accounts().size(), 1);
+        const auto migrated = controller.accounts().first().toMap();
+        QCOMPARE(migrated.value("id"), metadata.value("id"));
+        QCOMPARE(migrated.value("authMethod").toString(), QString("password"));
+        const auto retained = db.content("INBOX", cached.summary.uidValidity, cached.summary.uid);
+        QVERIFY(retained); QCOMPARE(retained->text, cached.text);
+        QCOMPARE(synthetic::sendCalls.load(), 0);
     }
     void selectedLegacyCacheUpgradesOnceWithoutDiscardingFallback() {
         QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
