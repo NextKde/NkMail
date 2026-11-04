@@ -6,6 +6,7 @@
 #include <QVariantMap>
 
 namespace nkmail {
+inline constexpr int CurrentBodyFormatVersion = 2;
 struct Account {
     QString id = QStringLiteral("default");
     QString name, address, username, password; // Private password or opaque Google refresh credential.

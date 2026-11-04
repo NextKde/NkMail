@@ -61,6 +61,25 @@ private slots:
         QVERIFY(db.saveAccount(account)); QCOMPARE(db.account().authMethod, account.authMethod);
         QVERIFY(db.account().password.isEmpty());
     }
+    void cidImagesResolveOnlyFromTrustedMessageParts() {
+        const QString image = QStringLiteral("data:image/png;base64,c3ludGhldGlj");
+        const auto html = sanitizeBrowserMailHtml(QStringLiteral(
+            "<img src='CID:logo%40fixture.invalid' alt='Logo' width='24' onerror='bad()'>"
+            "<img src='cid:missing@fixture.invalid' alt='Missing &amp; safe'>"
+            "<img src='https://fixture.invalid/tracker'>"
+            "<img src='data:image/svg+xml,bad'><img src='file:///private'>"), {{"logo@fixture.invalid", image}});
+        QVERIFY(html.contains("src=\"" + image + "\""));
+        QVERIFY(html.contains("width=\"24\""));
+        QVERIFY(html.contains("Missing &amp; safe"));
+        QCOMPARE(html.count("data-nkmail-src="), 1);
+        QVERIFY(!html.contains("onerror")); QVERIFY(!html.contains("svg+xml")); QVERIFY(!html.contains("file:"));
+        QVERIFY(!html.contains("cid:"));
+        QVERIFY(!sanitizeBrowserMailHtml("<img src='cid:logo@fixture.invalid' alt='Fallback'>").contains("<img"));
+        const auto repeated = sanitizeBrowserMailHtml(QString("<img src='cid:logo@fixture.invalid' alt='Budget'>").repeated(12),
+            {{"logo@fixture.invalid", QString("data:image/png;base64,") + QString(1024 * 1024, 'A')}});
+        QVERIFY(repeated.size() < 9 * 1024 * 1024);
+        QVERIFY(repeated.contains("Budget"));
+    }
     void browserHtmlPreservesLayoutButNotActiveContent() {
         const auto html = sanitizeBrowserMailHtml(QStringLiteral(
             "<style>.card{padding:24px;background:#f5f5f5}</style>"

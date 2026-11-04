@@ -733,7 +733,7 @@ void MailController::openMessage(const QString &uid, const QString &validity, co
     bool upgrading = false;
     if (auto cached = m_database->content(folder, validity, uid)) {
         present(*cached);
-        if (cached->bodyFormatVersion >= 1 || m_demo || m_account.password.isEmpty()) return;
+        if (cached->bodyFormatVersion >= CurrentBodyFormatVersion || m_demo || m_account.password.isEmpty()) return;
         upgrading = true; // Re-read only this selected message with PEEK; keep cache visible.
     }
     if (!upgrading) {

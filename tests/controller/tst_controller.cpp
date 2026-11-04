@@ -64,7 +64,7 @@ void reset()
         Content c;
         c.summary.folder = folder; c.summary.uidValidity = validity; c.summary.uid = uid;
         c.text = QStringLiteral("Synthetic body ") + uid;
-        c.bodyFormatVersion = 1;
+        c.bodyFormatVersion = CurrentBodyFormatVersion;
         c.attachments.append({"fixture.txt", "text/plain", {}, 9, QByteArray("synthetic")});
         return c;
     };
@@ -542,12 +542,18 @@ private slots:
         QVERIFY(retained); QCOMPARE(retained->text, cached.text);
         QCOMPARE(synthetic::sendCalls.load(), 0);
     }
+    void selectedLegacyCacheUpgradesOnceWithoutDiscardingFallback_data() {
+        QTest::addColumn<int>("formatVersion");
+        QTest::newRow("legacy-layout") << 0;
+        QTest::newRow("before-cid-support") << 1;
+    }
     void selectedLegacyCacheUpgradesOnceWithoutDiscardingFallback() {
+        QFETCH(int, formatVersion);
         QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
         {
             MailDatabase db; QVERIFY(db.open(root.path()));
             Content c; c.summary = synthetic::page(account(), "INBOX", 0, 1).messages.first();
-            c.text = "Legacy cached text"; c.html = "<p>Legacy cached text</p>";
+            c.text = "Legacy cached text"; c.html = "<p>Legacy cached text</p>"; c.bodyFormatVersion = formatVersion;
             QVERIFY(db.saveContent(c));
         }
         const auto normal = synthetic::content;
@@ -566,7 +572,7 @@ private slots:
         QCOMPARE(synthetic::contentCalls.load(), 1);
         MailDatabase db; QVERIFY(db.open(root.path()));
         const auto cached = db.content("INBOX", "100", "120");
-        QVERIFY(cached); QCOMPARE(cached->bodyFormatVersion, 1);
+        QVERIFY(cached); QCOMPARE(cached->bodyFormatVersion, CurrentBodyFormatVersion);
         QVERIFY(!cached->displayHtml.isEmpty());
     }
     void initTestCase() { QVERIFY(QDir().mkpath(QStringLiteral(NKMAIL_CONTROLLER_TMP_ROOT))); }

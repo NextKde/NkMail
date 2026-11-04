@@ -621,3 +621,10 @@ Old unchecked lists and provider statements above are historical evidence, not a
 
 - Image action polish: switched reader actions to the existing compact MailAction adapter (14 px image/sender icons, 28 px rounded material buttons); renamed the sender option to “允许此发件人显示图片” / “Allow images from this sender” in both the reader and display settings. Display options remain in the right toolbar or More → Display on narrow windows.
 - VM reader/UI/i18n/catalog checks passed 4/4; final icon-and-label width/interaction checks passed, and the updated narrow-reader screenshot was reviewed.
+
+## CID embedded message images · 2026-11-04
+
+- Resolve case-insensitive cid: schemes and percent-encoded IDs against current-message MIME parts, normalizing mailio's non-strict angle-bracket IDs. Duplicate IDs are ambiguous and do not select an arbitrary part.
+- Validate decoded raster type/size/pixels before creating application-owned data URLs; raw sender data/file URLs and SVG remain blocked. Missing, invalid and budget-exceeding resources use escaped alt text. Inline images stay out of the attachment list unless explicitly attached.
+- Cache format 2 stores resolved image HTML; version 0/1 messages upgrade only when selected and connected, preserving their fallback during the read. Existing remote permissions remain independent.
+- VM core/controller/UI/i18n/catalog checks passed in the full run. CID protocol fixtures passed over TLS and STARTTLS after correcting an invalid synthetic PNG and normalizing Content-ID brackets. Reader checks passed in 9.76s; reviewed the synthetic embedded-image capture. No host automated validation or real mailbox writes.

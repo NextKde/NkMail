@@ -5,6 +5,8 @@
 
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QBuffer>
+#include <QImageReader>
 #include <QFile>
 #include <QFileInfo>
 #include <QElapsedTimer>
@@ -273,7 +275,19 @@ QString mimeType(Mime::content_type_t type)
     }
     return major + u'/' + (type.media_subtype().empty() ? QStringLiteral("octet-stream") : unicode(type.media_subtype()));
 }
-struct Decoded { QStringList plain, html, rawHtml; QList<Attachment> attachments; qint64 bytes = 0; int nodes = 0; };
+QString rasterDataUrl(const std::string &data)
+{
+    if (data.empty() || data.size() > 2 * 1024 * 1024) return {};
+    QByteArray bytes(data.data(), qsizetype(data.size()));
+    QBuffer buffer(&bytes); buffer.open(QIODevice::ReadOnly);
+    QImageReader reader(&buffer);
+    const auto format = reader.format().toLower();
+    if (format != "png" && format != "jpeg" && format != "gif" && format != "webp") return {};
+    const auto size = reader.size();
+    if (!size.isValid() || qint64(size.width()) * size.height() > 16000000 || reader.read().isNull()) return {};
+    return QStringLiteral("data:image/%1;base64,%2").arg(QString::fromLatin1(format), QString::fromLatin1(bytes.toBase64()));
+}
+struct Decoded { QHash<QString, QString> inlineImages; QStringList plain, html, rawHtml; QList<Attachment> attachments; qint64 bytes = 0; int nodes = 0; };
 void decodePart(Mime part, Decoded &out, int depth = 0)
 {
     if (depth > 24 || ++out.nodes > 500) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Message MIME structure exceeds safety limits."));
@@ -281,6 +295,17 @@ void decodePart(Mime part, Decoded &out, int depth = 0)
     const auto data = part.content();
     out.bytes += qint64(data.size());
     if (out.bytes > MaxDecoded) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Message exceeds safety limits."));
+    auto contentId = unicode(part.content_id()).trimmed();
+    // mailio non-strict parsing retains the header's angle brackets.
+    if (contentId.startsWith(u'<') && contentId.endsWith(u'>'))
+        contentId = contentId.mid(1, contentId.size() - 2);
+    const auto imageUrl = contentId.isEmpty() ? QString{} : rasterDataUrl(data);
+    if (!imageUrl.isEmpty()) {
+        // Duplicate IDs are ambiguous: never silently choose a different part.
+        if (out.inlineImages.contains(contentId)) out.inlineImages[contentId].clear();
+        else out.inlineImages.insert(contentId, imageUrl);
+        if (part.content_disposition() != Mime::content_disposition_t::ATTACHMENT) return;
+    }
     const bool attached = part.content_disposition() == Mime::content_disposition_t::ATTACHMENT || !part.name().empty();
     if (attached && type.media_type() != Mime::media_type_t::MULTIPART) {
         if (qint64(data.size()) > MaxAttachment || out.attachments.size() >= 100)
@@ -595,8 +620,8 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
         Decoded decoded; decodePart(m, decoded);
         c.text = (decoded.plain.isEmpty() ? decoded.html : decoded.plain).join(QStringLiteral("\n\n"));
         c.html = sanitizeMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
-        c.displayHtml = sanitizeBrowserMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
-        c.bodyFormatVersion = 1;
+        c.displayHtml = sanitizeBrowserMailHtml(decoded.rawHtml.join(QStringLiteral("\n")), decoded.inlineImages);
+        c.bodyFormatVersion = CurrentBodyFormatVersion;
         c.attachments = std::move(decoded.attachments);
         c.summary.hasAttachments = !c.attachments.isEmpty();
         c.summary.preview = c.text.simplified().left(160);

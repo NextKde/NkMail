@@ -106,6 +106,21 @@ TestCase {
         mouseDrag(bar, bar.width / 2, (bar.position + bar.size / 2) * bar.height, 0, 200)
         tryVerify(() => flick.contentY > scroll.height)
     }
+    function test_embedded_raster_needs_no_network() {
+        const before = server.hits
+        const view = createTemporaryObject(browserComponent, testCase, {width: 520, height: 360, html:
+            '<div style="padding:24px"><h2>Embedded message image</h2><p>This synthetic logo is part of the message.</p>'
+            + '<img id="embedded-logo" width="64" height="64" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGNQaDjwH4QZYAwAT7QJfdl8EOkAAAAASUVORK5CYII=">'
+            + '<p>Example sender<br>Logo and signature remain available offline.</p>'
+            + '<img data-nkmail-src="' + server.url + '/tracker" alt="Remote image stays blocked"></div>'})
+        tryVerify(() => view.documentReady, 20000)
+        tryVerify(() => inspect(view, "document.getElementById('embedded-logo').naturalWidth") === 2)
+        compare(server.hits, before)
+        if (server.capturePath.length > 0) {
+            waitForRendering(view)
+            grabImage(view).save(server.capturePath + ".cid.png")
+        }
+    }
     function test_large_inline_document_and_loaded_image() {
         const view = createTemporaryObject(browserComponent, testCase, {width: 660, height: 500, html:
             '<img id="inline" width="40" height="40" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX2kAAAAASUVORK5CYII=">'

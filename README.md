@@ -304,3 +304,9 @@ integration awaits a tested canonical UI release exposing that property.
 Remote images are blocked by default. “Show images for this message” remembers consent for that account/folder/UIDVALIDITY/UID across restarts. “Allow images from this sender” remembers the exact sender address within the current account. Display options also provide an optional global “Always show remote images” switch, a current-sender toggle and “Reset image permissions”. Removing an account removes its message/sender permissions. Disabling a policy prevents future automatic downloads; images already loaded can remain visible.
 
 Permissions persist locally; downloaded image bodies still use a bounded in-memory cache and may be fetched again after restarting. Automatic loading uses the same image limits, TLS checks, cookie-free requests and retry UI as explicit loading. No server-side mailbox changes are made by image preferences.
+
+### Embedded message images
+
+CID-referenced raster images inside MIME messages render without remote-image permission or network access. PNG, JPEG, GIF and WebP parts are matched by Content-ID (including URL-encoded CID references), checked for valid decoding and capped at 2 MiB / 16 million pixels each. Inline expansion is capped at 8 MiB per rendered body. SVG, broken/missing/ambiguous references and oversized resources fall back to alternative text. Remote HTTP images remain permission-gated. Inline image parts do not clutter the attachment list; explicit attachments remain available.
+
+Body cache format 2 retains the resolved images in sanitized HTML, making them available offline. Older selected cached messages are upgraded with a read-only fetch when credentials are available; their existing content stays visible while upgrading.
