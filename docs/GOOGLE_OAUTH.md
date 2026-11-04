@@ -44,6 +44,16 @@ CI uses synthetic project JSON and never needs a real Google credential. Officia
 release automation must supply its project JSON securely; ordinary source CI artifacts
 are not automatically configured official Google releases.
 
+## Consent troubleshooting
+
+Google can grant basic sign-in identity without granting Gmail mail access. On the
+Google consent page, allow Gmail mail access to connect the mailbox. The layout can
+vary depending on existing grants; a checkbox is not always shown. NkMail
+checks the granted scope and refuses to save a mailbox without it. A separate message
+identifies a missing offline refresh token; do not confuse this with missing mail scope
+or a TCP connection failure. Retrying opens explicit consent again. NkMail never
+silently substitutes password authentication or accepts a partial grant as success.
+
 ## Token and protocol behavior
 
 Authorization uses PKCE S256, random state, a short-lived IPv4 loopback listener and

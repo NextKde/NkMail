@@ -210,6 +210,12 @@ LiquidDialog {
                 text: qsTranslate("GoogleOAuth", "Google sign-in is unavailable in this build. Contact the application distributor.")
                 Layout.fillWidth: true; wrapMode: Text.Wrap; font.pixelSize: 11; color: AppTheme.mutedText
             }
+            Text {
+                objectName: "googleMailPermissionHint"
+                visible: root.step === 0 && root.googleProvider && root.googleAvailable
+                text: qsTr("Allow Gmail mail access on Google's consent page to connect your mailbox.")
+                Layout.fillWidth: true; wrapMode: Text.Wrap; font.pixelSize: 11; color: AppTheme.mutedText
+            }
             KosButton {
                 objectName: "googleAppPasswordOption"
                 visible: root.step === 0 && root.googleProvider && !root.submitting

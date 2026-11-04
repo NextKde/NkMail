@@ -248,6 +248,10 @@
             <source>Save account</source>
             <translation>保存账号</translation>
         </message>
+        <message>
+            <source>Allow Gmail mail access on Google's consent page to connect your mailbox.</source>
+            <translation>请在 Google 授权页面允许访问 Gmail 邮件，以连接邮箱。</translation>
+        </message>
     </context>
     <context>
         <name>MailComposer</name>
@@ -2252,10 +2256,6 @@ Alex
             <translation>Google 未授权此账号，请检查账号或组织政策后重试。</translation>
         </message>
         <message>
-            <source>Google did not grant the required mail permission and offline access. Try signing in again.</source>
-            <translation>Google 未授予所需的邮件权限和离线访问权限，请重新登录授权。</translation>
-        </message>
-        <message>
             <source>Google did not return a verified email address.</source>
             <translation>Google 未返回已验证的邮箱地址。</translation>
         </message>
@@ -2282,6 +2282,14 @@ Alex
         <message>
             <source>This sign-in response could not be accepted.</source>
             <translation>无法接受此登录响应。</translation>
+        </message>
+        <message>
+            <source>Gmail mail access was not granted. Sign in again and allow Gmail mail access on Google's consent page.</source>
+            <translation>尚未授予 Gmail 邮件访问权限。请重新登录，并在 Google 授权页面允许访问 Gmail 邮件。</translation>
+        </message>
+        <message>
+            <source>Google did not return offline access. Sign in again and complete the consent process; if this persists, contact the application distributor.</source>
+            <translation>Google 未返回离线访问权限。请重新登录并完成授权；如仍失败，请联系应用发布者。</translation>
         </message>
     </context>
 </TS>

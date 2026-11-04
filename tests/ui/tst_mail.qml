@@ -1131,6 +1131,7 @@ TestCase {
         verify(findChild(dialog, "googleUnavailableHint").visible)
         setupMock.googleConfigured = true
         tryCompare(signIn, "enabled", true) // No email or password required to open Google.
+        verify(findChild(dialog, "googleMailPermissionHint").visible)
         signIn.clicked()
         compare(setupMock.googleStarts, 1)
         verify(dialog.submitting)

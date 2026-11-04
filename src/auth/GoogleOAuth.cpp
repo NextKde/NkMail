@@ -3,6 +3,7 @@
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDesktopServices>
+#include <QDebug>
 #include <QEventLoop>
 #include <QFile>
 #include <QHostAddress>
@@ -31,7 +32,8 @@ constexpr auto Cancelled = QT_TRANSLATE_NOOP("GoogleOAuth", "Google sign-in was 
 constexpr auto TimedOut = QT_TRANSLATE_NOOP("GoogleOAuth", "Google sign-in timed out. Try again.");
 constexpr auto CallbackError = QT_TRANSLATE_NOOP("GoogleOAuth", "Could not open the local Google sign-in callback.");
 constexpr auto BrowserError = QT_TRANSLATE_NOOP("GoogleOAuth", "Could not open the system browser for Google sign-in.");
-constexpr auto MissingPermission = QT_TRANSLATE_NOOP("GoogleOAuth", "Google did not grant the required mail permission and offline access. Try signing in again.");
+constexpr auto MissingPermission = QT_TRANSLATE_NOOP("GoogleOAuth", "Gmail mail access was not granted. Sign in again and allow Gmail mail access on Google's consent page.");
+constexpr auto MissingOfflineAccess = QT_TRANSLATE_NOOP("GoogleOAuth", "Google did not return offline access. Sign in again and complete the consent process; if this persists, contact the application distributor.");
 constexpr auto IdentityError = QT_TRANSLATE_NOOP("GoogleOAuth", "Google did not return a verified email address.");
 constexpr auto CallbackText = QT_TRANSLATE_NOOP("GoogleOAuth", "Authorization received. You may return to NkMail.");
 constexpr auto BadCallbackText = QT_TRANSLATE_NOOP("GoogleOAuth", "This sign-in response could not be accepted.");
@@ -90,6 +92,16 @@ QJsonObject requestJson(const GoogleClient &client, const QUrl &url, const QUrlQ
     if (reply->bytesAvailable() > 64 * 1024) throw GoogleOAuthError(InvalidReply);
     const auto bytes = reply->readAll();
     const auto object = QJsonDocument::fromJson(bytes).object();
+    if (!client.fixture && (reply->error() != QNetworkReply::NoError || status != 200)) {
+        const char *stage = !form ? "identity" : form->queryItemValue("grant_type") == "refresh_token" ? "refresh" : "exchange";
+        const auto providerError = object.value("error").toString();
+        const auto knownErrors = QStringList{"invalid_grant", "invalid_client", "invalid_request", "invalid_scope", "access_denied", "temporarily_unavailable", "server_error"};
+        // Fixed stage, enum, status and allowlisted codes only. Never log URLs,
+        // response bodies, headers, identities, authorization codes or tokens.
+        qWarning().noquote() << "NkMail Google request failed:" << stage
+            << "network=" << int(reply->error()) << "http=" << status
+            << "provider=" << (knownErrors.contains(providerError) ? providerError : QStringLiteral("unspecified"));
+    }
     if (object.value("error").toString() == "invalid_grant") throw GoogleOAuthError(Reauthorize);
     if (object.value("error").toString() == "invalid_client") throw GoogleOAuthError(InvalidClient);
     if (reply->error() != QNetworkReply::NoError || status != 200) throw GoogleOAuthError(NetworkError);
@@ -368,7 +380,7 @@ void GoogleOAuthFlow::exchange(const QString &code) {
             const auto tokens = requestJson(client, client.tokenUrl, &form, {}, cancelled);
             const auto expiresAt = expiry(tokens); const auto access = tokens.value("access_token").toString();
             const auto refresh = tokens.value("refresh_token").toString();
-            if (!safeToken(refresh)) throw GoogleOAuthError(MissingPermission);
+            if (!safeToken(refresh)) throw GoogleOAuthError(MissingOfflineAccess);
             const auto identity = requestJson(client, client.identityUrl, nullptr, access, cancelled);
             email = identity.value("email").toString();
             if (!validEmail(email) || !identity.value("email_verified").toBool()) throw GoogleOAuthError(IdentityError);

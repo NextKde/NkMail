@@ -28,3 +28,14 @@ users. Real user consent, public branding/privacy information and Google's produ
 verification remain separate acceptance steps. No real mail, credentials, raw logs, project
 console screenshots or build products are published here. No external sending or mailbox
 mutation was performed.
+
+
+Consent diagnostics now distinguish missing Gmail mail scope from a missing offline
+refresh token. The interface explains that mail access is required, without assuming
+Google always shows a checkbox. Existing Google grants can change the consent layout.
+A reported generic authorization failure does not establish which permission is missing;
+real acceptance remains pending until the separate error or successful retry is observed.
+
+The follow-up UI/i18n/catalog/OAuth checks passed 4/4 in 43.08s. Fixed diagnostic fields
+(stage, network enum, HTTP status and allowlisted provider code) help distinguish request
+failures without logging URLs, headers, response bodies, account identities or tokens.

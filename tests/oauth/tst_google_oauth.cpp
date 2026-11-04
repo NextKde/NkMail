@@ -135,6 +135,7 @@ private slots:
         const QUrlQuery authorization(browserUrl);
         QCOMPARE(authorization.queryItemValue("code_challenge_method"), "S256");
         QCOMPARE(authorization.queryItemValue("access_type"), "offline");
+        QCOMPARE(authorization.queryItemValue("prompt"), "consent");
         QVERIFY(authorization.queryItemValue("scope").contains("https://mail.google.com/"));
         QVERIFY(authorization.queryItemValue("state").size() >= 43);
         const QUrl redirect(authorization.queryItemValue("redirect_uri"));
@@ -192,6 +193,16 @@ private slots:
             flow.start({}); const QUrlQuery auth(browser);
             callback(QUrl(auth.queryItemValue("redirect_uri")), target(auth));
             QTRY_COMPARE(failed.count(), 1); QCOMPARE(granted.count(), 0);
+            const auto message = failed.first().first().toString();
+            if (which == 1) {
+                QVERIFY(message.contains("offline access"));
+                QVERIFY(!message.contains("Gmail mail access was not granted"));
+                QCOMPARE(fixture.identityRequests, 0);
+            } else if (which == 2) {
+                QVERIFY(message.contains("Gmail mail access was not granted"));
+                QVERIFY(message.contains("allow Gmail mail access"));
+                QCOMPARE(fixture.identityRequests, 0);
+            }
         }
     }
     void concurrentRefreshIsSingleFlightAndIdentityBound() {

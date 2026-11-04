@@ -248,6 +248,10 @@
             <source>Save account</source>
             <translation>Save account</translation>
         </message>
+        <message>
+            <source>Allow Gmail mail access on Google's consent page to connect your mailbox.</source>
+            <translation>Allow Gmail mail access on Google's consent page to connect your mailbox.</translation>
+        </message>
     </context>
     <context>
         <name>MailComposer</name>
@@ -2252,10 +2256,6 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation>Google did not authorize this account. Check the account or organization policy and try again.</translation>
         </message>
         <message>
-            <source>Google did not grant the required mail permission and offline access. Try signing in again.</source>
-            <translation>Google did not grant the required mail permission and offline access. Try signing in again.</translation>
-        </message>
-        <message>
             <source>Google did not return a verified email address.</source>
             <translation>Google did not return a verified email address.</translation>
         </message>
@@ -2282,6 +2282,14 @@ Synthetic demo draft. Sending is disabled.</translation>
         <message>
             <source>This sign-in response could not be accepted.</source>
             <translation>This sign-in response could not be accepted.</translation>
+        </message>
+        <message>
+            <source>Gmail mail access was not granted. Sign in again and allow Gmail mail access on Google's consent page.</source>
+            <translation>Gmail mail access was not granted. Sign in again and allow Gmail mail access on Google's consent page.</translation>
+        </message>
+        <message>
+            <source>Google did not return offline access. Sign in again and complete the consent process; if this persists, contact the application distributor.</source>
+            <translation>Google did not return offline access. Sign in again and complete the consent process; if this persists, contact the application distributor.</translation>
         </message>
     </context>
 </TS>
