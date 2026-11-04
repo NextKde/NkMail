@@ -908,8 +908,8 @@
     <context>
         <name>MailLabels</name>
         <message>
-            <source>All inboxes (cached)</source>
-            <translation>所有收件箱（缓存）</translation>
+            <source>All inboxes</source>
+            <translation>所有收件箱</translation>
         </message>
         <message>
             <location filename="../qml/MailLabels.qml" line="7" />
@@ -2190,6 +2190,18 @@ Alex
             <source>POP does not support server folders.</source>
             <translation>POP 不支持服务器文件夹。</translation>
         </message>
+        <message>
+            <source>All inboxes updated · read-only</source>
+            <translation>所有收件箱已更新 · 只读</translation>
+        </message>
+        <message>
+            <source>Some inboxes could not be updated</source>
+            <translation>部分收件箱未能更新</translation>
+        </message>
+        <message>
+            <source>Refreshing all inboxes…</source>
+            <translation>正在刷新所有收件箱…</translation>
+        </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
@@ -2419,6 +2431,17 @@ Alex
         <message>
             <source>Loading…</source>
             <translation>正在加载…</translation>
+        </message>
+    </context>
+    <context>
+        <name>nkmail::InboxSync</name>
+        <message>
+            <source>Account needs a password.</source>
+            <translation>账号需要密码。</translation>
+        </message>
+        <message>
+            <source>Invalid inbox response.</source>
+            <translation>收件箱响应无效。</translation>
         </message>
     </context>
 </TS>

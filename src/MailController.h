@@ -16,6 +16,7 @@ class AccountSession;
 class DraftService;
 class SendService;
 class MailboxSync;
+class InboxSync;
 class RemoteImageLoader;
 class MailTransport;
 class MailController : public QObject {
@@ -84,7 +85,7 @@ public:
     QString currentFolder() const { return m_folder; }
     QString status() const { return m_status; }
     QString error() const { return m_error; }
-    bool busy() const { return m_busy || (m_commands && m_commands->busy()); }
+    bool busy() const;
     bool sending() const;
     bool configured() const;
     bool demo() const { return m_demo; }
@@ -103,7 +104,7 @@ public:
     int accountUnreadRevision() const { return m_accountUnreadRevision; }
     Q_INVOKABLE bool configureGoogleAccount(const QString &existingId = {});
     Q_INVOKABLE bool configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
-    // Foreground account owns browsing/search. Background accounts poll inbox stats.
+    // Foreground account owns browsing/search. Background accounts refresh recent inbox headers and poll IMAP inbox stats.
     Q_INVOKABLE void switchAccount(const QString &id, bool keepUnifiedInbox = false);
     // Read-only cache probe: lists another account's folders without touching the
     // active account or opening a connection.
@@ -167,6 +168,8 @@ private:
     void loadCached(bool append = false);
     void fetchPage(bool append, bool quiet = false);
     void startRefreshTimer();
+    void refreshInboxes(bool includeCurrent);
+    void reloadUnifiedInbox();
     void checkNewMail(const Page &page);
     void setStatus(const QString &status, const QString &error = {});
     void present(const Content &content);
@@ -208,5 +211,6 @@ private:
     AccountSession *m_credentials = nullptr;
     QObject *m_accountSetup = nullptr;
     MailboxSync *m_sync = nullptr;
+    InboxSync *m_inboxSync = nullptr;
 };
 }

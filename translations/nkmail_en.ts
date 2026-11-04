@@ -908,8 +908,8 @@
     <context>
         <name>MailLabels</name>
         <message>
-            <source>All inboxes (cached)</source>
-            <translation>All inboxes (cached)</translation>
+            <source>All inboxes</source>
+            <translation>All inboxes</translation>
         </message>
         <message>
             <location filename="../qml/MailLabels.qml" line="7" />
@@ -2190,6 +2190,18 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>POP does not support server folders.</source>
             <translation>POP does not support server folders.</translation>
         </message>
+        <message>
+            <source>All inboxes updated · read-only</source>
+            <translation>All inboxes updated · read-only</translation>
+        </message>
+        <message>
+            <source>Some inboxes could not be updated</source>
+            <translation>Some inboxes could not be updated</translation>
+        </message>
+        <message>
+            <source>Refreshing all inboxes…</source>
+            <translation>Refreshing all inboxes…</translation>
+        </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
@@ -2419,6 +2431,17 @@ Synthetic demo draft. Sending is disabled.</translation>
         <message>
             <source>Loading…</source>
             <translation>Loading…</translation>
+        </message>
+    </context>
+    <context>
+        <name>nkmail::InboxSync</name>
+        <message>
+            <source>Account needs a password.</source>
+            <translation>Account needs a password.</translation>
+        </message>
+        <message>
+            <source>Invalid inbox response.</source>
+            <translation>Invalid inbox response.</translation>
         </message>
     </context>
 </TS>

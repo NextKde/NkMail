@@ -3,6 +3,7 @@
 #include "mail/backend.h"
 #include "mail/MailTransport.h"
 #include "services/AccountSession.h"
+#include "services/InboxSync.h"
 #include "services/AccountSetup.h"
 #include "auth/GoogleOAuth.h"
 #include "services/RemoteImageLoader.h"
@@ -437,6 +438,114 @@ private slots:
         QVERIFY(controller.selectedMessage().value("bodyError").toString().isEmpty());
     }
 
+    void inboxSyncIsolatesAccountsFailuresAndPopState() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 0, false));
+        auto first = account(); first.password = "first-secret";
+        auto bad = first; bad.id = "bad"; bad.name = "Broken";
+        auto pop = first; pop.id = "pop"; pop.incomingProtocol = "pop3"; pop.password = "pop-secret";
+        MailDatabase db; QVERIFY(db.open(root.path())); QVERIFY(db.saveAccount(bad)); QVERIFY(db.saveAccount(pop));
+        QVERIFY(db.open(root.path(), pop.id));
+        Page prior; prior.folder = "INBOX"; prior.uidValidity = "pop3-uidl-v1";
+        Summary kept; kept.folder = prior.folder; kept.uidValidity = prior.uidValidity; kept.uid = "opaque-kept"; kept.flagged = true;
+        Summary hidden = kept; hidden.uid = "opaque-hidden"; prior.messages = {kept, hidden};
+        QVERIFY(db.savePage(prior)); QVERIFY(db.removePopMessages({hidden}));
+        std::atomic_bool identitiesCorrect{true};
+        synthetic::page = [&identitiesCorrect](const Account &a, const QString &folder, int offset, int limit) {
+            if (folder != "INBOX" || offset != 0 || limit != 50) identitiesCorrect = false;
+            if (a.id == "bad") throw std::runtime_error("synthetic unavailable");
+            if (a.password != (a.id == "pop" ? "pop-secret" : "first-secret")) identitiesCorrect = false;
+            Page p; p.folder = folder; p.uidValidity = a.id == "pop" ? "pop3-uidl-v1" : "100";
+            for (const auto &uid : {QString("opaque-kept"), QString("opaque-hidden")}) {
+                Summary row; row.folder = folder; row.uidValidity = p.uidValidity; row.uid = uid; row.unread = true; p.messages.append(row);
+            }
+            return p;
+        };
+        AccountSession credentials(root.path()); InboxSync sync(root.path(), &credentials, std::make_shared<MailTransport>());
+        QSignalSpy done(&sync, &InboxSync::finished); QSignalSpy updated(&sync, &InboxSync::updated);
+        sync.start({first, bad, pop}); sync.start({first}); // Coalesce overlapping refreshes.
+        QTRY_COMPARE(done.count(), 1); QCOMPARE(updated.count(), 2); QVERIFY(identitiesCorrect);
+        QCOMPARE(done.first().first().toStringList().size(), 1); QCOMPARE(synthetic::pageCalls.load(), 3);
+        QCOMPARE(db.cachedPage("INBOX").messages.size(), 1);
+        QVERIFY(db.cachedPage("INBOX").messages.first().flagged); QVERIFY(!db.cachedPage("INBOX").messages.first().unread);
+        QVERIFY(db.open(root.path())); QCOMPARE(db.cachedPage("INBOX").messages.size(), 2);
+    }
+    void inboxSyncSkipsMissingCredentialsAndContinues() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 0, false));
+        auto missing = account(); auto ready = missing; ready.id = "ready"; ready.password = "synthetic-secret";
+        MailDatabase db; QVERIFY(db.open(root.path())); QVERIFY(db.saveAccount(ready));
+        AccountSession credentials(root.path()); InboxSync sync(root.path(), &credentials, std::make_shared<MailTransport>());
+        QSignalSpy done(&sync, &InboxSync::finished); QSignalSpy updated(&sync, &InboxSync::updated);
+        sync.start({missing, ready}); QTRY_COMPARE(done.count(), 1);
+        QCOMPARE(done.first().first().toStringList().size(), 1); QCOMPARE(updated.count(), 1);
+        QCOMPARE(updated.first().first().toString(), QString("ready")); QCOMPARE(synthetic::pageCalls.load(), 1);
+    }
+    void unifiedInboxSyncSurvivesSourceSwitchWhileHeadersArePending() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
+        MailDatabase db; QVERIFY(db.open(root.path())); auto other = account(); other.id = "other";
+        other.address = other.username = "other@example.invalid"; QVERIFY(db.saveAccount(other));
+        QVERIFY(db.open(root.path(), other.id));
+        QVERIFY(db.savePage(synthetic::page(other, "INBOX", 0, 1)));
+        auto body = synthetic::content(other, "INBOX", "100", "120"); body.text = "Other body"; QVERIFY(db.saveContent(body));
+        AccountSession keys(root.path()); QSettings settings(QDir(root.path()).filePath("credentials.ini"), QSettings::IniFormat);
+        settings.setValue(keys.key(other) + "/restoreAllowed", true); settings.sync();
+        QSemaphore entered, release; auto original = synthetic::page;
+        synthetic::page = [&](const Account &a, const QString &f, int o, int n) {
+            if (a.id == "default") { entered.release(); release.acquire(); }
+            auto p = original(a, f, o, n); for (auto &row : p.messages) row.subject = a.id; return p;
+        };
+        MailController controller(false, root.path()); ReleaseOnExit cleanup{release};
+        QTRY_VERIFY(controller.status().contains("restored")); controller.selectSmartMailbox("allInbox"); controller.refresh();
+        QTRY_VERIFY(entered.available()); entered.acquire(); QVERIFY(controller.busy());
+        controller.openMessage("120", "100", "INBOX", "other");
+        QCOMPARE(controller.currentAccountId(), QString("other"));
+        QCOMPARE(controller.selectedMessage().value("text").toString(), QString("Other body"));
+        release.release(); QTRY_COMPARE(controller.status(), QString("All inboxes updated · read-only")); QVERIFY(!controller.busy());
+        QCOMPARE(controller.currentAccountId(), QString("other")); QCOMPARE(controller.selectedMessage().value("text").toString(), QString("Other body"));
+        QCOMPARE(db.cachedPage("INBOX").messages.first().subject, QString("other"));
+        QVERIFY(db.open(root.path())); QCOMPARE(db.cachedPage("INBOX").messages.first().subject, QString("default"));
+    }
+    void inboxSyncDiscardsRemovedEditedAndCancelledResults_data() {
+        QTest::addColumn<int>("mode");
+        QTest::newRow("removed") << 0; QTest::newRow("edited") << 1; QTest::newRow("cancelled") << 2;
+    }
+    void inboxSyncDiscardsRemovedEditedAndCancelledResults() {
+        QFETCH(int, mode);
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 0, false));
+        auto a = account(); a.password = "synthetic-secret";
+        QSemaphore entered, release; const auto original = synthetic::page;
+        synthetic::page = [&](const Account &account, const QString &f, int o, int n) { entered.release(); release.acquire(); return original(account, f, o, n); };
+        AccountSession credentials(root.path()); InboxSync sync(root.path(), &credentials, std::make_shared<MailTransport>());
+        ReleaseOnExit cleanup{release}; QSignalSpy updated(&sync, &InboxSync::updated); QSignalSpy done(&sync, &InboxSync::finished);
+        sync.start({a}); QTRY_VERIFY(entered.available()); entered.acquire();
+        MailDatabase db; QVERIFY(db.open(root.path()));
+        if (mode == 0) QVERIFY(db.removeAccount(a.id));
+        if (mode == 1) { a.imapHost = "changed.example.invalid"; QVERIFY(db.saveAccount(a)); }
+        if (mode == 2) sync.cancel();
+        release.release();
+        if (mode != 2) QTRY_COMPARE(done.count(), 1);
+        else { QTest::qWait(50); QVERIFY(!sync.running()); }
+        QCOMPARE(updated.count(), 0); QVERIFY(db.cachedPage("INBOX").messages.isEmpty());
+    }
+    void unifiedInboxRefreshDownloadsOtherAccountsAndKeepsBodyAndPagination() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 80));
+        MailDatabase db; QVERIFY(db.open(root.path()));
+        Content content = synthetic::content(account(), "INBOX", "100", "41"); QVERIFY(db.saveContent(content));
+        auto other = account(); other.id = "other"; other.address = other.username = "other@example.invalid"; QVERIFY(db.saveAccount(other));
+        AccountSession keys(root.path());
+        QSettings settings(QDir(root.path()).filePath("credentials.ini"), QSettings::IniFormat);
+        settings.setValue(keys.key(other) + "/restoreAllowed", true); settings.sync();
+        MailController controller(false, root.path()); QTRY_VERIFY(controller.status().contains("restored"));
+        controller.selectSmartMailbox("allInbox"); controller.loadMore(); QCOMPARE(messages(controller)->count(), 80);
+        controller.openMessage("41", "100", "INBOX", "default");
+        QCOMPARE(controller.selectedMessage().value("text").toString(), content.text);
+        controller.refresh(); controller.refresh();
+        QTRY_COMPARE(controller.status(), QString("All inboxes updated · read-only"));
+        QCOMPARE(synthetic::pageCalls.load(), 2); QCOMPARE(controller.currentAccountId(), QString("default"));
+        QCOMPARE(messages(controller)->count(), 80); QVERIFY(controller.hasMore());
+        QCOMPARE(controller.selectedMessage().value("text").toString(), content.text);
+        controller.loadMore(); QCOMPARE(messages(controller)->count(), 130);
+        QVERIFY(db.open(root.path(), "other")); QCOMPARE(db.cachedPage("INBOX").messages.size(), 50);
+    }
     void unifiedInboxReadsSameUidFromCorrectAccountWithoutWrites() {
         QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
         {

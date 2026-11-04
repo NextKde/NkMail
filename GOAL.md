@@ -662,3 +662,12 @@ Old unchecked lists and provider statements above are historical evidence, not a
 
 - Corrected grouped input focus per user clarification: keep #d1d1d6 background and dark text, show only a 1px canonical-blue border on active input focus. This explicitly requested border supersedes the prior no-focus-border styling for this input.
   VM account editing/binding regression passed (3/3 including lifecycle); host preview rebuilt and replaced for manual inspection.
+
+## Multi-account recent inbox synchronization · 2026-11-04
+
+- Unified-inbox Refresh now downloads the newest 50 inbox headers per saved IMAP/POP account with available credentials. Periodic refresh also updates inactive-account inbox caches. The aggregate remains read-only; older uncached pages still require the source folder.
+- InboxSync owns independent serial scheduling and per-account cache binding. Failures/missing passwords do not stop subsequent accounts; in-flight edited/deleted/cancelled results are discarded. Foreground writes cancel background results to avoid restoring stale flags. POP local flags/deletion tombstones survive refresh.
+- Aggregate refresh preserves loaded pagination and the selected body, with explicit invalidation on source UIDVALIDITY changes. Progress uses the existing busy UI while source switching remains available. Synthetic regressions cover failures, credential isolation, missing credentials, POP reconciliation, deleted/edited accounts, cancellation and source switching during pending reads.
+- Initial VM controller/i18n/catalog checks passed 3/3. Full VM suite passed 10/10 in 115.99s; final progress UI/controller/i18n/catalog checks passed 4/4 in 65.19s. Synthetic aggregate capture reviewed. Host preview rebuilt/replaced for manual inspection; no host automated validation. Canonical UI pin check and dependency guards now pass in the VM; previous GitHub API TLS blocker did not recur on this run.
+
+- Previous settings iteration is now reviewable as PR #24, stacked on #23; the blocked dependency check was rerun successfully before PR creation.

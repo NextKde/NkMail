@@ -311,9 +311,9 @@ CID-referenced raster images inside MIME messages render without remote-image pe
 
 Body cache format 2 retains the resolved images in sanitized HTML, making them available offline. Older selected cached messages are upgraded with a read-only fetch when credentials are available; their existing content stays visible while upgrading.
 
-### Cached unified inbox
+### Unified inbox
 
-**All inboxes (cached)** combines cached inbox headers across saved accounts, retaining each row's account/folder/UIDVALIDITY/UID identity. The list shows the source account and opens content with that account's credentials. Search and unread filtering operate on the local cache; Refresh reloads cached rows rather than syncing every account remotely. This initial aggregate is read-only: opening mail does not mark it read, and mailbox modifications are disabled. Use the row menu's **Open source folder** action to manage messages in their original account. Replies use the selected message's source account.
+**All inboxes** combines cached inbox headers across saved accounts, retaining each row's account/folder/UIDVALIDITY/UID identity. The list shows the source account and opens content with that account's credentials. Search and unread filtering operate on the local cache; Refresh independently downloads the newest 50 inbox headers from each saved IMAP/POP account with available credentials. Periodic refresh also updates inactive accounts; one account failure does not stop the others. Older messages already cached remain available, and refreshing preserves the loaded aggregate window and current body. This is bounded recent-header synchronization, not a full-history mirror or server-deletion reconciliation. Older uncached mail can be fetched from its source account folder. The aggregate remains read-only: opening mail does not mark it read, and mailbox modifications are disabled. Use the row menu's **Open source folder** action to manage messages in their original account. Replies use the selected message's source account.
 
 ### POP accounts
 

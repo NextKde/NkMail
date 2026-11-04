@@ -7,6 +7,7 @@
 #include "services/DraftService.h"
 #include "services/SendService.h"
 #include "services/MailboxSync.h"
+#include "services/InboxSync.h"
 #include "services/RemoteImageLoader.h"
 #include "mail/MailTransport.h"
 #include <QDir>
@@ -84,10 +85,27 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         setStatus(error.isEmpty() ? tr("Messages updated") : tr("Mailbox operation needs attention"), error);
     });
     m_sync = new MailboxSync(m_transport, this);
+    m_inboxSync = new InboxSync(m_root, m_credentials, m_transport, this);
+    connect(m_inboxSync, &InboxSync::runningChanged, this, &MailController::statusChanged);
+    connect(m_inboxSync, &InboxSync::updated, this, [this](const QString &id, const QString &validity) {
+        if (id == m_account.id && m_content.summary.folder == QLatin1String("INBOX")
+            && !m_content.summary.uidValidity.isEmpty() && m_content.summary.uidValidity != validity) {
+            ++m_selectionGeneration; m_content = {}; m_selected.clear(); m_selectedUid.clear();
+            emit selectionChanged();
+        }
+        m_accountUnread.remove(id); ++m_accountUnreadRevision;
+        emit accountUnreadChanged(); emit folderUnreadChanged();
+        if (m_smartMailbox == QLatin1String("allInbox")) reloadUnifiedInbox();
+    });
+    connect(m_inboxSync, &InboxSync::finished, this, [this](const QStringList &failures) {
+        if (m_smartMailbox == QLatin1String("allInbox"))
+            setStatus(failures.isEmpty() ? tr("All inboxes updated · read-only") : tr("Some inboxes could not be updated"), failures.join(u'\n'));
+    });
     m_refreshTimer.setTimerType(Qt::VeryCoarseTimer);
     connect(&m_refreshTimer, &QTimer::timeout, this, [this] {
         if (m_busy || m_commands->busy() || sending() || m_demo || !configured()) return;
-        fetchPage(false, true);
+        if (m_smartMailbox != QLatin1String("allInbox")) fetchPage(false, true);
+        refreshInboxes(m_smartMailbox == QLatin1String("allInbox"));
 
         for (const auto &account : m_database->accounts()) {
             if (account.id == m_account.id || account.incomingProtocol == "pop3") continue;
@@ -150,8 +168,12 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     });
     QTimer::singleShot(0, this, &MailController::initialize);
 }
-MailController::~MailController() { delete m_sync; delete m_commands; delete m_send; delete m_images; }
+MailController::~MailController() { delete m_inboxSync; delete m_sync; delete m_commands; delete m_send; delete m_images; }
 QObject *MailController::messages() const { return m_messages; }
+bool MailController::busy() const {
+    return m_busy || (m_commands && m_commands->busy())
+        || (m_smartMailbox == QLatin1String("allInbox") && m_inboxSync && m_inboxSync->running());
+}
 bool MailController::configured() const { return !m_account.address.isEmpty() && !m_account.imapHost.isEmpty(); }
 QVariantMap MailController::account() const { return accountMap(m_account); }
 QVariantList MailController::accounts() const {
@@ -345,6 +367,7 @@ bool MailController::configureAccountImpl(const QVariantMap &configuration, cons
     // Only the live account may reuse the session-only password held in memory.
     next.password = password.isEmpty() ? (editingCurrent && next.authMethod == m_account.authMethod ? m_account.password : QString{}) : password;
     if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return false; }
+    m_inboxSync->cancel();
     m_sync->resetReadConnection();
     if (editingCurrent && next.authMethod != m_account.authMethod) m_credentials->forget(m_account);
     m_credentials->setPassword(next);
@@ -469,6 +492,7 @@ void MailController::removeAccount(const QString &id) {
     for (const auto &account : m_database->accounts())
         if (account.id == accountId) { target = account; found = true; break; }
     if (!found) return;
+    m_inboxSync->cancel();
     if (!m_database->removeAccount(accountId)) { setStatus(tr("Could not remove account"), m_database->error()); return; }
     QStringList retainedFavorites;
     for (const auto &entry : favoriteEntries())
@@ -493,7 +517,27 @@ void MailController::removeAccount(const QString &id) {
     emit accountChanged(); emit foldersChanged(); emit selectionChanged(); emit draftsChanged();
     setStatus(tr("No accounts left"));
 }
+void MailController::reloadUnifiedInbox() {
+    const auto page = m_database->smartPage("allInbox", 0, qMax(pageSize, m_offset), m_search, m_unreadOnly);
+    m_messages->replace(page.messages); m_offset = page.nextOffset; m_hasMore = page.hasMore;
+    emit statusChanged();
+}
+void MailController::refreshInboxes(bool includeCurrent) {
+    if (m_demo || m_inboxSync->running() || m_commands->busy() || sending()) return;
+    QList<Account> accounts;
+    for (auto account : m_database->accounts()) {
+        if (account.id == m_account.id) {
+            if (!includeCurrent) continue;
+            account.password = m_account.password;
+        }
+        accounts.append(account);
+    }
+    if (accounts.isEmpty()) return;
+    if (m_smartMailbox == QLatin1String("allInbox")) setStatus(tr("Refreshing all inboxes…"));
+    m_inboxSync->start(accounts);
+}
 void MailController::refresh() {
+    if (m_smartMailbox == QLatin1String("allInbox") && !m_demo) { refreshInboxes(true); return; }
     if (m_account.incomingProtocol == "pop3" && m_folder == "Sent" && m_smartMailbox.isEmpty()) { m_cachedOnly = true; loadCached(); return; }
     if (!m_smartMailbox.isEmpty()) { loadCached(); setStatus(m_smartMailbox == QLatin1String("allInbox") ? tr("All inboxes · cached messages · read-only") : tr("Smart mailbox · current account cached messages")); return; }
     if (m_demo) { setStatus(tr("Preview · synthetic mail · not connected")); return; }
@@ -504,6 +548,7 @@ void MailController::refresh() {
         else setStatus(tr("Account needs attention"), tr("Add an account and enter an application password before connecting."));
         return;
     }
+    m_inboxSync->cancel();
     const auto generation = ++m_generation; const auto account = m_account;
     m_busy = true; setStatus(tr("Connecting securely…"));
     m_sync->folders(account, [this, generation](const QList<Folder> &folders, const QString &error) {
@@ -653,6 +698,7 @@ void MailController::fetchPage(bool append, bool quiet) {
     if (m_account.incomingProtocol == "pop3" && m_folder == "Sent" && m_smartMailbox.isEmpty()) { m_cachedOnly = true; loadCached(append); return; }
     if (m_busy || m_commands->busy() || m_demo || m_account.password.isEmpty()) return;
     if (!m_smartMailbox.isEmpty() || !m_search.isEmpty()) { loadCached(append); return; }
+    m_inboxSync->cancel();
     const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
     const auto offset = append ? m_offset : 0;
     m_busy = true; if (!quiet) setStatus(tr("Fetching message headers…"));
@@ -828,6 +874,7 @@ int MailController::sendDelay() const { return m_send->delay(); }
 void MailController::clearError() { m_error.clear(); emit statusChanged(); }
 void MailController::disconnectAccount() {
     if (sending()) return;
+    m_inboxSync->cancel();
     m_sync->resetReadConnection();
     clearPendingSend();
     ++m_generation; ++m_selectionGeneration; m_account.password.clear(); m_busy = false; m_restorePending = false; m_switchCredentialPending = false; m_cachedOnly = true;
@@ -885,6 +932,7 @@ void MailController::executeCommand(const QVariantList &indices, MailboxCommands
         seen.insert(identity); selected.append(summary);
     }
     if (selected.isEmpty()) return;
+    m_inboxSync->cancel();
     ++m_generation; m_serverSearching = false;
     setStatus(tr("Updating messages…"));
     m_commands->execute(m_account, selected, action, value, destination, m_demo);
