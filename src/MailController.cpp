@@ -678,14 +678,32 @@ void MailController::openMessage(const QString &uid, const QString &validity, co
         if (cached->bodyFormatVersion >= 1 || m_demo || m_account.password.isEmpty()) return;
         upgrading = true; // Re-read only this selected message with PEEK; keep cache visible.
     }
-    if (!upgrading) { m_selectedUid = uid; m_selected.clear(); m_content = {}; emit selectionChanged(); }
-    if (m_demo || m_account.password.isEmpty()) { setStatus(tr("This message is not cached"), tr("Connect to download its content.")); return; }
+    if (!upgrading) {
+        m_selectedUid = uid; m_content = {};
+        const int row = m_messages->indexOf(folder, validity, uid);
+        if (row >= 0) m_content.summary = summaryFromMap(m_messages->get(row));
+        else { m_content.summary.uid = uid; m_content.summary.uidValidity = validity; m_content.summary.folder = folder; }
+        m_content.to = m_content.summary.recipients;
+        m_selected = contentMap(m_content); m_selected.insert("bodyPending", true);
+    }
+    m_selected.insert("bodyLoading", !m_demo && !m_account.password.isEmpty());
+    m_selected.insert("bodyError", QString{});
+    if (m_demo || m_account.password.isEmpty()) {
+        m_selected.insert("bodyError", tr("Connect to download its content.")); emit selectionChanged();
+        setStatus(tr("This message is not cached"), tr("Connect to download its content.")); return;
+    }
+    emit selectionChanged();
     const auto generation = m_generation; const auto account = m_account;
     setStatus(tr("Loading message without changing server flags…"));
     m_sync->content(account, folder, validity, uid, [this, generation, selectionGeneration](const Content &content, const QString &error) {
         if (generation != m_generation || selectionGeneration != m_selectionGeneration) return;
-        if (!error.isEmpty()) { setStatus(tr("Could not load message"), error); return; }
-        if (!m_database->saveContent(content)) { setStatus(tr("Could not cache content"), m_database->error()); return; }
+        const auto failed = [this](const QString &message) {
+            m_selected.insert("bodyLoading", false);
+            m_selected.insert("bodyError", QCoreApplication::translate("MailErrors", message.toUtf8().constData()));
+            emit selectionChanged();
+        };
+        if (!error.isEmpty()) { failed(error); setStatus(tr("Could not load message"), error); return; }
+        if (!m_database->saveContent(content)) { failed(m_database->error()); setStatus(tr("Could not cache content"), m_database->error()); return; }
         present(content); setStatus(tr("Message cached · remote content blocked"));
     });
 }

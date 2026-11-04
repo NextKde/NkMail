@@ -527,14 +527,23 @@ QList<QVariantMap> MailioBackend::search(const Account &a, const QString &folder
 }
 Content MailioBackend::content(const Account &a, const QString &folder, const QString &validity, const QString &uid)
 {
+    QElapsedTimer elapsed; elapsed.start();
+    const auto trace = [&](const char *phase) {
+        if (qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
+            qInfo().noquote() << "NkMail sync phase:" << phase << "elapsed-ms=" << elapsed.elapsed();
+    };
+    trace("content-start");
     try {
         accountValid(a, false); folderValid(folder);
         const auto expected = identity(validity), id = identity(uid);
         Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
+        trace("content-authenticated");
         const auto stat = imap.select(utf8(folder), true);
         if (stat.uid_validity != expected) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Folder identity changed. Refresh the message list."));
+        trace("content-selected");
         imap.literal_limit(MaxMessage);
         const auto messages = imap.fetch({{id, id}}, options(false), mailio::codec::line_len_policy_t::NONE);
+        trace("content-downloaded");
         const auto found = messages.find(id);
         if (found == messages.end()) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Message no longer exists."));
         const auto &m = found->second;
@@ -550,9 +559,10 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
         c.attachments = std::move(decoded.attachments);
         c.summary.hasAttachments = !c.attachments.isEmpty();
         c.summary.preview = c.text.simplified().left(160);
+        trace("content-complete");
         return c;
-    } catch (const BackendError &) { throw; }
-      catch (...) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate.")); }
+    } catch (const BackendError &) { trace("content-failed"); throw; }
+      catch (...) { trace("content-failed"); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate.")); }
 }
 void MailioBackend::verifySmtp(const Account &a)
 {

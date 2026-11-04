@@ -1612,6 +1612,22 @@ Alex
             <source>Select a message to read it here.</source>
             <translation>选择一封邮件，在这里阅读。</translation>
         </message>
+        <message>
+            <source>Could not load message</source>
+            <translation>无法加载邮件</translation>
+        </message>
+        <message>
+            <source>Downloading message…</source>
+            <translation>正在下载邮件正文…</translation>
+        </message>
+        <message>
+            <source>Rendering message…</source>
+            <translation>正在渲染邮件正文…</translation>
+        </message>
+        <message>
+            <source>Retry</source>
+            <translation>重试</translation>
+        </message>
     </context>
     <context>
         <name>ProviderPicker</name>

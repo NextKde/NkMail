@@ -153,6 +153,25 @@ TestCase {
         app.requestActivate()
         wait(40)
     }
+    function test_reader_preserves_header_with_visible_loading_and_retry() {
+        const pending = {uid: "pending", uidValidity: "42", folder: "INBOX", sender: "Studio Example",
+            subject: "A message on its way", to: "alex@example.invalid", bodyPending: true, bodyLoading: true}
+        const reader = createTemporaryObject(readerComponent, app.contentItem, {mail: mock, message: pending,
+            hasMessage: true, width: 700, height: 600})
+        verify(reader !== null)
+        tryCompare(findChild(reader, "readerSubject"), "text", pending.subject)
+        verify(findChild(reader, "messageBodyLoadingState").visible)
+        verify(findChild(reader, "messageBodySpinner").running)
+        verify(!findChild(reader, "messageBody").visible)
+        verify(!findChild(reader, "browserBodyLoader").active)
+        reader.message = Object.assign({}, pending, {bodyLoading: false, bodyError: "Synthetic connection failure"})
+        verify(!findChild(reader, "messageBodySpinner").running)
+        verify(findChild(reader, "retryMessageBodyButton").visible)
+        compare(findChild(reader, "readerSubject").text, pending.subject)
+        reader.message = Object.assign({}, pending, {bodyPending: false, bodyLoading: false, text: "Ready body"})
+        verify(!findChild(reader, "messageBodyLoadingState").visible)
+        verify(findChild(reader, "messageBody").visible)
+    }
     function test_empty_mail_sync_shows_the_current_phase() {
         const original = []
         for (let i = 0; i < messageModel.count; ++i) original.push(Object.assign({}, messageModel.get(i)))

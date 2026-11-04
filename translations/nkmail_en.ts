@@ -1612,6 +1612,22 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Select a message to read it here.</source>
             <translation>Select a message to read it here.</translation>
         </message>
+        <message>
+            <source>Could not load message</source>
+            <translation>Could not load message</translation>
+        </message>
+        <message>
+            <source>Downloading message…</source>
+            <translation>Downloading message…</translation>
+        </message>
+        <message>
+            <source>Rendering message…</source>
+            <translation>Rendering message…</translation>
+        </message>
+        <message>
+            <source>Retry</source>
+            <translation>Retry</translation>
+        </message>
     </context>
     <context>
         <name>ProviderPicker</name>

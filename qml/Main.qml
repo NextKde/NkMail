@@ -109,7 +109,7 @@ ApplicationWindow {
     }
     function dateLabel(date) { return MailLabels.dateLabel(date) }
     function compose(mode) {
-        if (mail.sending) return
+        if (mail.sending || ((mode || "new") !== "new" && window.message.bodyPending === true)) return
         composer.editDraft(mail.newDraft(mode || "new"))
     }
     // Capture helper is deliberately unavailable for real accounts.
@@ -348,7 +348,7 @@ ApplicationWindow {
                 readerVisible: window.readerVisible
                 draftsVisible: window.draftsVisible
                 liquidControls: window.liquidControls
-                hasMessage: window.hasMessage
+                hasMessage: window.hasMessage && window.message.bodyPending !== true
                 visible: reader.visible || readerHeader.searching
                 x: contentScene.x + (window.narrow ? 0 : reader.x)
                 width: Math.max(0, windowChrome.controlsLeft - x)

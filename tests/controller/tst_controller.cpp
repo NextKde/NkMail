@@ -206,6 +206,33 @@ struct ReleaseOnExit {
 class ControllerTests : public QObject {
     Q_OBJECT
 private slots:
+    void bodyLoadingPreservesHeaderAndOffersRetryAfterFailure() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
+        QSemaphore release;
+        const auto normal = synthetic::content;
+        synthetic::content = [&release](const Account &, const QString &, const QString &, const QString &) -> Content {
+            release.acquire(); throw std::runtime_error("Synthetic body failure");
+        };
+        MailController controller(false, root.path()); ReleaseOnExit cleanup{release};
+        QTRY_VERIFY(controller.status().contains("restored"));
+        controller.openMessage("120", "100");
+        QVERIFY(controller.selectedMessage().value("bodyLoading").toBool());
+        QVERIFY(controller.selectedMessage().value("bodyPending").toBool());
+        QCOMPARE(controller.selectedMessage().value("subject").toString(), QString("even"));
+        QCOMPARE(controller.selectedMessage().value("senderAddress").toString(), QString("sender@example.invalid"));
+        QVERIFY(controller.selectedMessage().value("text").toString().isEmpty());
+        release.release();
+        QTRY_VERIFY(!controller.selectedMessage().value("bodyLoading").toBool());
+        QVERIFY(!controller.selectedMessage().value("bodyError").toString().isEmpty());
+        QCOMPARE(controller.selectedMessage().value("subject").toString(), QString("even"));
+        synthetic::content = normal;
+        controller.openMessage("120", "100");
+        QTRY_COMPARE(controller.selectedMessage().value("text").toString(), QString("Synthetic body 120"));
+        QVERIFY(!controller.selectedMessage().value("bodyPending").toBool());
+        QVERIFY(!controller.selectedMessage().value("bodyLoading").toBool());
+        QVERIFY(controller.selectedMessage().value("bodyError").toString().isEmpty());
+    }
+
     void smartMailboxOpensDuplicateUidFromSourceFolder() {
         QTemporaryDir root(temporaryTemplate());
         QVERIFY(seed(root.path(), 0, false));
@@ -630,7 +657,7 @@ void ControllerTests::latePageIgnoredDuringCachedSearch()
     release.release();
     // Drain the queued completion through another task in the same pool.
     controller.openMessage("120", "100");
-    QTRY_VERIFY(!controller.selectedMessage().isEmpty());
+    QTRY_VERIFY(!controller.selectedMessage().isEmpty() && !controller.selectedMessage().value("bodyPending").toBool());
     QCOMPARE(controller.search(), QStringLiteral("even"));
     for (int row = 0; row < messages(controller)->count(); ++row)
         QCOMPARE(messages(controller)->get(row).value("subject").toString(), QStringLiteral("even"));
@@ -655,7 +682,7 @@ void ControllerTests::newerSelectionWinsOverLateBody()
     QTRY_COMPARE(synthetic::contentCalls.load(), 1);
     controller.openMessage("119", "100");
     release.release();
-    QTRY_COMPARE(controller.selectedMessage().value("uid").toString(), QStringLiteral("119"));
+    QTRY_COMPARE(controller.selectedMessage().value("text").toString(), QStringLiteral("Synthetic body 119"));
     QCOMPARE(controller.selectedUid(), QStringLiteral("119"));
     QCOMPARE(synthetic::contentCalls.load(), 2);
 }
@@ -714,7 +741,7 @@ void ControllerTests::uidValidityChangeRestartsPagination()
     controller.refresh();
     QTRY_VERIFY(!controller.busy());
     controller.openMessage("120", "100");
-    QTRY_VERIFY(!controller.selectedMessage().isEmpty());
+    QTRY_VERIFY(!controller.selectedMessage().isEmpty() && !controller.selectedMessage().value("bodyPending").toBool());
     controller.loadMore();
     QTRY_VERIFY(!controller.busy());
     QCOMPARE(offsets(), QList<int>({0, 50, 0}));
@@ -731,10 +758,11 @@ void ControllerTests::staleBodySelectionCannotExportPreviousAttachment()
     MailController controller(false, root.path());
     QTRY_VERIFY(controller.status().contains("restored"));
     controller.openMessage("120", "100");
-    QTRY_VERIFY(!controller.selectedMessage().isEmpty());
+    QTRY_VERIFY(!controller.selectedMessage().isEmpty() && !controller.selectedMessage().value("bodyPending").toBool());
     controller.disconnectAccount();
     controller.openMessage("119", "100");
-    QVERIFY(controller.selectedMessage().isEmpty());
+    QVERIFY(controller.selectedMessage().value("bodyPending").toBool());
+    QVERIFY(controller.selectedMessage().value("text").toString().isEmpty());
     const auto target = root.filePath("must-not-export-previous-message.txt");
     controller.saveAttachment(0, QUrl::fromLocalFile(target).toString());
     QVERIFY(!QFile::exists(target));
@@ -834,7 +862,7 @@ void ControllerTests::accountTransportChangeClearsVisibleCache()
     MailController controller(false, root.path());
     QTRY_VERIFY(controller.status().contains("restored"));
     controller.openMessage("120", "100");
-    QTRY_VERIFY(!controller.selectedMessage().isEmpty());
+    QTRY_VERIFY(!controller.selectedMessage().isEmpty() && !controller.selectedMessage().value("bodyPending").toBool());
     auto configuration = controller.account();
     configuration.insert("imapPort", 1993);
     controller.configureAccount(configuration, QStringLiteral("new-session-password"), false);
@@ -938,7 +966,7 @@ void ControllerTests::composeReplyAndForward()
 {
     QTemporaryDir root(temporaryTemplate());
     MailController controller(true, root.path());
-    QTRY_VERIFY(!controller.selectedMessage().isEmpty());
+    QTRY_VERIFY(!controller.selectedMessage().isEmpty() && !controller.selectedMessage().value("bodyPending").toBool());
     QSignalSpy changed(&controller, &MailController::draftsChanged);
     const auto fresh = controller.newDraft("new");
     QVERIFY(!fresh.value("id").toString().isEmpty());
@@ -992,7 +1020,7 @@ void ControllerTests::replyAllQuotedNamesAndExactSelfExclusion()
     MailController controller(false, root.path());
     QTRY_VERIFY(controller.status().contains("restored"));
     controller.openMessage("120", "100");
-    QTRY_VERIFY(!controller.selectedMessage().isEmpty());
+    QTRY_VERIFY(!controller.selectedMessage().isEmpty() && !controller.selectedMessage().value("bodyPending").toBool());
     const auto reply = controller.newDraft("replyAll");
     QVERIFY(!reply.isEmpty());
     QCOMPARE(reply.value("cc").toString(), QStringLiteral("jane@example.invalid, nottest@example.invalid, other@example.invalid"));
@@ -1014,7 +1042,7 @@ void ControllerTests::unsupportedReplyRecipientsFailClosed()
     MailController controller(false, root.path());
     QTRY_VERIFY(controller.status().contains("restored"));
     controller.openMessage("120", "100");
-    QTRY_VERIFY(!controller.selectedMessage().isEmpty());
+    QTRY_VERIFY(!controller.selectedMessage().isEmpty() && !controller.selectedMessage().value("bodyPending").toBool());
     const auto before = controller.drafts().size();
     QVERIFY(controller.newDraft("replyAll").isEmpty());
     QVERIFY(!controller.error().isEmpty());
@@ -1027,7 +1055,7 @@ void ControllerTests::attachmentExportAndDraftDiscard()
 {
     QTemporaryDir root(temporaryTemplate());
     MailController controller(true, root.path());
-    QTRY_VERIFY(!controller.selectedMessage().isEmpty());
+    QTRY_VERIFY(!controller.selectedMessage().isEmpty() && !controller.selectedMessage().value("bodyPending").toBool());
     const auto exported = root.filePath("exported.txt");
     controller.saveAttachment(0, QUrl::fromLocalFile(exported).toString());
     QFile file(exported);

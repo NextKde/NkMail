@@ -10,6 +10,11 @@ Rectangle {
     required property var mail
     property var message: ({})
     property bool hasMessage: false
+    readonly property bool bodyPending: message.bodyPending === true
+    readonly property bool bodyLoading: message.bodyLoading === true
+    readonly property string bodyError: message.bodyError || ""
+    readonly property bool hasHeader: !!(message.sender || message.senderAddress || message.subject || message.date || message.to)
+    readonly property bool renderingBody: browserBody.active && (!browserBody.item || !browserBody.item.documentReady)
     property bool draftsVisible: false
     property bool detailsVisible: false
     property bool showRichText: true
@@ -45,6 +50,7 @@ Rectangle {
                     spacing: 14
                     MailMessageHeader {
                         objectName: "mailMessageHeader"
+                        visible: root.hasHeader
                         Layout.fillWidth: true
                         Layout.minimumWidth: 0
                         Layout.topMargin: 12
@@ -157,12 +163,47 @@ Rectangle {
                             onClicked: root.mail.loadRemoteImages()
                         }
                     }
+                    ColumnLayout {
+                        objectName: "messageBodyLoadingState"
+                        visible: root.bodyLoading || root.renderingBody || root.bodyError.length > 0
+                        Layout.fillWidth: true
+                        Layout.topMargin: 20; Layout.bottomMargin: 20
+                        spacing: 12
+                        RowLayout {
+                            Layout.alignment: Qt.AlignHCenter
+                            spacing: 12
+                            BusyIndicator {
+                                objectName: "messageBodySpinner"
+                                running: root.bodyLoading || root.renderingBody
+                                visible: running
+                                implicitWidth: 32; implicitHeight: 32
+                            }
+                            Text {
+                                text: root.bodyError.length ? qsTr("Could not load message")
+                                    : root.bodyLoading ? qsTr("Downloading message…") : qsTr("Rendering message…")
+                                color: root.ink; font.pixelSize: 14; font.weight: Font.DemiBold
+                            }
+                        }
+                        Text {
+                            visible: root.bodyError.length > 0
+                            text: root.bodyError
+                            Layout.fillWidth: true
+                            color: root.muted; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter
+                        }
+                        KosButton {
+                            objectName: "retryMessageBodyButton"
+                            visible: root.bodyError.length > 0 && !root.bodyLoading
+                            Layout.alignment: Qt.AlignHCenter
+                            text: qsTr("Retry")
+                            onClicked: root.mail.openMessage(String(root.message.uid || ""), String(root.message.uidValidity || ""), String(root.message.folder || ""))
+                        }
+                    }
                     // Render only the backend-sanitized html field; fall back to plain text.
                     Loader {
                         id: browserBody
                         objectName: "browserBodyLoader"
                         readonly property string displayHtml: MailLabels.value(root.message, "displayHtml")
-                        active: root.showRichText && displayHtml.length > 0
+                        active: !root.bodyPending && root.showRichText && displayHtml.length > 0
                         visible: active
                         Layout.fillWidth: true
                         Layout.preferredHeight: item ? item.implicitHeight : 0
@@ -185,7 +226,7 @@ Rectangle {
                         objectName: "messageBody"
                         Layout.preferredWidth: 0
                         Layout.minimumWidth: 0
-                        visible: !browserBody.active && !asRich
+                        visible: !root.bodyPending && !browserBody.active && !asRich
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.max(200, contentHeight)
                         readonly property string richHtml: MailLabels.value(root.message, "html") || ""
@@ -210,7 +251,7 @@ Rectangle {
                         objectName: "legacyMessageBody"
                         Layout.preferredWidth: 0
                         Layout.minimumWidth: 0
-                        visible: !browserBody.active && asRich
+                        visible: !root.bodyPending && !browserBody.active && asRich
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.max(200, contentHeight)
                         readonly property string richHtml: MailLabels.value(root.message, "html") || ""
