@@ -544,3 +544,11 @@ The scoped local implementation is substantially complete, but real-provider rea
 - Account headers only expand/collapse. Selecting a child folder performs account navigation. Added a UI regression for a non-current account header preserving current account identity.
 - Custom favorites have a remove context action. Successful account removal clears corresponding persisted favorites; older orphan entries are filtered from display.
 - VM controller/i18n/catalog passed; initial reader/UI load found a handler object-property error, fixed before delivery. Final reader/UI passed 2/2 in 52.66s. Host compiled and relaunched under the user's existing authorization, preserving process environment; no host automated tests or real mailbox mutation. Perceived scrolling smoothness awaits user feedback.
+
+
+## Reader surface on window restore · 2026-11-04
+
+- User reports a black HTML body after minimizing/restoring, recovering on scrolling. This suggests a stale rendered surface; the host-specific GPU/compositor cause has not been isolated.
+- Bind WebEngine item visibility to its containing window's minimized/hidden state, explicitly notifying the browser renderer through suspend/resume without replacing the document or resetting scrolling.
+- VM reader suite passed in 2.89s, including new minimize/restore and hide/show pixel checks without user input, with document URL/readiness preserved. This VM result does not establish reproduction or resolution on the user's compositor.
+- Host rebuilt/relaunched with prior process environment under existing authorization. No host automated tests or mailbox mutations. Await user confirmation of the original minimize/restore symptom.

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import QtWebEngine
 import NextKde.Mail.Reader 1.0
 
@@ -11,6 +12,12 @@ WebEngineView {
     signal linkActivated(string link)
     objectName: "mailHtmlBody"
     implicitHeight: Math.max(200, Math.min(12000, documentHeight))
+    // Explicitly notify Chromium when the containing window is minimized/hidden.
+    // Keeping only the native window hidden can leave its imported texture stale
+    // on restore until unrelated input schedules another compositor frame.
+    readonly property bool windowSuspended: Window.window !== null
+        && (Window.visibility === Window.Minimized || Window.visibility === Window.Hidden)
+    visible: !windowSuspended
     backgroundColor: "white"
     audioMuted: true
     activeFocusOnPress: true
