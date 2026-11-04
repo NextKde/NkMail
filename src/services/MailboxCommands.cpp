@@ -27,6 +27,12 @@ void MailboxCommands::execute(const Account &account, QList<Summary> messages, A
         if (action == Action::Flag) message.flagged = value;
     }
     const bool removed = action == Action::Remove || action == Action::Move;
+    if (account.incomingProtocol == "pop3") {
+        if (action == Action::Move) { emit completed({}, false, tr("POP does not support moving messages between server folders.")); return; }
+        const bool saved = removed ? m_database.removePopMessages(messages) : m_database.updateFlags(messages);
+        emit completed(saved ? messages : QList<Summary>{}, removed, saved ? QString{} : m_database.error());
+        return;
+    }
     m_busy = true;
     QPointer<MailboxCommands> self(this);
     auto finish = [self, account, messages, removed](const QString &error) {

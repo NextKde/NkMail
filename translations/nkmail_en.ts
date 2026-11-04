@@ -121,20 +121,10 @@
             <translation>Server</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="179" />
-            <source>IMAP server</source>
-            <translation>IMAP server</translation>
-        </message>
-        <message>
             <location filename="../qml/AccountDialog.qml" line="180" />
             <location filename="../qml/AccountDialog.qml" line="190" />
             <source>Port</source>
             <translation>Port</translation>
-        </message>
-        <message>
-            <location filename="../qml/AccountDialog.qml" line="180" />
-            <source>IMAP port</source>
-            <translation>IMAP port</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="182" />
@@ -228,6 +218,26 @@
             <location filename="../qml/AccountDialog.qml" line="192" />
             <source>To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.</source>
             <translation>To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.</translation>
+        </message>
+        <message>
+            <source>Incoming port</source>
+            <translation>Incoming port</translation>
+        </message>
+        <message>
+            <source>Incoming server</source>
+            <translation>Incoming server</translation>
+        </message>
+        <message>
+            <source>Incoming · POP</source>
+            <translation>Incoming · POP</translation>
+        </message>
+        <message>
+            <source>POP keeps server copies. Read status, flags and deletion apply only on this device. Sent copies are saved locally; server folders are unavailable.</source>
+            <translation>POP keeps server copies. Read status, flags and deletion apply only on this device. Sent copies are saved locally; server folders are unavailable.</translation>
+        </message>
+        <message>
+            <source>Protocol</source>
+            <translation>Protocol</translation>
         </message>
     </context>
     <context>
@@ -846,10 +856,49 @@
             <source>Unsupported account authentication method.</source>
             <translation>Unsupported account authentication method.</translation>
         </message>
+        <message>
+            <source>POP message exceeds the download size limit.</source>
+            <translation>POP message exceeds the download size limit.</translation>
+        </message>
+        <message>
+            <source>POP page exceeds the download size limit.</source>
+            <translation>POP page exceeds the download size limit.</translation>
+        </message>
+        <message>
+            <source>POP server must support UIDL to identify messages safely.</source>
+            <translation>POP server must support UIDL to identify messages safely.</translation>
+        </message>
+        <message>
+            <source>POP server returned an invalid or oversized UIDL list.</source>
+            <translation>POP server returned an invalid or oversized UIDL list.</translation>
+        </message>
+        <message>
+            <source>POP server returned duplicate message identities.</source>
+            <translation>POP server returned duplicate message identities.</translation>
+        </message>
+        <message>
+            <source>POP supports only the server inbox.</source>
+            <translation>POP supports only the server inbox.</translation>
+        </message>
+        <message>
+            <source>This POP message was deleted locally.</source>
+            <translation>This POP message was deleted locally.</translation>
+        </message>
+        <message>
+            <source>This operation is not supported by POP.</source>
+            <translation>This operation is not supported by POP.</translation>
+        </message>
+        <message>
+            <source>Unsupported incoming mail protocol or authentication.</source>
+            <translation>Unsupported incoming mail protocol or authentication.</translation>
+        </message>
     </context>
     <context>
         <name>MailLabels</name>
-        <message><source>All inboxes (cached)</source><translation>All inboxes (cached)</translation></message>
+        <message>
+            <source>All inboxes (cached)</source>
+            <translation>All inboxes (cached)</translation>
+        </message>
         <message>
             <location filename="../qml/MailLabels.qml" line="7" />
             <source>Flagged</source>
@@ -1107,25 +1156,29 @@
             <source>Close search</source>
             <translation>Close search</translation>
         </message>
+        <message>
+            <source>Delete locally</source>
+            <translation>Delete locally</translation>
+        </message>
     </context>
     <context>
         <name>Main</name>
-    <message>
-        <source>Allow images from this sender</source>
-        <translation>Allow images from this sender</translation>
-    </message>
-    <message>
-        <source>Always show remote images</source>
-        <translation>Always show remote images</translation>
-    </message>
-    <message>
-        <source>Remote images can reveal that you opened a message.</source>
-        <translation>Remote images can reveal that you opened a message.</translation>
-    </message>
-    <message>
-        <source>Reset image permissions</source>
-        <translation>Reset image permissions</translation>
-    </message>
+        <message>
+            <source>Allow images from this sender</source>
+            <translation>Allow images from this sender</translation>
+        </message>
+        <message>
+            <source>Always show remote images</source>
+            <translation>Always show remote images</translation>
+        </message>
+        <message>
+            <source>Remote images can reveal that you opened a message.</source>
+            <translation>Remote images can reveal that you opened a message.</translation>
+        </message>
+        <message>
+            <source>Reset image permissions</source>
+            <translation>Reset image permissions</translation>
+        </message>
         <message>
             <location filename="../qml/Main.qml" line="20" />
             <source>NkMail</source>
@@ -1337,10 +1390,17 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Save attachment</source>
             <translation>Save attachment</translation>
         </message>
+        <message>
+            <source>Delete locally</source>
+            <translation>Delete locally</translation>
+        </message>
     </context>
     <context>
         <name>MessagePane</name>
-        <message><source>Open source folder</source><translation>Open source folder</translation></message>
+        <message>
+            <source>Open source folder</source>
+            <translation>Open source folder</translation>
+        </message>
         <message>
             <source>Add an account</source>
             <translation>Add an account</translation>
@@ -1506,17 +1566,21 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Delete</source>
             <translation>Delete</translation>
         </message>
+        <message>
+            <source>Delete locally</source>
+            <translation>Delete locally</translation>
+        </message>
     </context>
     <context>
         <name>MessageReader</name>
-    <message>
-        <source>Show images for this message</source>
-        <translation>Show images for this message</translation>
-    </message>
-    <message>
-        <source>Allow images from this sender</source>
-        <translation>Allow images from this sender</translation>
-    </message>
+        <message>
+            <source>Show images for this message</source>
+            <translation>Show images for this message</translation>
+        </message>
+        <message>
+            <source>Allow images from this sender</source>
+            <translation>Allow images from this sender</translation>
+        </message>
         <message>
             <source>Connect to load the original message formatting.</source>
             <translation>Connect to load the original message formatting.</translation>
@@ -1648,21 +1712,6 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation>Tencent Exmail</translation>
         </message>
         <message>
-            <location filename="../qml/ProviderPicker.qml" line="13" />
-            <source>Microsoft OAuth and native Exchange are not available yet. Browser sign-in requires an application registration.</source>
-            <translation>Microsoft OAuth and native Exchange are not available yet. Browser sign-in requires an application registration.</translation>
-        </message>
-        <message>
-            <location filename="../qml/ProviderPicker.qml" line="16" />
-            <source>Enable IMAP/SMTP in your webmail settings and use the client authorization code when required.</source>
-            <translation>Enable IMAP/SMTP in your webmail settings and use the client authorization code when required.</translation>
-        </message>
-        <message>
-            <location filename="../qml/ProviderPicker.qml" line="17" />
-            <source>Enter the IMAP and SMTP settings supplied by your mail administrator.</source>
-            <translation>Enter the IMAP and SMTP settings supplied by your mail administrator.</translation>
-        </message>
-        <message>
             <location filename="../qml/ProviderPicker.qml" line="18" />
             <source>Use an app-specific password generated in your provider account settings.</source>
             <translation>Use an app-specific password generated in your provider account settings.</translation>
@@ -1681,6 +1730,14 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../qml/ProviderPicker.qml" line="15" />
             <source>Enable two-step verification in your Google account and generate an app password. Use that app password here, not your Google account password.</source>
             <translation>Enable two-step verification in your Google account and generate an app password. Use that app password here, not your Google account password.</translation>
+        </message>
+        <message>
+            <source>Enable IMAP or POP and SMTP in your webmail settings and use the client authorization code when required.</source>
+            <translation>Enable IMAP or POP and SMTP in your webmail settings and use the client authorization code when required.</translation>
+        </message>
+        <message>
+            <source>Enter the IMAP or POP and SMTP settings supplied by your mail administrator.</source>
+            <translation>Enter the IMAP or POP and SMTP settings supplied by your mail administrator.</translation>
         </message>
     </context>
     <context>
@@ -1814,8 +1871,14 @@ Synthetic demo draft. Sending is disabled.</translation>
     </context>
     <context>
         <name>nkmail::MailController</name>
-        <message><source>All inboxes · cached messages · read-only</source><translation>All inboxes · cached messages · read-only</translation></message>
-        <message><source>Open the account folder to change messages.</source><translation>Open the account folder to change messages.</translation></message>
+        <message>
+            <source>All inboxes · cached messages · read-only</source>
+            <translation>All inboxes · cached messages · read-only</translation>
+        </message>
+        <message>
+            <source>Open the account folder to change messages.</source>
+            <translation>Open the account folder to change messages.</translation>
+        </message>
         <message>
             <location filename="../src/MailController.cpp" line="73" />
             <source>Messages updated</source>
@@ -2112,6 +2175,14 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Enter a Google app password in account settings to reconnect this account.</source>
             <translation>Enter a Google app password in account settings to reconnect this account.</translation>
         </message>
+        <message>
+            <source>Choose IMAP or POP for incoming mail.</source>
+            <translation>Choose IMAP or POP for incoming mail.</translation>
+        </message>
+        <message>
+            <source>POP does not support server folders.</source>
+            <translation>POP does not support server folders.</translation>
+        </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
@@ -2144,6 +2215,10 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../src/services/MailboxCommands.cpp" line="55" />
             <source>Mailbox operation failed. Refresh before retrying.</source>
             <translation>Mailbox operation failed. Refresh before retrying.</translation>
+        </message>
+        <message>
+            <source>POP does not support moving messages between server folders.</source>
+            <translation>POP does not support moving messages between server folders.</translation>
         </message>
     </context>
     <context>
@@ -2259,6 +2334,14 @@ Synthetic demo draft. Sending is disabled.</translation>
             <location filename="../src/services/SendService.cpp" line="93" />
             <source>Send cancelled</source>
             <translation>Send cancelled</translation>
+        </message>
+        <message>
+            <source>SMTP server accepted this message · local Sent copy failed; accepted draft retained</source>
+            <translation>SMTP server accepted this message · local Sent copy failed; accepted draft retained</translation>
+        </message>
+        <message>
+            <source>SMTP server accepted this message · local Sent copy saved</source>
+            <translation>SMTP server accepted this message · local Sent copy saved</translation>
         </message>
     </context>
     <context>

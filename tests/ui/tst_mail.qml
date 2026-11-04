@@ -1389,12 +1389,35 @@ TestCase {
         compare(Profiles.forAddress(" USER@GMAIL.COM "), "google")
         compare(Profiles.forAddress("person@company.invalid"), "manual")
         compare(Profiles.forAddress("person@gmail.com.attacker.invalid"), "manual")
-        dialog.step = 0
-        findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("microsoft")
-        dialog.nextStep()
-        compare(dialog.step, 0)
-        tryCompare(visualChild(picker, "providerLogo_microsoft"), "status", Image.Ready)
+        compare(Profiles.ids.indexOf("microsoft"), -1)
+        compare(visualChild(picker, "providerLogo_microsoft"), null)
         compare(Profiles.logo("manual"), "")
+        dialog.close()
+    }
+    function test_pop_account_configuration_and_local_action_labels() {
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        const picker = findChild(dialog, "providerChoice")
+        picker.currentIndex = Profiles.ids.indexOf("qq")
+        dialog.nextStep()
+        const protocol = findChild(dialog, "incomingProtocolChoice")
+        protocol.currentIndex = 1; protocol.activated(1)
+        compare(dialog.configuration().incomingProtocol, "pop3")
+        compare(dialog.configuration().imapHost, "pop.qq.com")
+        compare(dialog.configuration().imapPort, 995)
+        verify(!dialog.configuration().imapStartTls)
+        if (imagePolicyCapture.capturePath.length > 0) {
+            findChild(dialog, "accountAddress").text = "person@example.invalid"
+            findChild(dialog, "accountName").text = "POP fixture"
+            wait(150)
+            grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".pop.png")
+        }
+        dialog.editAccount({id: "existing-pop", incomingProtocol: "pop3", imapHost: "pop.example.invalid", imapPort: 995})
+        compare(dialog.configuration().incomingProtocol, "pop3")
+        verify(!protocol.enabled)
+        dialog.addAccount(); picker.currentIndex = Profiles.ids.indexOf("icloud"); dialog.nextStep()
+        compare(protocol.count, 1)
+        compare(dialog.configuration().incomingProtocol, "imap")
         dialog.close()
     }
     function test_account_wizard_preserves_config_on_failure() {

@@ -83,7 +83,7 @@ class Server:
 
     def run(self):
         try:
-            attempts = 2 if self.scenario in ("reuse-reset", "reuse-account", "reuse-password", "reuse-trust", "reuse-drop", "reuse-drop-twice") else 1
+            attempts = 2 if self.scenario in ("pop-renumber", "reuse-reset", "reuse-account", "reuse-password", "reuse-trust", "reuse-drop", "reuse-drop-twice") else 1
             for connection_index in range(attempts):
                 self.connection_index = connection_index
                 conn, _ = self.socket.accept()
@@ -97,6 +97,7 @@ class Server:
                         conn = self.context.wrap_socket(conn, server_side=True)
                     self.conn = conn
                     if self.protocol == "imap": self.imap()
+                    elif self.protocol == "pop": self.pop()
                     else: self.smtp()
         except (ssl.SSLError, ConnectionResetError, BrokenPipeError):
             pass  # Expected for TLS-negative tests and closed sessions.
@@ -116,6 +117,39 @@ class Server:
         return bytes(data).rstrip(b"\r\n")
 
     def upgrade(self): self.conn = self.context.wrap_socket(self.conn, server_side=True)
+
+    def pop(self):
+        self.write(b"+OK POP fixture ready\r\n")
+        secure = not self.starttls
+        while line := self.line():
+            self.commands.append(line.decode(errors="replace"))
+            fields = line.split()
+            command = fields[0].upper()
+            if command == b"STLS":
+                if self.scenario == "refuse-starttls": self.write(b"-ERR unavailable\r\n"); continue
+                self.write(b"+OK upgrade\r\n"); self.upgrade(); secure = True
+            elif command in (b"USER", b"PASS"):
+                assert secure, "Credentials before TLS"
+                self.write(b"+OK authenticated\r\n")
+            elif command == b"UIDL":
+                if self.scenario == "no-uidl": self.write(b"-ERR unavailable\r\n")
+                elif self.scenario == "duplicate-uidl": self.write(b"+OK\r\n1 same\r\n2 same\r\n.\r\n")
+                elif self.scenario == "invalid-uidl": self.write(b"+OK\r\n1 bad id\r\n.\r\n")
+                elif self.scenario == "missing": self.write(b"+OK\r\n1 opaque-A\r\n.\r\n")
+                elif self.scenario == "pop-renumber" and self.connection_index == 1:
+                    self.write(b"+OK\r\n1 opaque-B\r\n.\r\n")
+                else: self.write(b"+OK\r\n1 opaque-A\r\n2 opaque-B\r\n.\r\n")
+            elif command in (b"TOP", b"RETR"):
+                if command == b"TOP" and self.scenario == "no-top": self.write(b"-ERR unavailable\r\n"); continue
+                if self.scenario == "pop-renumber" and self.connection_index == 1: assert fields[1] == b"1"
+                if self.scenario == "gone": self.write(b"-ERR gone\r\n"); continue
+                raw = HEADERS if command == b"TOP" else MESSAGE
+                if self.scenario == "dots": raw = b"From: sender@fixture.invalid\r\nSubject: Dot fixture\r\n\r\n.one\r\n..two\r\n"
+                if self.scenario == "pop-oversize": raw = (b"x" * 1024 + b"\r\n") * (26 * 1024)
+                self.write(b"+OK message follows\r\n")
+                self.write(b"\r\n".join(b"." + line if line.startswith(b".") else line for line in raw.split(b"\r\n")) + b".\r\n")
+            elif command == b"QUIT": self.write(b"+OK bye\r\n"); break
+            else: raise AssertionError("Unexpected POP command: " + repr(line))
 
     def imap(self):
         self.write(b"* OK fixture IMAP ready\r\n")
@@ -298,6 +332,37 @@ def main():
         seen_sni = []
         good.set_servername_callback(lambda sock, name, ctx: seen_sni.append(name))
         ca = root / "ca.pem"
+        for starttls in (False, True):
+            sent, _ = invoke("smtp", good, ca, "pop-send", starttls)
+            assert sent["ok"] and sent["state"] == 0, sent
+            folders, _ = invoke("pop", good, ca, "pop-folders", starttls)
+            assert folders["ok"] and [f["id"] for f in folders["folders"]] == ["INBOX", "Sent"], folders
+            passed += 2
+            for scenario in ("normal", "no-top"):
+                result, server = invoke("pop", good, ca, "pop-page-batch", starttls, scenario)
+                assert result["ok"] and [m["uid"] for m in result["messages"]] == ["opaque-B", "opaque-A"], result
+                assert not any(c.startswith("DELE") for c in server.commands)
+                assert any(c.startswith("RETR") for c in server.commands) == (scenario == "no-top")
+                passed += 1
+            result, server = invoke("pop", good, ca, "pop-read-pop", starttls, "pop-renumber")
+            assert result["ok"] and result["uid"] == "opaque-B" and "你好" in result["text"] and result["hasMore"], result
+            assert "RETR 1" in server.commands and "RETR 2" not in server.commands
+            passed += 1
+            result, _ = invoke("pop", good, ca, "pop-content", starttls, "dots")
+            assert result["ok"] and ".one" in result["text"] and "..two" in result["text"], result
+            passed += 1
+            for scenario in ("no-uidl", "duplicate-uidl", "invalid-uidl", "missing", "gone", "pop-oversize"):
+                result, server = invoke("pop", good, ca, "pop-content", starttls, scenario)
+                assert not result["ok"], (scenario, result)
+                assert not any(c.startswith("DELE") for c in server.commands)
+                passed += 1
+            for ctx, anchor in ((wrong, ca), (good, ""), (expired, ca)):
+                result, server = invoke("pop", ctx, anchor, "pop-page", starttls)
+                assert not result["ok"] and not any(c.startswith(("USER", "PASS")) for c in server.commands), result
+                passed += 1
+        result, server = invoke("pop", good, ca, "pop-page", True, "refuse-starttls")
+        assert not result["ok"] and not any(c.startswith(("USER", "PASS")) for c in server.commands), result
+        passed += 1
         for operation in ("remove", "move"):
             for scenario in ("normal", "no-uidplus"):
                 result, server = invoke("imap", good, ca, operation, scenario=scenario)

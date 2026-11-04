@@ -193,6 +193,8 @@ private:
     int m_accountUnreadRevision = 0;
     QString m_root, m_folder = QStringLiteral("INBOX"), m_status, m_error, m_search, m_selectedUid;
     QString m_uidValidity; // Selected folder generation, for validating server search.
+    int m_popCacheOffset = 0;
+    bool m_popServerHasMore = false;
     int m_offset = 0;
     quint64 m_generation = 0, m_selectionGeneration = 0;
     Account m_account;

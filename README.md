@@ -1,6 +1,6 @@
 # NkMail
 
-A native Qt Quick mail client for NextKde. The interface takes cues from macOS Mail, uses canonical **Kos.Ui** from nextkdeAppDemo, and uses **mailio** for IMAP, SMTP and MIME.
+A native Qt Quick mail client for NextKde. The interface takes cues from macOS Mail, uses canonical **Kos.Ui** from nextkdeAppDemo, and uses **mailio** for IMAP, POP3, SMTP and MIME.
 
 > Under active local development. See [GOAL.md](GOAL.md) for the actual acceptance checklist and [progress](docs/progress/README.md) for verified milestones. A rendered preview is not proof of provider compatibility.
 
@@ -22,7 +22,7 @@ Choose **Google / Gmail**, enter your email address, and continue with a Google
 **app password** generated after enabling two-step verification. The normal Google
 account password is not supported. Some organization/security policies disable app
 passwords. See [Google's instructions](https://support.google.com/accounts/answer/185833).
-NkMail uses Gmail IMAP/SMTP; POP is not implemented. Remembering credentials uses
+NkMail supports IMAP or POP3 incoming mail with SMTP sending. Gmail requires an app password where permitted by account policy. Remembering credentials uses
 the system keychain, with no plaintext fallback.
 
 Browser OAuth sign-in is hidden from account setup. The existing OAuth backend is
@@ -314,3 +314,11 @@ Body cache format 2 retains the resolved images in sanitized HTML, making them a
 ### Cached unified inbox
 
 **All inboxes (cached)** combines cached inbox headers across saved accounts, retaining each row's account/folder/UIDVALIDITY/UID identity. The list shows the source account and opens content with that account's credentials. Search and unread filtering operate on the local cache; Refresh reloads cached rows rather than syncing every account remotely. This initial aggregate is read-only: opening mail does not mark it read, and mailbox modifications are disabled. Use the row menu's **Open source folder** action to manage messages in their original account. Replies use the selected message's source account.
+
+### POP accounts
+
+Choose **POP** in the incoming-protocol selector when adding an account. Default security is implicit TLS (995); STARTTLS uses port 110 and never falls back to plaintext. The server must provide stable UIDL identifiers. Header pages use TOP, with a bounded RETR fallback when TOP is unavailable. Bodies and attachments use the same sanitized MIME reader as IMAP.
+
+POP keeps all server copies: NkMail never sends DELE. Read/star state and **Delete locally** belong to this device; deletion tombstones prevent a refresh from restoring locally deleted mail. Cached messages remain available when server copies disappear, though an uncached body cannot be recovered after server removal. SMTP-accepted mail receives a local Sent copy; ambiguous sends are never retried. Folder moves/archive and server search are unavailable, and inactive POP accounts do not provide server unread polling or notifications. Switching incoming protocol on an existing account requires re-adding it.
+
+The add-account list shows supported password/app-password providers and a manual IMAP/POP + SMTP option. Microsoft/Exchange is absent because its required authentication is not implemented; hiding it does not mean Microsoft lacks standard mail protocols. iCloud offers IMAP only. Provider presets are not a claim of live-account certification; verification checks both incoming and outgoing servers without sending mail.

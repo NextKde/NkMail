@@ -528,6 +528,54 @@ private slots:
         QVERIFY(controller.smartMailbox().isEmpty());
         QCOMPARE(messages(controller)->count(), 1);
     }
+    void popRetainsAndPaginatesCachedMailAfterServerRemoval() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path()));
+        {
+            MailDatabase db; QVERIFY(db.open(root.path())); auto a = db.account(); a.incomingProtocol = "pop3";
+            QVERIFY(db.saveAccount(a)); QVERIFY(db.saveFolders({{"INBOX", "Inbox", 70, "inbox"}}));
+            QVERIFY(db.savePage(synthetic::page(a, "INBOX", 0, 70)));
+        }
+        const auto original = synthetic::page;
+        synthetic::page = [original](const Account &a, const QString &folder, int, int) {
+            auto page = original(a, folder, 0, 1); page.hasMore = false; return page;
+        };
+        MailController controller(false, root.path()); QTRY_VERIFY(controller.status().contains("restored"));
+        controller.refresh(); QTRY_COMPARE(synthetic::pageCalls.load(), 1); QTRY_VERIFY(!controller.busy());
+        QCOMPARE(messages(controller)->count(), 50); QVERIFY(controller.hasMore());
+        controller.loadMore(); QCOMPARE(messages(controller)->count(), 70); QVERIFY(!controller.hasMore());
+        QCOMPARE(synthetic::pageCalls.load(), 1); // Remaining local mail needs no POP connection.
+    }
+    void popUsesLocalFlagsDeletionAndSentWithoutImapWrites() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path()));
+        {
+            MailDatabase db; QVERIFY(db.open(root.path())); auto a = db.account(); a.incomingProtocol = "pop3";
+            QVERIFY(db.saveAccount(a)); QVERIFY(db.saveFolders({{"INBOX", "Inbox", 1, "inbox"}, {"Sent", "Sent", 0, "sent"}}));
+            auto p = synthetic::page(a, "INBOX", 0, 1); p.uidValidity = "pop3-uidl-v1";
+            p.messages[0].uidValidity = p.uidValidity; p.messages[0].uid = "opaque-B"; p.messages[0].unread = true;
+            QVERIFY(db.savePage(p));
+        }
+        class NoRemoteWrites final : public MailTransport {
+        public:
+            int writes = 0;
+            void storeFlagsMany(const Account &, const QString &, const QString &, const QStringList &, const QStringList &, bool) override { ++writes; }
+            void removeOrMove(const Account &, const QString &, const QString &, const QStringList &, const QString &) override { ++writes; }
+        };
+        auto transport = std::make_shared<NoRemoteWrites>();
+        MailController controller(false, root.path(), nullptr, transport);
+        QTRY_VERIFY(controller.status().contains("restored")); QCOMPARE(messages(controller)->count(), 1);
+        controller.setMessagesRead({0}, true); QVERIFY(!messages(controller)->get(0).value("unread").toBool());
+        controller.setMessagesFlagged({0}, true); QVERIFY(messages(controller)->get(0).value("flagged").toBool());
+        controller.moveMessages({0}, "Sent"); QCOMPARE(messages(controller)->count(), 1);
+        controller.deleteMessages({0}); QCOMPARE(messages(controller)->count(), 0); QCOMPARE(transport->writes, 0);
+        auto draft = controller.newDraft(); draft.insert("to", "nobody@example.invalid"); draft.insert("body", "POP sent fixture");
+        controller.sendDraft(draft); QTRY_COMPARE(synthetic::sendCalls.load(), 1); QTRY_VERIFY(!controller.sending());
+        QCOMPARE(synthetic::sentFolderCalls.load(), 0);
+        controller.selectFolder("Sent"); QCOMPARE(messages(controller)->count(), 1);
+        controller.openMessage(draft.value("id").toString(), "pop-local-v1", "Sent");
+        QCOMPARE(controller.selectedMessage().value("text").toString(), QString("POP sent fixture"));
+        const auto reads = synthetic::pageCalls.load(); controller.refresh(); QCOMPARE(synthetic::pageCalls.load(), reads);
+        controller.sendDraft(draft); QCOMPARE(synthetic::sendCalls.load(), 1);
+    }
     void serverManagedSentCopyDoesNotAppendOrResend() {
         QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path()));
         { MailDatabase db; QVERIFY(db.open(root.path())); auto a = db.account(); a.serverSavesSent = true; QVERIFY(db.saveAccount(a)); }

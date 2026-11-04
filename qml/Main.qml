@@ -749,13 +749,13 @@ ApplicationWindow {
         LiquidPopoverItem { text: qsTr("Forward"); iconName: "forward"; enabled: !mail.sending; onTriggered: window.compose("forward") }
         LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: window.detailsVisible = true }
         LiquidPopoverItem {
-            text: qsTr("删除"); iconName: "trash"
+            text: mail.account.incomingProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"); iconName: "trash"
             enabled: mail.smartMailbox !== "allInbox" && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.deleteMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: qsTr("归档"); iconName: "archive"
-            enabled: mail.smartMailbox !== "allInbox" && window.hasMessage && !readerHeader.messageOpsVisible
+            enabled: mail.account.incomingProtocol !== "pop3" && mail.smartMailbox !== "allInbox" && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.archiveMessage(window.selectedIndex())
         }
         LiquidPopoverItem {

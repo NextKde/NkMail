@@ -90,13 +90,13 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         fetchPage(false, true);
 
         for (const auto &account : m_database->accounts()) {
-            if (account.id == m_account.id) continue;
+            if (account.id == m_account.id || account.incomingProtocol == "pop3") continue;
             const auto generation = m_generation;
             QPointer<MailController> self(this);
             m_credentials->resolve(account, [self, generation](const Account &authenticated) {
                 if (!self || generation != self->m_generation || authenticated.password.isEmpty()) return;
                 self->m_sync->stats(authenticated, [self, authenticated, generation](const InboxStats &stats, const QString &error) {
-                    if (!self || generation != self->m_generation || !error.isEmpty()) return;
+                    if (!self || generation != self->m_generation || !error.isEmpty() || authenticated.incomingProtocol == "pop3") return;
                     self->m_accountUnread.insert(authenticated.id, stats.unseen);
                     ++self->m_accountUnreadRevision;
                     emit self->accountUnreadChanged();
@@ -324,6 +324,9 @@ bool MailController::configureAccountImpl(const QVariantMap &configuration, cons
         || next.imapPort < 1 || next.imapPort > 65535 || next.smtpPort < 1 || next.smtpPort > 65535) {
         setStatus(tr("Check account settings"), tr("Enter an email address, username, valid server names and ports.")); return false;
     }
+    if (next.incomingProtocol != "imap" && next.incomingProtocol != "pop3") {
+        setStatus(tr("Check account settings"), tr("Choose IMAP or POP for incoming mail.")); return false;
+    }
     // An explicit id selects an existing account to edit; otherwise the address
     // (case-folded, whitespace trimmed) is the stable identity, and a random id is
     // the last resort so two empty drafts never collapse into one record.
@@ -336,7 +339,7 @@ bool MailController::configureAccountImpl(const QVariantMap &configuration, cons
     // original restriction so single-account behaviour is unchanged; other accounts
     // are independent records and may differ freely.
     if (editingCurrent && configured() && (next.address.compare(m_account.address, Qt::CaseInsensitive) != 0
-        || next.imapHost != m_account.imapHost || next.username != m_account.username)) {
+        || next.incomingProtocol != m_account.incomingProtocol || next.imapHost != m_account.imapHost || next.username != m_account.username)) {
         setStatus(tr("Account change requires a separate data directory"), tr("Remove and re-add the account to change its email address, username or IMAP host.")); return false;
     }
     // Only the live account may reuse the session-only password held in memory.
@@ -491,6 +494,7 @@ void MailController::removeAccount(const QString &id) {
     setStatus(tr("No accounts left"));
 }
 void MailController::refresh() {
+    if (m_account.incomingProtocol == "pop3" && m_folder == "Sent" && m_smartMailbox.isEmpty()) { m_cachedOnly = true; loadCached(); return; }
     if (!m_smartMailbox.isEmpty()) { loadCached(); setStatus(m_smartMailbox == QLatin1String("allInbox") ? tr("All inboxes · cached messages · read-only") : tr("Smart mailbox · current account cached messages")); return; }
     if (m_demo) { setStatus(tr("Preview · synthetic mail · not connected")); return; }
     if (m_busy || sending() || m_commands->busy()) return;
@@ -554,7 +558,7 @@ void MailController::setSearch(const QString &query) {
 }
 void MailController::searchServer() {
     const QString query = m_search;
-    if (!m_smartMailbox.isEmpty() || query.isEmpty() || !configured() || m_demo || m_account.password.isEmpty() || m_uidValidity.isEmpty()) return;
+    if (m_account.incomingProtocol == "pop3" || !m_smartMailbox.isEmpty() || query.isEmpty() || !configured() || m_demo || m_account.password.isEmpty() || m_uidValidity.isEmpty()) return;
     const auto generation = m_generation; const auto account = m_account;
     const auto folder = m_folder; const auto validity = m_uidValidity;
     m_serverSearching = true; setStatus(tr("Searching server…"));
@@ -606,6 +610,7 @@ void MailController::startRefreshTimer() {
     m_refreshTimer.start(qMax(60, m_refreshInterval) * 1000);
 }
 void MailController::checkNewMail(const Page &page) {
+    if (m_account.incomingProtocol == "pop3") return; // UIDL is opaque, never an increasing IMAP UID.
     quint64 maxUid = 0;
     for (const auto &summary : page.messages) {
         bool ok = false;
@@ -635,16 +640,23 @@ void MailController::checkNewMail(const Page &page) {
 }
 void MailController::loadMore() {
     if (m_busy || !m_hasMore) return;
+    if (m_account.incomingProtocol == "pop3" && !m_cachedOnly && m_smartMailbox.isEmpty()
+        && m_search.isEmpty() && !m_popServerHasMore) {
+        const auto page = m_database->cachedPage(m_folder, m_popCacheOffset, pageSize);
+        m_messages->append(page.messages); m_popCacheOffset = page.nextOffset; m_hasMore = page.hasMore;
+        emit statusChanged(); return;
+    }
     if (m_demo || m_cachedOnly || !m_search.isEmpty() || m_account.password.isEmpty()) loadCached(true);
     else fetchPage(true);
 }
 void MailController::fetchPage(bool append, bool quiet) {
+    if (m_account.incomingProtocol == "pop3" && m_folder == "Sent" && m_smartMailbox.isEmpty()) { m_cachedOnly = true; loadCached(append); return; }
     if (m_busy || m_commands->busy() || m_demo || m_account.password.isEmpty()) return;
     if (!m_smartMailbox.isEmpty() || !m_search.isEmpty()) { loadCached(append); return; }
     const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
     const auto offset = append ? m_offset : 0;
     m_busy = true; if (!quiet) setStatus(tr("Fetching message headers…"));
-    m_sync->page(account, folder, offset, pageSize, [this, generation, append, quiet](const Page &page, const QString &error) {
+    m_sync->page(account, folder, offset, pageSize, [this, generation, append, quiet](const Page &incomingPage, const QString &error) {
         if (generation != m_generation) return;
         m_busy = false;
         if (!error.isEmpty()) {
@@ -653,6 +665,7 @@ void MailController::fetchPage(bool append, bool quiet) {
             return;
         }
         m_busy = false;
+        const auto page = m_database->reconcilePopPage(incomingPage);
         if (!m_database->savePage(page)) {
             if (!quiet) setStatus(MailController::tr("Could not cache messages"), m_database->error());
             return;
@@ -673,7 +686,14 @@ void MailController::fetchPage(bool append, bool quiet) {
             fetchPage(false, quiet);
             return;
         }
-        if (m_unreadOnly) {
+        if (m_account.incomingProtocol == "pop3" && !m_unreadOnly && m_search.isEmpty()) {
+            // POP is a local collection: keep downloaded mail when the server
+            // removes its copy. Network offsets remain independent of this list.
+            const auto cached = m_database->cachedPage(page.folder, append ? m_popCacheOffset : 0, pageSize);
+            if (append) m_messages->append(cached.messages); else m_messages->replace(cached.messages);
+            m_popCacheOffset = cached.nextOffset; m_popServerHasMore = page.hasMore;
+            m_offset = page.nextOffset; m_hasMore = page.hasMore || cached.hasMore;
+        } else if (m_unreadOnly) {
             // The network page is intentionally raw. Recompute filtered
             // offsets against the complete cache after saving it.
             loadCached(false);
@@ -826,6 +846,7 @@ void MailController::setMessagesRead(const QVariantList &indices, bool read) { e
 void MailController::setMessagesFlagged(const QVariantList &indices, bool flagged) { executeCommand(indices, MailboxCommands::Action::Flag, flagged); }
 void MailController::deleteMessages(const QVariantList &indices) { executeCommand(indices, MailboxCommands::Action::Remove); }
 void MailController::archiveMessages(const QVariantList &indices) {
+    if (m_account.incomingProtocol == "pop3") { setStatus(tr("POP does not support server folders.")); return; }
     for (const auto &value : m_folders) {
         const auto folder = value.toMap();
         if (isArchiveFolder(m_folders, folder.value("id").toString())) {
@@ -846,7 +867,7 @@ void MailController::executeCommand(const QVariantList &indices, MailboxCommands
         setStatus(tr("Open the account folder to change messages.")); return;
     }
     if (m_commands->busy() || m_busy || sending() || sendPending()) { setStatus(tr("Another mail operation is in progress")); return; }
-    if (!m_demo && (!configured() || m_account.password.isEmpty())) {
+    if (!m_demo && m_account.incomingProtocol != "pop3" && (!configured() || m_account.password.isEmpty())) {
         if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
         else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Enter a Google app password in account settings to reconnect this account."));
         else setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages."));

@@ -10,6 +10,7 @@ inline constexpr int CurrentBodyFormatVersion = 2;
 struct Account {
     QString id = QStringLiteral("default");
     QString name, address, username, password; // Private password or opaque Google refresh credential.
+    QString incomingProtocol = QStringLiteral("imap"); // imap or pop3; imapHost/Port hold the incoming endpoint.
     QString authMethod = QStringLiteral("password");
     QString imapHost, smtpHost;
     int imapPort = 993, smtpPort = 465;

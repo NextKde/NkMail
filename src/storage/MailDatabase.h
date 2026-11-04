@@ -32,6 +32,8 @@ public:
     bool saveFolders(const QList<Folder> &folders);
     bool invalidateUidValidity(const QString &folder, const QString &uidValidity);
     bool savePage(const Page &page);
+    Page reconcilePopPage(const Page &page) const;
+    bool removePopMessages(const QList<Summary> &messages);
     Page cachedPage(const QString &folder, int offset = 0, int limit = 50,
                     const QString &search = {}, bool unreadOnly = false) const;
     Page smartPage(const QString &kind, int offset, int limit, const QString &search = {}, bool unreadOnly = false) const;

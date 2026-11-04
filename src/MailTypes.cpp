@@ -15,7 +15,7 @@ QVariantMap accountMap(const Account &a)
 {
     // Deliberately enumerate fields: adding a secret to Account must not serialize it.
     return {{"id", a.id}, {"name", a.name}, {"address", a.address},
-            {"username", a.username}, {"authMethod", a.authMethod}, {"imapHost", a.imapHost}, {"smtpHost", a.smtpHost},
+            {"incomingProtocol", a.incomingProtocol}, {"username", a.username}, {"authMethod", a.authMethod}, {"imapHost", a.imapHost}, {"smtpHost", a.smtpHost},
             {"imapPort", a.imapPort}, {"smtpPort", a.smtpPort},
             {"imapStartTls", a.imapStartTls}, {"smtpStartTls", a.smtpStartTls},
             {"serverSavesSent", a.serverSavesSent}, {"caFile", a.caFile}};
@@ -27,6 +27,7 @@ Account accountFromMap(const QVariantMap &m)
     a.name = m.value("name").toString();
     a.address = m.value("address").toString();
     a.username = m.value("username").toString();
+    a.incomingProtocol = m.value("incomingProtocol", "imap").toString();
     a.authMethod = m.value("authMethod", "password").toString();
     // Input may contain a session-only password. accountMap never exposes it.
     a.password = m.value("password").toString();

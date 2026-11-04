@@ -31,10 +31,18 @@ LiquidDialog {
     property bool submitting: false
     property int step: 0
     property bool advanced: false
+    property string incomingProtocol: "imap"
+    function chooseProtocol(protocol) {
+        incomingProtocol = protocol
+        imapTls.checked = false
+        imapPortField.text = protocol === "pop3" ? "995" : "993"
+        imapField.text = protocol === "pop3" ? Profiles.popHost(providerChoice.provider) : Profiles.settings(providerChoice.provider).imapHost
+    }
     property string setupError: ""
     readonly property var setup: mail.accountSetup || null
     function nextStep() {
         if (!providerChoice.available) return
+        incomingProtocol = "imap"
         usernameField.text = addressField.text.trim()
         const preset = Profiles.settings(providerChoice.provider)
         imapField.text = preset.imapHost; smtpField.text = preset.smtpHost
@@ -59,6 +67,7 @@ LiquidDialog {
         // start a new one). A passed account map pre-fills those fields and keeps
         // its id in `original`, so save() edits that record instead of creating one.
         original = (account && String(account.id || "").length > 0) ? account : (mail.account || ({}))
+        incomingProtocol = original.incomingProtocol || "imap"
         nameField.text = field(original, "name")
         addressField.text = field(original, "address")
         usernameField.text = field(original, "username")
@@ -97,7 +106,7 @@ LiquidDialog {
     function configuration() {
         return {
             id: original.id || "", name: nameField.text.trim(), address: addressField.text.trim(),
-            username: usernameField.text.trim(), imapHost: imapField.text.trim(), smtpHost: smtpField.text.trim(),
+            incomingProtocol: incomingProtocol, username: usernameField.text.trim(), imapHost: imapField.text.trim(), smtpHost: smtpField.text.trim(),
             imapPort: Number(imapPortField.text), smtpPort: Number(smtpPortField.text),
             imapStartTls: imapTls.checked, smtpStartTls: smtpTls.checked, serverSavesSent: serverSavesSent.checked, caFile: caField.text.trim()
         }
@@ -198,7 +207,7 @@ LiquidDialog {
             }
             LiquidCheckBox {
                 id: serverSavesSent
-                visible: root.step === 1 && root.advanced
+                visible: root.step === 1 && root.advanced && root.incomingProtocol !== "pop3"
                 text: qsTr("Server automatically saves sent mail")
                 enabled: !root.submitting
             }
@@ -232,12 +241,27 @@ LiquidDialog {
             Text { visible: root.setupError.length > 0; text: root.setupError; color: AppTheme.destructive; Layout.fillWidth: true; wrapMode: Text.Wrap }
             SettingsGroup {
                 visible: root.step === 1
-                title: qsTr("Incoming · IMAP")
-                SettingsItem { title: qsTr("Server"); KosTextField { id: imapField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("IMAP server"); placeholderText: "imap.example.invalid" } }
-                SettingsItem { visible: root.advanced; title: qsTr("Port"); KosTextField { id: imapPortField; implicitWidth: 90; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("IMAP port"); validator: IntValidator { bottom: 1; top: 65535 } } }
+                title: root.incomingProtocol === "pop3" ? qsTr("Incoming · POP") : qsTr("Incoming · IMAP")
+                SettingsItem {
+                    title: qsTr("Protocol")
+                    KosComboBox {
+                        objectName: "incomingProtocolChoice"
+                        model: providerChoice.provider === "icloud" ? ["IMAP"] : ["IMAP", "POP"]
+                        currentIndex: root.incomingProtocol === "pop3" ? 1 : 0
+                        enabled: !root.submitting && !root.original.id
+                        onActivated: root.chooseProtocol(currentIndex === 1 ? "pop3" : "imap")
+                    }
+                }
+                Text {
+                    visible: root.incomingProtocol === "pop3"
+                    Layout.fillWidth: true; wrapMode: Text.Wrap; color: AppTheme.mutedText; font.pixelSize: 11
+                    text: qsTr("POP keeps server copies. Read status, flags and deletion apply only on this device. Sent copies are saved locally; server folders are unavailable.")
+                }
+                SettingsItem { title: qsTr("Server"); KosTextField { id: imapField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Incoming server"); placeholderText: root.incomingProtocol === "pop3" ? "pop.example.invalid" : "imap.example.invalid" } }
+                SettingsItem { visible: root.advanced; title: qsTr("Port"); KosTextField { id: imapPortField; implicitWidth: 90; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Incoming port"); validator: IntValidator { bottom: 1; top: 65535 } } }
                 SettingsItem {
                     visible: root.advanced; title: qsTr("STARTTLS"); description: qsTr("Off uses implicit TLS, not plaintext.")
-                    KosCheckBox { id: imapTls; enabled: !root.mail.demo && !root.submitting; onToggled: imapPortField.text = checked ? "143" : "993" }
+                    KosCheckBox { id: imapTls; enabled: !root.mail.demo && !root.submitting; onToggled: imapPortField.text = root.incomingProtocol === "pop3" ? (checked ? "110" : "995") : (checked ? "143" : "993") }
                 }
             }
             SettingsGroup {
@@ -259,7 +283,7 @@ LiquidDialog {
                 }
             }
             Text { visible: !!root.mail.error; text: root.mail.error; color: AppTheme.destructive; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap }
-            Text { text: qsTr("Reading does not change server flags. Explicit mail actions can update or delete messages."); color: AppTheme.mutedText; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            Text { visible: root.incomingProtocol !== "pop3"; text: qsTr("Reading does not change server flags. Explicit mail actions can update or delete messages."); color: AppTheme.mutedText; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap }
         }
     }
     footer: Item {

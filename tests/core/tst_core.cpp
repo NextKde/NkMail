@@ -48,6 +48,34 @@ Page page(QList<Summary> messages, QString generation = QStringLiteral("100"))
 class CoreTests : public QObject {
     Q_OBJECT
 private slots:
+    void popLocalStateSurvivesRefreshRestartAndMailboxChanges() {
+        QTemporaryDir dir(temporaryTemplate()); MailDatabase db; QVERIFY(db.open(dir.path()));
+        QCOMPARE(accountFromMap({}).incomingProtocol, QString("imap"));
+        Account a; a.incomingProtocol = "pop3"; a.imapHost = "pop.example.invalid";
+        QCOMPARE(accountFromMap(accountMap(a)).incomingProtocol, QString("pop3"));
+        QVERIFY(db.saveAccount(a));
+        auto mail = message("opaque-B", "pop3-uidl-v1"); mail.unread = true;
+        auto incoming = page({mail}, mail.uidValidity); incoming.nextOffset = 1; incoming.hasMore = true;
+        QVERIFY(db.savePage(incoming));
+        auto local = mail; local.unread = false; local.flagged = true;
+        QVERIFY(db.updateFlags({local})); QVERIFY(db.savePage(incoming));
+        auto cached = db.cachedPage("INBOX"); QCOMPARE(cached.messages.size(), 1);
+        QVERIFY(!cached.messages.first().unread); QVERIFY(cached.messages.first().flagged);
+        Content content; content.summary = local; content.text = "Retained local body";
+        QVERIFY(db.saveContent(content));
+        QVERIFY(db.savePage(page({}, mail.uidValidity)));
+        QVERIFY(db.content("INBOX", mail.uidValidity, mail.uid));
+        QVERIFY(db.removePopMessages({mail})); db.close(); QVERIFY(db.open(dir.path()));
+        QVERIFY(db.savePage(incoming)); QCOMPARE(db.cachedPage("INBOX").messages.size(), 0);
+        QVERIFY(!db.saveContent(content));
+        const auto filtered = db.reconcilePopPage(incoming); QCOMPARE(filtered.nextOffset, 1); QVERIFY(filtered.hasMore);
+        QVERIFY(db.open(dir.path(), "other")); a.id = "other"; QVERIFY(db.saveAccount(a));
+        QVERIFY(db.savePage(incoming)); QCOMPARE(db.cachedPage("INBOX").messages.size(), 1);
+        QVERIFY(db.open(dir.path())); QVERIFY(db.removeAccount("default")); a.id = "default"; QVERIFY(db.saveAccount(a));
+        QVERIFY(db.savePage(incoming)); QCOMPARE(db.cachedPage("INBOX").messages.size(), 1);
+        a.incomingProtocol = "imap"; QVERIFY(db.saveAccount(a)); QCOMPARE(db.cachedPage("INBOX").messages.size(), 0);
+    }
+
     void oauthAccountMetadataNeverSerializesRefreshCredentials() {
         Account account; account.authMethod = "google_oauth";
         account.address = account.username = "reader@example.invalid";

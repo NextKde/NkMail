@@ -171,11 +171,11 @@ Rectangle {
                         objectName: "moveToMenuItem"
                         text: qsTr("移动到…")
                         iconName: "folder"
-                        enabled: !messageRow.readOnlyMailbox && mail.folders.filter(f => f.id !== messageRow.folder).length > 0
+                        enabled: mail.account.incomingProtocol !== "pop3" && !messageRow.readOnlyMailbox && mail.folders.filter(f => f.id !== messageRow.folder).length > 0
                         onTriggered: { rowMenu.close(); messageRow.openMenuAtContext(messageMoveMenu) }
                     }
-                    LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; enabled: !messageRow.readOnlyMailbox; onTriggered: messageRow.contextCommand("archive") }
-                    LiquidPopoverItem { text: qsTr("删除"); iconName: "trash"; enabled: !messageRow.readOnlyMailbox; onTriggered: messageRow.contextCommand("delete") }
+                    LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; enabled: mail.account.incomingProtocol !== "pop3" && !messageRow.readOnlyMailbox; onTriggered: messageRow.contextCommand("archive") }
+                    LiquidPopoverItem { text: mail.account.incomingProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"); iconName: "trash"; enabled: !messageRow.readOnlyMailbox; onTriggered: messageRow.contextCommand("delete") }
                 }
                 LiquidPopover {
                     id: messageMoveMenu

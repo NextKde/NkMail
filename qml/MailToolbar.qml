@@ -116,8 +116,8 @@ Item {
             visible: !readerHeader.draftsVisible && !readerHeader.searching && readerHeader.windowWidth >= 1100 && readerHeader.selection.selectionSize === 0
                 && readerHeader.actionWidth >= readerHeader.baseActionsWidth + implicitWidth + 14
             icons: ["trash", "archive", "flag"]
-            labels: [qsTr("删除"), qsTr("归档"), qsTr("旗标")]
-            enabledActions: [readerHeader.hasMessage && mail.smartMailbox !== "allInbox", readerHeader.hasMessage && mail.smartMailbox !== "allInbox", readerHeader.hasMessage && mail.smartMailbox !== "allInbox"]
+            labels: [mail.account.incomingProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"), qsTr("归档"), qsTr("旗标")]
+            enabledActions: [readerHeader.hasMessage && mail.smartMailbox !== "allInbox", readerHeader.hasMessage && mail.smartMailbox !== "allInbox" && mail.account.incomingProtocol !== "pop3", readerHeader.hasMessage && mail.smartMailbox !== "allInbox"]
             onTriggered: index => {
                 readerHeader.messageCommandRequested(index)
             }
@@ -138,7 +138,8 @@ Item {
             objectName: "selectionOpsGroup"
             visible: !readerHeader.draftsVisible && !readerHeader.searching && readerHeader.selection.selectionSize > 0
             icons: ["envelope", "flag", "archive", "trash", "folder"]
-            labels: [qsTr("已读"), qsTr("旗标"), qsTr("归档"), qsTr("删除"), qsTr("移动")]
+            enabledActions: [true, true, mail.account.incomingProtocol !== "pop3", true, mail.account.incomingProtocol !== "pop3"]
+            labels: [qsTr("已读"), qsTr("旗标"), qsTr("归档"), mail.account.incomingProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"), qsTr("移动")]
             onTriggered: index => {
                 if (index === 0) mail.setMessagesRead(readerHeader.selection.selectedIndexList(), true)
                 else if (index === 1) mail.setMessagesFlagged(readerHeader.selection.selectedIndexList(), true)
