@@ -1,6 +1,6 @@
 # 邮箱提供商接入与兼容范围
 
-更新：2026-11-03。以下是实现范围和证据，不是所有真实账户均已通过验证的承诺。
+更新：2026-11-04。以下是实现范围和证据，不是所有真实账户均已通过验证的承诺。
 
 ## 当前接入
 
@@ -51,3 +51,13 @@ Microsoft / Exchange 入口明确标为尚未支持，禁止进入密码验证�
 - [Yahoo IMAP 配置](https://help.yahoo.com/kb/SLN4075.html)、[AOL 官方帮助](https://help.aol.com/articles/how-do-i-use-other-email-applications-to-send-and-receive-my-aol-mail)、[Thunderbird AOL 配置](https://autoconfig.thunderbird.net/v1.1/aol.com)
 - [RFC 2971](https://www.rfc-editor.org/rfc/rfc2971.html)
 - [Google 桌面 OAuth](https://developers.google.com/identity/protocols/oauth2/native-app)、[Microsoft OAuth IMAP/SMTP](https://learn.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth)
+
+## Gmail 登录诊断 · 2026-11-04
+
+Gmail 同时提供 IMAP 和 POP；启用 POP 不会让账户变成只能使用 POP。当前 NkMail 的接收协议为 IMAP，没有 POP 客户端实现，也没有 Google OAuth / 网页授权登录。Google 预设使用 imap.gmail.com:993 和 smtp.gmail.com:465。
+
+Google 当前的客户端接入说明要求使用“使用 Google 账号登录”，或在账户允许时，开启两步验证并生成应用专用密码。普通 Google 账户密码不能直接替代应用专用密码。其他邮箱能否使用普通密码取决于服务商政策，因此通用表单使用“密码 / 授权码”，提供商说明再明确具体要求。
+
+本次在指定 VM 使用系统 CA 和证书校验配置探测 IMAP 993 / POP 995；两次均在 TCP 建连阶段超时，未进入 TLS 或认证阶段。没有提交真实账户凭据，不能据此判断密码有效性，也不能把 VM 的连接结果直接当成本机失败原因。未改动真实邮箱。
+
+参考：[Gmail 客户端接入与个人账户 IMAP](https://support.google.com/mail/answer/7126229?hl=zh-Hans)、[Google 应用专用密码](https://support.google.com/accounts/answer/185833?hl=zh-Hans)、[Gmail POP 配置](https://support.google.com/mail/answer/7104828?hl=zh-Hans)。其中旧 POP 帮助中关于普通密码及“安全性较低的应用”的建议，与当前账号接入政策不一致，不采用该旧建议。

@@ -129,7 +129,7 @@ LiquidDialog {
             spacing: 10
             Text {
                 text: root.mail.demo ? qsTr("Example account · synthetic data only. Account changes and sending are disabled in demo mode.")
-                    : qsTr("Connect one account with an application password. TLS certificate verification is always enabled.")
+                    : qsTr("Use the password or app password required by your email provider.")
                 color: AppTheme.mutedText; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap
             }
             Text {
@@ -160,8 +160,8 @@ LiquidDialog {
                 SettingsItem { visible: root.step === 1; title: qsTr("Name"); KosTextField { id: nameField; objectName: "accountName"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Name") } }
                 SettingsItem { visible: root.step === 1; title: qsTr("Username"); KosTextField { id: usernameField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Username") } }
                 SettingsItem {
-                    visible: root.step === 1; title: qsTr("App password"); description: qsTr("Stored passwords are never displayed.")
-                    KosTextField { id: passwordField; objectName: "accountPassword"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; echoMode: TextInput.Password; enabled: !root.mail.demo && !root.submitting; Accessible.name: qsTr("Application password"); placeholderText: qsTr("Enter application password") }
+                    visible: root.step === 1; title: qsTr("Password / app password"); description: qsTr("Stored passwords are never displayed.")
+                    KosTextField { id: passwordField; objectName: "accountPassword"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; echoMode: TextInput.Password; enabled: !root.mail.demo && !root.submitting; Accessible.name: qsTr("Password or app password"); placeholderText: qsTr("Enter password or app password") }
                 }
                 SettingsItem {
                     visible: root.step === 1; title: qsTr("Remember password"); description: qsTr("Use the system keychain; no plaintext fallback.")

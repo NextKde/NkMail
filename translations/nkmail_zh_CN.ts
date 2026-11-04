@@ -23,8 +23,8 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="121" />
-            <source>Connect one account with an application password. TLS certificate verification is always enabled.</source>
-            <translation>使用应用专用密码连接账号。始终启用 TLS 证书验证。</translation>
+            <source>Use the password or app password required by your email provider.</source>
+            <translation>请使用邮箱服务商要求的密码、授权码或应用专用密码。</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="126" />
@@ -56,8 +56,8 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="131" />
-            <source>App password</source>
-            <translation>应用专用密码</translation>
+            <source>Password / app password</source>
+            <translation>密码 / 授权码</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="131" />
@@ -66,13 +66,13 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="132" />
-            <source>Application password</source>
-            <translation>应用专用密码</translation>
+            <source>Password or app password</source>
+            <translation>密码或应用专用密码</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="132" />
-            <source>Enter application password</source>
-            <translation>输入应用专用密码</translation>
+            <source>Enter password or app password</source>
+            <translation>输入密码、授权码或应用专用密码</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="135" />
@@ -1592,8 +1592,8 @@ Alex
         </message>
         <message>
             <location filename="../qml/ProviderPicker.qml" line="14" />
-            <source>Use a Google app password with two-step verification. Some managed accounts require OAuth, which is not available yet.</source>
-            <translation>使用开启两步验证后生成的 Google 应用密码。部分受管理账户必须使用 OAuth，目前暂不支持。</translation>
+            <source>Gmail uses IMAP here. Enable two-step verification and use a Google app password; your normal Google password is not accepted. Google browser sign-in and POP are not supported yet.</source>
+            <translation>此处通过 IMAP 连接 Gmail。请开启两步验证并使用 Google 应用专用密码，普通 Google 密码无法用于此连接。目前尚不支持 Google 网页授权登录和 POP。</translation>
         </message>
         <message>
             <location filename="../qml/ProviderPicker.qml" line="16" />

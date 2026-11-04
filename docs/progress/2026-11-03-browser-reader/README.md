@@ -25,3 +25,8 @@ Expected diagnostics remain: Qt 6.9+ warns about the compatibility profile const
 External fonts, CSS background resources, active content and CID image resolution are not enabled by this change. Sender styles are retained within the allowed passive HTML subset; unsupported markup is still removed.
 
 API references: [Qt WebEngine settings](https://doc.qt.io/qt-6.10/qml-qtwebengine-webenginesettings.html), [request interception](https://doc.qt.io/qt-6.10/qwebengineurlrequestinterceptor.html), [custom document schemes](https://doc.qt.io/qt-6.10/qwebengineurlschemehandler.html).
+
+
+![Integrated browser reader with synthetic notification](notification.png)
+
+Hosted `release-gate` passed for browser-reader commit `5dc43594f72f16713a98681e5583426c25cca7fa` on 2026-11-03 (run 41640362986). Later provider-guidance edits have their own check run.

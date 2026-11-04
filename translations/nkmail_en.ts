@@ -23,8 +23,8 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="121" />
-            <source>Connect one account with an application password. TLS certificate verification is always enabled.</source>
-            <translation>Connect one account with an application password. TLS certificate verification is always enabled.</translation>
+            <source>Use the password or app password required by your email provider.</source>
+            <translation>Use the password or app password required by your email provider.</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="126" />
@@ -56,8 +56,8 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="131" />
-            <source>App password</source>
-            <translation>App password</translation>
+            <source>Password / app password</source>
+            <translation>Password / app password</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="131" />
@@ -66,13 +66,13 @@
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="132" />
-            <source>Application password</source>
-            <translation>Application password</translation>
+            <source>Password or app password</source>
+            <translation>Password or app password</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="132" />
-            <source>Enter application password</source>
-            <translation>Enter application password</translation>
+            <source>Enter password or app password</source>
+            <translation>Enter password or app password</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="135" />
@@ -1592,8 +1592,8 @@ Synthetic demo draft. Sending is disabled.</translation>
         </message>
         <message>
             <location filename="../qml/ProviderPicker.qml" line="14" />
-            <source>Use a Google app password with two-step verification. Some managed accounts require OAuth, which is not available yet.</source>
-            <translation>Use a Google app password with two-step verification. Some managed accounts require OAuth, which is not available yet.</translation>
+            <source>Gmail uses IMAP here. Enable two-step verification and use a Google app password; your normal Google password is not accepted. Google browser sign-in and POP are not supported yet.</source>
+            <translation>Gmail uses IMAP here. Enable two-step verification and use a Google app password; your normal Google password is not accepted. Google browser sign-in and POP are not supported yet.</translation>
         </message>
         <message>
             <location filename="../qml/ProviderPicker.qml" line="16" />
