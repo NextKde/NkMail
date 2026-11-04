@@ -29,3 +29,11 @@ protection. The initial tests needed a populated list-summary fixture and an exp
 window parent; those setup errors were corrected before final acceptance. The screenshot
 capture check also passed. No host automated tests or real mail publication; no mailbox
 write or SMTP submission. Real body timing/visual acceptance is pending the manual run.
+
+
+The live diagnostic follow-up recorded body operations of approximately 11.73s and
+3.48s, dominated by IMAP connection/authentication and content transfer/protocol parsing.
+Local content preparation after fetch took approximately 6–8ms. This does not isolate
+browser rendering time or constitute a network benchmark. Each uncached body currently
+opens a new IMAP connection, which adds latency; connection reuse is not implemented by
+this loading-state change.

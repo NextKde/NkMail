@@ -2096,6 +2096,10 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Sign in with Google to reconnect this account.</source>
             <translation>Sign in with Google to reconnect this account.</translation>
         </message>
+        <message>
+            <source>Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting.</source>
+            <translation>Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting.</translation>
+        </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>

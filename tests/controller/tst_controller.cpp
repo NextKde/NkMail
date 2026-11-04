@@ -206,6 +206,23 @@ struct ReleaseOnExit {
 class ControllerTests : public QObject {
     Q_OBJECT
 private slots:
+    void qqMissingCredentialExplainsAuthorizationCodeWithoutConnecting() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1, false));
+        {
+            MailDatabase db; QVERIFY(db.open(root.path()));
+            auto qq = db.account(); qq.imapHost = "imap.qq.com"; QVERIFY(db.saveAccount(qq));
+            QVERIFY(db.savePage(synthetic::page(qq, "INBOX", 0, 1)));
+        }
+        MailController controller(false, root.path());
+        QTRY_COMPARE(messages(controller)->count(), 1);
+        controller.setMessagesFlagged({0}, true);
+        QVERIFY(controller.error().contains("QQ Mail authorization code"));
+        QVERIFY(controller.error().contains("Remember password"));
+        QCOMPARE(synthetic::folderCalls.load(), 0);
+        QCOMPARE(synthetic::pageCalls.load(), 0);
+        QCOMPARE(synthetic::sendCalls.load(), 0);
+    }
+
     void bodyLoadingPreservesHeaderAndOffersRetryAfterFailure() {
         QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
         QSemaphore release;

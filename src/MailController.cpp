@@ -129,6 +129,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
             m_switchCredentialPending = false;
             m_account.password.clear();
             if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Sign in with Google to reconnect this account."));
+            else if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
             else setStatus(tr("Account needs a password"), tr("Enter an application password for this account."));
             return;
         }
@@ -462,7 +463,12 @@ void MailController::refresh() {
     if (!m_smartMailbox.isEmpty()) { loadCached(); setStatus(tr("Smart mailbox · current account cached messages")); return; }
     if (m_demo) { setStatus(tr("Preview · synthetic mail · not connected")); return; }
     if (m_busy || sending() || m_commands->busy()) return;
-    if (!configured() || m_account.password.isEmpty()) { setStatus(tr("Account needs attention"), tr("Add an account and enter an application password before connecting.")); return; }
+    if (!configured() || m_account.password.isEmpty()) {
+        if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
+        else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Sign in with Google to reconnect this account."));
+        else setStatus(tr("Account needs attention"), tr("Add an account and enter an application password before connecting."));
+        return;
+    }
     const auto generation = ++m_generation; const auto account = m_account;
     m_busy = true; setStatus(tr("Connecting securely…"));
     m_sync->folders(account, [this, generation](const QList<Folder> &folders, const QString &error) {
@@ -761,7 +767,10 @@ void MailController::executeCommand(const QVariantList &indices, MailboxCommands
                                      bool value, const QString &destination) {
     if (m_commands->busy() || m_busy || sending() || sendPending()) { setStatus(tr("Another mail operation is in progress")); return; }
     if (!m_demo && (!configured() || m_account.password.isEmpty())) {
-        setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages.")); return;
+        if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
+        else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Sign in with Google to reconnect this account."));
+        else setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages."));
+        return;
     }
     QList<Summary> selected;
     QSet<QString> seen;

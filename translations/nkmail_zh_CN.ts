@@ -2096,6 +2096,10 @@ Alex
             <source>Sign in with Google to reconnect this account.</source>
             <translation>请使用 Google 账号登录以重新连接此邮箱。</translation>
         </message>
+        <message>
+            <source>Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting.</source>
+            <translation>请使用 QQ 邮箱授权码重新连接，并勾选“记住密码”，以便重启后从系统钥匙串恢复。</translation>
+        </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
