@@ -171,13 +171,13 @@ LiquidDialog {
                 visible: root.step === 1
                 title: qsTr("Identity")
                 SettingsItem {
-                    allowStacking: false; visible: root.step === 1; title: qsTr("Name"); SettingsTextField { id: nameField; objectName: "accountName"; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Name") } }
+                    allowStacking: false; visible: root.step === 1; title: qsTr("Name"); MailSettingsInput { id: nameField; objectName: "accountName"; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Name") } }
                 SettingsItem {
-                    allowStacking: false; visible: root.step === 1; title: qsTr("Username"); SettingsTextField { id: usernameField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Username") } }
+                    allowStacking: false; visible: root.step === 1; title: qsTr("Username"); MailSettingsInput { id: usernameField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Username") } }
                 SettingsItem {
                     allowStacking: false;
                     visible: root.step === 1; title: qsTr("Password / app password"); description: qsTr("Stored passwords are never displayed.")
-                    SettingsTextField { id: passwordField; objectName: "accountPassword"; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; echoMode: TextInput.Password; enabled: !root.mail.demo && !root.submitting; Accessible.name: qsTr("Password or app password"); placeholderText: qsTr("Enter password or app password") }
+                    MailSettingsInput { id: passwordField; objectName: "accountPassword"; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; echoMode: TextInput.Password; enabled: !root.mail.demo && !root.submitting; Accessible.name: qsTr("Password or app password"); placeholderText: qsTr("Enter password or app password") }
                 }
                 SettingsItem {
                     allowStacking: false;
@@ -277,9 +277,9 @@ LiquidDialog {
                     }
                 }
                 SettingsItem {
-                    allowStacking: false; title: qsTr("Server"); SettingsTextField { id: imapField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Incoming server"); placeholderText: root.incomingProtocol === "pop3" ? "pop.example.invalid" : "imap.example.invalid" } }
+                    allowStacking: false; title: qsTr("Server"); MailSettingsInput { id: imapField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Incoming server"); placeholderText: root.incomingProtocol === "pop3" ? "pop.example.invalid" : "imap.example.invalid" } }
                 SettingsItem {
-                    allowStacking: false; visible: root.advanced; title: qsTr("Port"); SettingsTextField { id: imapPortField; Layout.preferredWidth: 90; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Incoming port"); validator: IntValidator { bottom: 1; top: 65535 } } }
+                    allowStacking: false; visible: root.advanced; title: qsTr("Port"); MailSettingsInput { id: imapPortField; Layout.preferredWidth: 90; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Incoming port"); validator: IntValidator { bottom: 1; top: 65535 } } }
                 SettingsItem {
                     allowStacking: false;
                     visible: root.advanced; title: qsTr("STARTTLS"); description: qsTr("Off uses implicit TLS, not plaintext.")
@@ -290,9 +290,9 @@ LiquidDialog {
                 visible: root.step === 1
                 title: qsTr("Outgoing · SMTP")
                 SettingsItem {
-                    allowStacking: false; title: qsTr("Server"); SettingsTextField { id: smtpField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("SMTP server"); placeholderText: "smtp.example.invalid" } }
+                    allowStacking: false; title: qsTr("Server"); MailSettingsInput { id: smtpField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("SMTP server"); placeholderText: "smtp.example.invalid" } }
                 SettingsItem {
-                    allowStacking: false; visible: root.advanced; title: qsTr("Port"); SettingsTextField { id: smtpPortField; Layout.preferredWidth: 90; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("SMTP port"); validator: IntValidator { bottom: 1; top: 65535 } } }
+                    allowStacking: false; visible: root.advanced; title: qsTr("Port"); MailSettingsInput { id: smtpPortField; Layout.preferredWidth: 90; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("SMTP port"); validator: IntValidator { bottom: 1; top: 65535 } } }
                 SettingsItem {
                     allowStacking: false;
                     visible: root.advanced; title: qsTr("STARTTLS"); description: qsTr("Off uses implicit TLS, not plaintext.")
@@ -305,7 +305,7 @@ LiquidDialog {
                 SettingsItem {
                     allowStacking: false;
                     title: qsTr("CA file"); description: qsTr("Optional PEM path; blank uses system trust.")
-                    SettingsTextField { id: caField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("CA file"); placeholderText: qsTr("System certificates") }
+                    MailSettingsInput { id: caField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("CA file"); placeholderText: qsTr("System certificates") }
                 }
             }
             Text { visible: !!root.mail.error; text: root.mail.error; color: AppTheme.destructive; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap }
