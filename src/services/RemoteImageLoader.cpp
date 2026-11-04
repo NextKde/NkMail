@@ -10,7 +10,6 @@
 #include <QPointer>
 #include <QBuffer>
 #include <QImageReader>
-#include <QDebug>
 namespace nkmail {
 namespace {
 bool remoteHttpUrl(const QString &value) {
@@ -99,9 +98,6 @@ void RemoteImageLoader::load(const QString &key, const QString &input) {
                             results[index].second = QStringLiteral("<img width=\"%1\" height=\"%2\" src=\"data:%3;base64,%4\">")
                                 .arg(size.width()).arg(size.height()).arg(contentType, QString::fromLatin1(data.toBase64()));
                     }
-                    if (results[index].second.isEmpty() && qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
-                        qInfo() << "NkMail image request failed: network=" << int(reply->error())
-                            << "http=" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
                     active.remove(reply); ++completed; reply->deleteLater();
                     if ((stopping && active.isEmpty()) || completed == sources.size()) loop.quit();
                     else schedule();

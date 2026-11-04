@@ -606,3 +606,9 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - Body delivery now depends on the selection generation, independent of list refresh/filter/flag changes. Account/folder/selection changes and completed removal still invalidate it. Flag completion updates selection flags in place, preserving pending/error/body state; a late PEEK snapshot preserves current read/star flags before caching.
 - Four deterministic VM regressions reproduced the old bug: read/star updates completing before/after the body. All four failed before the fix. Tests also cover large HTML delivery through callback/cache/selection. After the fix, the full VM suite passed 10/10 in 100.16s, including all four race cases.
 - Temporary MIME/DOM/dispatch diagnostics and the diagnostic empty-cache bypass have been removed. No real-mail content or raw logs are published. Host builds/replacements are for user manual inspection; automated tests run only in the VM.
+
+## Post-fix diagnostic cleanup · 2026-11-04
+
+- User confirmed the uncached-body blank issue is resolved. Removed the remaining opt-in IMAP phase timing and image-request diagnostic output, their logging includes and a duplicate include. Lifecycle fixes, error handling and race regression coverage remain intact.
+- Remote images currently require per-message consent and use an 8 MiB in-memory rendered-body cache. Persistent per-message consent and sender exceptions are not implemented; no automatic-loading policy was changed in this cleanup.
+- Cleanup validation: VM controller and loopback protocol tests passed 2/2 in 32.77s; host preview rebuilt and replaced for manual use.

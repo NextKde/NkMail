@@ -1,4 +1,3 @@
-#include <QCoreApplication>
 #include "backend.h"
 
 #include "HtmlSanitizer.h"
@@ -8,7 +7,6 @@
 #include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
-#include <QDebug>
 #include <QElapsedTimer>
 #include <QCryptographicHash>
 #include <memory>
@@ -488,12 +486,6 @@ QList<Folder> MailioBackend::folders(const Account &a)
 }
 Page MailioBackend::page(const Account &a, const QString &folder, int offset, int limit, bool reuseConnection)
 {
-    QElapsedTimer elapsed; elapsed.start();
-    const auto trace = [&](const char *phase) {
-        if (qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
-            qInfo().noquote() << "NkMail sync phase:" << phase << "elapsed-ms=" << elapsed.elapsed();
-    };
-    trace("page-start");
     bool retryReusedConnection = false;
     try {
         accountValid(a, false); folderValid(folder);
@@ -501,10 +493,8 @@ Page MailioBackend::page(const Account &a, const QString &folder, int offset, in
         bool reused = false;
         auto &imap = readSession(a, reuseConnection, reused);
         retryReusedConnection = reused && reuseConnection;
-        trace(reused ? "page-session-reused" : "page-authenticated");
         const auto stat = imap.select(utf8(folder), true);
         if (!stat.uid_validity) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Server did not provide UIDVALIDITY."));
-        trace("page-selected");
         Page p; p.folder = folder; p.uidValidity = QString::number(stat.uid_validity); p.nextOffset = offset;
         if (static_cast<unsigned long>(offset) >= stat.messages_no) { finishReadSession(reuseConnection); return p; }
         const auto end = stat.messages_no - static_cast<unsigned long>(offset);
@@ -514,7 +504,6 @@ Page MailioBackend::page(const Account &a, const QString &folder, int offset, in
         imap.search({Imap::search_condition_t(Imap::search_condition_t::SID_LIST,
                      std::list<Imap::messages_range_t>{{begin, end}})}, uids, true);
         if (uids.size() > static_cast<size_t>(limit)) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Server returned an invalid page."));
-        trace("page-searched");
         imap.literal_limit(256 * 1024);
         std::list<Imap::messages_range_t> ranges;
         for (const auto uid : uids) ranges.emplace_back(uid, uid);
@@ -522,21 +511,19 @@ Page MailioBackend::page(const Account &a, const QString &folder, int offset, in
         // window and render newest first regardless of server response order.
         const auto messages = ranges.empty() ? std::map<unsigned long, mailio::message>{}
             : imap.fetch(ranges, options(true), mailio::codec::line_len_policy_t::NONE);
-        trace("page-headers-fetched");
         for (auto it = uids.rbegin(); it != uids.rend(); ++it) {
             const auto found = messages.find(*it);
             if (found != messages.end()) p.messages << summary(found->second, folder, p.uidValidity, *it);
         }
         p.nextOffset = offset + int(end - begin + 1); p.hasMore = begin > 1;
-        trace("page-complete");
         finishReadSession(reuseConnection);
         return p;
     } catch (const mailio::dialog_error &) {
         resetReadConnection();
         if (retryReusedConnection) return page(a, folder, offset, limit, true);
         throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message headers. Check account, connection and trusted TLS certificate."));
-    } catch (const BackendError &) { resetReadConnection(); trace("page-failed"); throw; }
-      catch (...) { resetReadConnection(); trace("page-failed"); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message headers. Check account, connection and trusted TLS certificate.")); }
+    } catch (const BackendError &) { resetReadConnection(); throw; }
+      catch (...) { resetReadConnection(); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message headers. Check account, connection and trusted TLS certificate.")); }
 }
 QList<QVariantMap> MailioBackend::search(const Account &a, const QString &folder, const QString &validity,
                                         const QString &query, int limit)
@@ -587,12 +574,6 @@ void MailioBackend::resetReadConnection()
 
 Content MailioBackend::content(const Account &a, const QString &folder, const QString &validity, const QString &uid, bool reuseConnection)
 {
-    QElapsedTimer elapsed; elapsed.start();
-    const auto trace = [&](const char *phase) {
-        if (qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
-            qInfo().noquote() << "NkMail sync phase:" << phase << "elapsed-ms=" << elapsed.elapsed();
-    };
-    trace("content-start");
     bool retryReusedConnection = false;
     try {
         accountValid(a, false); folderValid(folder);
@@ -600,13 +581,10 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
         bool reused = false;
         auto &imap = readSession(a, reuseConnection, reused);
         retryReusedConnection = reused && reuseConnection;
-        trace(reused ? "content-session-reused" : "content-authenticated");
         const auto stat = imap.select(utf8(folder), true);
         if (stat.uid_validity != expected) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Folder identity changed. Refresh the message list."));
-        trace("content-selected");
         imap.literal_limit(MaxMessage);
         const auto messages = imap.fetch({{id, id}}, options(false), mailio::codec::line_len_policy_t::NONE);
-        trace("content-downloaded");
         const auto found = messages.find(id);
         if (found == messages.end()) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Message no longer exists."));
         const auto &m = found->second;
@@ -622,19 +600,16 @@ Content MailioBackend::content(const Account &a, const QString &folder, const QS
         c.attachments = std::move(decoded.attachments);
         c.summary.hasAttachments = !c.attachments.isEmpty();
         c.summary.preview = c.text.simplified().left(160);
-        trace("content-complete");
         finishReadSession(reuseConnection);
         return c;
     } catch (const mailio::dialog_error &) {
         resetReadConnection();
         if (retryReusedConnection) {
-            trace("content-session-reconnect");
             return content(a, folder, validity, uid, true);
         }
-        trace("content-failed");
         throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate."));
-    } catch (const BackendError &) { resetReadConnection(); trace("content-failed"); throw; }
-      catch (...) { resetReadConnection(); trace("content-failed"); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate.")); }
+    } catch (const BackendError &) { resetReadConnection(); throw; }
+      catch (...) { resetReadConnection(); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate.")); }
 }
 void MailioBackend::verifySmtp(const Account &a)
 {
