@@ -208,6 +208,28 @@ struct ReleaseOnExit {
 class ControllerTests : public QObject {
     Q_OBJECT
 private slots:
+    void addingAccountFetchesMailAutomatically() {
+        synthetic::reset();
+        QTemporaryDir root(temporaryTemplate());
+        MailController controller(false, root.path());
+        QTRY_COMPARE(controller.status(), QString("Add your email account to get started"));
+        auto firstConfiguration = accountMap(account()); firstConfiguration.insert("id", "");
+        QVERIFY(controller.configureAccount(firstConfiguration, "synthetic-secret", false));
+        QTRY_VERIFY(synthetic::pageCalls.load() > 0);
+        QTRY_VERIFY(!controller.busy());
+        auto *model = qobject_cast<MessageListModel *>(controller.messages());
+        QVERIFY(model); QCOMPARE(model->rowCount(), 50);
+        const auto original = controller.account().value("id").toString();
+        auto other = account(); other.address = other.username = "new@example.invalid";
+        const int previous = synthetic::pageCalls.load();
+        auto otherConfiguration = accountMap(other); otherConfiguration.insert("id", "");
+        QVERIFY(controller.configureAccount(otherConfiguration, "second-secret", false));
+        QTRY_VERIFY(synthetic::pageCalls.load() > previous);
+        QCOMPARE(controller.account().value("id").toString(), original);
+        MailDatabase db; QVERIFY(db.open(root.path(), "new@example.invalid"));
+        QTRY_COMPARE(db.cachedPage("INBOX", 0, 50).messages.size(), 50);
+        QCOMPARE(synthetic::sendCalls.load(), 0);
+    }
     void imagePermissionsPersistAndRemainScoped() {
         QTemporaryDir root; const auto path = root.filePath("image-permissions.ini");
         Summary message; message.uid = "1"; message.uidValidity = "42"; message.folder = "INBOX"; message.senderAddress = "Notice@Example.invalid";

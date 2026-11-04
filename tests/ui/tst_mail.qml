@@ -1521,6 +1521,25 @@ TestCase {
         compare(findChild(app, "accountPassword").text, "")
         compare(findChild(app, "accountPassword").echoMode, TextInput.Password)
     }
+    function test_check_mail_is_visible_and_respects_busy_state() {
+        const button = findChild(app, "checkMailButton")
+        verify(button !== null)
+        verify(button.visible)
+        verify(button.text.length > 0)
+        mouseClick(button)
+        compare(mock.refreshCount, 1)
+        mock.busy = true
+        compare(button.enabled, false)
+        mock.busy = false
+        app.width = 650
+        wait(30)
+        verify(button.visible)
+        const title = findChild(app, "folderTitle")
+        verify(title.x + title.width <= button.x)
+        if (imagePolicyCapture.capturePath.length > 0)
+            grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".receipt.png")
+    }
+
     function test_narrow_window_keeps_three_panes() {
         app.width = 650
         app.readerVisible = true

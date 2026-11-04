@@ -671,3 +671,10 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - Initial VM controller/i18n/catalog checks passed 3/3. Full VM suite passed 10/10 in 115.99s; final progress UI/controller/i18n/catalog checks passed 4/4 in 65.19s. Synthetic aggregate capture reviewed. Host preview rebuilt/replaced for manual inspection; no host automated validation. Canonical UI pin check and dependency guards now pass in the VM; previous GitHub API TLS blocker did not recur on this run.
 
 - Previous settings iteration is now reviewable as PR #24, stacked on #23; the blocked dependency check was rerun successfully before PR creation.
+
+## Automatic first receipt and discoverable refresh · 2026-11-04
+
+- New password accounts now fetch their first inbox automatically. First-account refresh waits for queued session credential restoration and checks account/generation before starting; background additions refresh only their own inbox without switching the reader. Background refresh failures surface through the existing actionable error UI.
+- Added a visible, labeled Check for mail action above the message list and completion-page guidance with Ctrl+R. iCloud guidance explicitly describes IMAP/SMTP with an app-specific password; this does not add Apple sign-in or claim provider acceptance.
+- VM regression exposed the first-account credential timing race; fixed it rather than leaving a silent refresh failure. The updated synthetic test covers first receipt, background cache isolation and no SMTP submission. Full VM UI/controller/i18n/catalog suite passed 4/4 in 82.55s; UI pin and 32 dependency guards passed. Narrow-window action/busy-state coverage passed. No host compilation, app launch or automated checks.
+- Remaining scope: aggregate mailbox writes, full-history/server reconciliation, junk/copy/.eml workflows, IDLE/POP notifications, disk image cache and favorites; real-provider acceptance and release-gate remain required.

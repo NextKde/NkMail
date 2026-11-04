@@ -13,6 +13,7 @@ ColumnLayout {
     readonly property string guidance: provider === "google" ? qsTr("Enable two-step verification in your Google account and generate an app password. Use that app password here, not your Google account password.")
         : ['qq','exmail','163','126'].indexOf(provider) >= 0
             ? qsTr("Enable IMAP or POP and SMTP in your webmail settings and use the client authorization code when required.")
+        : provider === "icloud" ? qsTr("Connect with IMAP and SMTP using an Apple app-specific password. Apple Account sign-in is not available.")
         : provider === "manual" ? qsTr("Enter the IMAP or POP and SMTP settings supplied by your mail administrator.")
         : qsTr("Use an app-specific password generated in your provider account settings.")
     spacing: 8

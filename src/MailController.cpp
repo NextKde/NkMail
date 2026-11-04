@@ -98,7 +98,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         if (m_smartMailbox == QLatin1String("allInbox")) reloadUnifiedInbox();
     });
     connect(m_inboxSync, &InboxSync::finished, this, [this](const QStringList &failures) {
-        if (m_smartMailbox == QLatin1String("allInbox"))
+        if (!failures.isEmpty() || m_smartMailbox == QLatin1String("allInbox"))
             setStatus(failures.isEmpty() ? tr("All inboxes updated · read-only") : tr("Some inboxes could not be updated"), failures.join(u'\n'));
     });
     m_refreshTimer.setTimerType(Qt::VeryCoarseTimer);
@@ -335,7 +335,25 @@ bool MailController::configureGoogleAccount(const QString &existingId) {
 }
 bool MailController::configureAccount(const QVariantMap &configuration, const QString &password, bool remember) {
     auto ordinary = configuration; ordinary.insert("authMethod", "password");
-    return configureAccountImpl(ordinary, password, remember);
+    const QString id = configuration.value("id").toString().trimmed().isEmpty()
+        ? configuration.value("address").toString().trimmed().toLower()
+        : configuration.value("id").toString().trimmed();
+    bool existing = false;
+    for (const auto &known : m_database->accounts()) if (known.id == id) existing = true;
+    if (!configureAccountImpl(ordinary, password, remember)) return false;
+    // Start first receipt without requiring discovery of a menu action. Background
+    // additions keep the current reader and bind results to their own account.
+    if (!existing) {
+        if (id == m_account.id) {
+            // switchAccount restores the session password on the next event turn.
+            const auto generation = m_generation;
+            QTimer::singleShot(0, this, [this, id, generation] {
+                if (m_account.id == id && m_generation == generation) refresh();
+            });
+        } else for (const auto &saved : m_database->accounts())
+            if (saved.id == id) { m_inboxSync->start({saved}); break; }
+    }
+    return true;
 }
 bool MailController::configureAccountImpl(const QVariantMap &configuration, const QString &password, bool remember) {
     if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return false; }

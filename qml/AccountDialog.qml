@@ -233,6 +233,12 @@ LiquidDialog {
                 color: AppTheme.text; font.pixelSize: 18
                 Layout.fillWidth: true; wrapMode: Text.Wrap
             }
+            Text {
+                visible: root.step === 2
+                text: qsTr("Mail is fetched automatically after adding an account. Use Check for mail above the message list, or Ctrl+R, to check again. Connection errors appear in the main window.")
+                color: AppTheme.mutedText; font.pixelSize: 12
+                Layout.fillWidth: true; wrapMode: Text.Wrap
+            }
             RowLayout {
                 visible: root.submitting
                 Layout.fillWidth: true

@@ -251,6 +251,10 @@
             <source>Outgoing STARTTLS</source>
             <translation>发件 STARTTLS</translation>
         </message>
+        <message>
+            <source>Mail is fetched automatically after adding an account. Use Check for mail above the message list, or Ctrl+R, to check again. Connection errors appear in the main window.</source>
+            <translation>添加账户后会自动收信。之后可点击邮件列表上方的“收取邮件”，或按 Ctrl+R 再次收取。连接错误会显示在主窗口中。</translation>
+        </message>
     </context>
     <context>
         <name>MailComposer</name>
@@ -1745,6 +1749,10 @@ Alex
         <message>
             <source>Enter the IMAP or POP and SMTP settings supplied by your mail administrator.</source>
             <translation>输入邮箱管理员提供的 IMAP 或 POP 及 SMTP 设置。</translation>
+        </message>
+        <message>
+            <source>Connect with IMAP and SMTP using an Apple app-specific password. Apple Account sign-in is not available.</source>
+            <translation>通过 IMAP 和 SMTP 连接，需使用 Apple 应用专用密码。不支持 Apple 账户网页登录。</translation>
         </message>
     </context>
     <context>

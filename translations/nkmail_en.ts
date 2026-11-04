@@ -251,6 +251,10 @@
             <source>Outgoing STARTTLS</source>
             <translation>Outgoing STARTTLS</translation>
         </message>
+        <message>
+            <source>Mail is fetched automatically after adding an account. Use Check for mail above the message list, or Ctrl+R, to check again. Connection errors appear in the main window.</source>
+            <translation>Mail is fetched automatically after adding an account. Use Check for mail above the message list, or Ctrl+R, to check again. Connection errors appear in the main window.</translation>
+        </message>
     </context>
     <context>
         <name>MailComposer</name>
@@ -1745,6 +1749,10 @@ Synthetic demo draft. Sending is disabled.</translation>
         <message>
             <source>Enter the IMAP or POP and SMTP settings supplied by your mail administrator.</source>
             <translation>Enter the IMAP or POP and SMTP settings supplied by your mail administrator.</translation>
+        </message>
+        <message>
+            <source>Connect with IMAP and SMTP using an Apple app-specific password. Apple Account sign-in is not available.</source>
+            <translation>Connect with IMAP and SMTP using an Apple app-specific password. Apple Account sign-in is not available.</translation>
         </message>
     </context>
     <context>

@@ -306,12 +306,24 @@ ApplicationWindow {
                     objectName: "folderTitle"
                     x: listHeader.leadingInset
                     y: windowChrome.controlsCenterY - height / 2
-                    width: window.narrow ? readerHeader.titleWidth : Math.max(0, parent.width - x - 14 - (unreadFilterButton.visible ? unreadFilterButton.width + 8 : 0))
+                    width: Math.max(0, parent.width - x - 14 - (checkMailButton.visible ? checkMailButton.width + 8 : 0) - (unreadFilterButton.visible ? unreadFilterButton.width + 8 : 0))
                     height: MailStyle.toolbarButtonHeight
                     text: mail.unreadOnly && !window.draftsVisible ? qsTr("%1 · Unread (cached)").arg(window.folderTitle()) : window.folderTitle()
                     color: window.ink; font.pixelSize: 19; font.weight: Font.Bold
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight; textFormat: Text.PlainText
+                }
+                MailAction {
+                    id: checkMailButton
+                    objectName: "checkMailButton"
+                    anchors.right: unreadFilterButton.left
+                    anchors.rightMargin: 8
+                    y: windowChrome.controlsCenterY - height / 2
+                    visible: messagePane.visible && !window.draftsVisible
+                    text: qsTr("Check for mail")
+                    enabled: !mail.busy && !mail.sending
+                    floatingAction: true; shellBackdrop: chromeBackdrop
+                    onClicked: mail.refresh()
                 }
                 MailAction {
                     id: unreadFilterButton
