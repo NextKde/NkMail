@@ -719,3 +719,9 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - Expose existing account/folder/favorite menus with direct options actions; preserve account disclosure behavior. Prioritize replies at ordinary widths and compact to icons when needed. Consolidate direct refresh in the list header with account scope and checking state.
 - Empty lists show errors and safe mail-check retry; do not replay failed mailbox writes. Add menu, scope, reply/refresh and empty-error regression coverage.
 - VM final UI/i18n/catalog checks passed 3/3 in 62.43s; focused checks passed 5/5. Initial new test failed to locate a reparented popup; fixed test access and verified menu opening. Canonical UI gate passed. Synthetic capture reviewed. Host binary rebuilt and owned preview replaced for manual use only; no host tests or GUI verification.
+
+## First distributable preview · 2026-11-05 (in progress)
+
+- Integrate stacked PRs #19–#30 through the final PR against main, preserving commit history and requiring release-gate before merge.
+- Prepare Arch x86_64 0.1.0rc1 package and complete source export, with pinned UI sources, licenses, checksums, dependency manifest and installation instructions. Packaging builds without OAuth fixture credentials and smoke-tests the installed binary in CI.
+- Pending: clean CI acceptance, main merge, package artifact verification and prerelease publication. No host execution/verification for this release work.

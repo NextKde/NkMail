@@ -4,6 +4,13 @@ A native Qt Quick mail client for NextKde. The interface takes cues from macOS M
 
 > Under active local development. See [GOAL.md](GOAL.md) for the actual acceptance checklist and [progress](docs/progress/README.md) for verified milestones. A rendered preview is not proof of provider compatibility.
 
+## Install or try the preview
+
+See [installation and first-use instructions](docs/INSTALL.md). Preview releases
+provide an Arch Linux x86_64 package, complete source bundle (including Kos.Ui),
+checksums and a rebuild recipe. Other Linux distributions require a source build
+with Qt 6.8+; no universal Linux binary or Windows/macOS package is provided.
+
 ## Current scope
 
 Multiple accounts with password or application-password authentication, folders, paginated headers,
@@ -154,8 +161,8 @@ System dependencies above must still be installed.
 
 ## Clone and build
 
-Run all build, test and application commands below **inside the designated virtual machine**.
-Host-side source editing is allowed; host-side execution/validation is not.
+Contributors in the maintainer workspace run validation in the designated VM.
+Users may build and run on their own compatible Linux desktop; see the installation guide.
 
 ```sh
 git clone --recurse-submodules https://github.com/NextKde/NkMail.git
@@ -313,7 +320,7 @@ Body cache format 2 retains the resolved images in sanitized HTML, making them a
 
 ### Unified inbox (entry temporarily hidden)
 
-The smart-mailbox sidebar section is currently hidden at the maintainer's request. Hierarchy, scope and configurable smart-mailbox rules are deferred in GOAL.md; the implementation below is retained for future use. Favorites remain scoped to the current account.
+The smart-mailbox sidebar section is currently hidden at the maintainer's request. Hierarchy, scope and configurable smart-mailbox rules are deferred in GOAL.md; the implementation below is retained for future use. Current-account shortcuts follow the active account; personal favorites retain their own source account.
 
 **All inboxes** combines cached inbox headers across saved accounts, retaining each row's account/folder/UIDVALIDITY/UID identity. The list shows the source account and opens content with that account's credentials. Search and unread filtering operate on the local cache; Refresh independently downloads the newest 50 inbox headers from each saved IMAP/POP account with available credentials. Periodic refresh also updates inactive accounts; one account failure does not stop the others. Older messages already cached remain available, and refreshing preserves the loaded aggregate window and current body. This is bounded recent-header synchronization, not a full-history mirror or server-deletion reconciliation. Older uncached mail can be fetched from its source account folder. The aggregate supports read/unread, flags, delete and archive, routed to each message's source account and mailbox epoch. Mixed-account selections are processed per account; partial failures are reported and never automatically retried. Archive uses each account's own cached archive destination. Move is available for a selection from one account and uses that account's folder list; cross-account moves are not offered. POP read/flag/delete remain local, and POP move/archive remain unavailable. Opening an unread row marks it read independently of the PEEK body fetch. Replies use the selected message's source account.
 

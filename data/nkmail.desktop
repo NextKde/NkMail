@@ -2,7 +2,8 @@
 Type=Application
 Name=NkMail
 GenericName=Email Client
-Comment=A thoughtful, read-only mailbox with safe local drafts
+Comment=Read and write email with multiple accounts
+Comment[zh_CN]=管理多个账号，收发邮件
 Exec=nkmail
 Icon=nkmail
 Terminal=false
