@@ -26,9 +26,21 @@ Item {
         collapsedAccounts = next
     }
 
+    function accountAddress(accountId) {
+        if (accountId === mail.currentAccountId) return String(mail.account.address || "")
+        const account = (mail.accounts || []).find(a => a.id === accountId)
+        return account ? String(account.address || "") : ""
+    }
+    function scopedTitle(title, accountId) {
+        const address = accountAddress(accountId)
+        return address.length > 0 ? title + " (" + address + ")" : title
+    }
+
     // Gallery navigation owns row visuals; NkMail adds only mailbox counts.
     component MailboxAction: LiquidNavigationButton {
         id: action
+        property string scopeHint: ""
+        KosToolTip { target: action; text: action.scopeHint; onlyWhenTruncated: true; truncated: caption.truncated }
         property string countText: ""
         property string unreadText: ""
         Layout.fillWidth: true
@@ -60,6 +72,7 @@ Item {
                 anchors.rightMargin: unread.visible ? 6 : 0
                 anchors.verticalCenter: parent.verticalCenter
                 text: action.text
+                textFormat: Text.PlainText
                 color: action.checked ? action.specificationSelectedTextColor
                     : AppTheme.dark ? Qt.rgba(1, 1, 1, .92) : Qt.rgba(0, 0, 0, .92)
                 font: action.font
@@ -167,9 +180,11 @@ Item {
                         required property string modelData
                         readonly property var targetFolder: Navigation.systemFolder(mail.folders || [], modelData)
                         objectName: modelData === "localDrafts" ? "draftFolderButton" : "favoriteShortcut_" + modelData
-                        text: modelData === "flagged" ? MailLabels.smartMailboxTitle("flagged")
+                        readonly property string mailboxTitle: modelData === "flagged" ? MailLabels.smartMailboxTitle("flagged")
                             : modelData === "localDrafts" ? qsTr("Local drafts")
                             : modelData === "inbox" ? qsTr("Inbox") : qsTr("Sent")
+                        text: root.scopedTitle(mailboxTitle, mail.currentAccountId)
+                        scopeHint: text
                         iconName: modelData === "flagged" ? "flag" : modelData === "localDrafts" ? "editRounded"
                             : modelData === "inbox" ? "envelope" : "forward"
                         enabled: modelData === "flagged" || modelData === "localDrafts" || !!targetFolder
@@ -213,7 +228,8 @@ Item {
                             }
                         }
                         required property var modelData
-                        text: modelData.title
+                        text: root.scopedTitle(modelData.title, modelData.accountId)
+                        scopeHint: text
                         iconName: MailLabels.folderIcon(modelData.folderId)
                         unreadText: {
                             root.unreadRevision

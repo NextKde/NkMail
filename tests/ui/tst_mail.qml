@@ -661,6 +661,23 @@ TestCase {
         verify(findChild(sidebar, "favoritesTitle").visible)
         verify(!findChild(sidebar, "smartMailboxesTitle").visible)
         const flagged = findChild(sidebar, "favoriteShortcut_flagged")
+        const originalAccountData = mock.account
+        const originalAccounts = mock.accounts
+        const originalFavorites = mock.favorites
+        verify(flagged.text.indexOf(mock.account.address) >= 0)
+        verify(findChild(sidebar, "favoriteShortcut_inbox").text.indexOf(mock.account.address) >= 0)
+        verify(findChild(sidebar, "draftFolderButton").text.indexOf(mock.account.address) >= 0)
+        try {
+            mock.account = Object.assign({}, originalAccountData, {address: "changed@example.invalid"})
+            verify(flagged.text.indexOf("changed@example.invalid") >= 0)
+            compare(flagged.scopeHint, flagged.text)
+            mock.accounts = originalAccounts.concat([{id: "other-scope", address: "other@example.invalid"}])
+            mock.favorites = [{accountId: "other-scope", folderId: "INBOX", title: "Other inbox"}]
+            const favorites = findChild(sidebar, "favoritesList")
+            tryCompare(favorites, "count", 1)
+            verify(favorites.itemAt(0).text.indexOf("other@example.invalid") >= 0)
+            verify(favorites.itemAt(0).text.indexOf("changed@example.invalid") < 0)
+        } finally { mock.account = originalAccountData; mock.accounts = originalAccounts; mock.favorites = originalFavorites }
         const unread = findChild(sidebar, "smartMailbox_unread")
         flagged.clicked()
         compare(mock.smartMailbox, "flagged")

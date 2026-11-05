@@ -700,3 +700,8 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - Reproduced vertical-letter status columns with synthetic 1%-width notification columns. The renderer's global overflow-wrap:anywhere reduced intrinsic minimum widths to glyph size; the new regression failed before the fix and passed after changing the envelope default to break-word.
 - Preserve sender styles and table layout. Track rendered width and expose native scrollbars for intrinsically wide content, retaining existing long-document scrolling. Long prose still wraps; switching documents resets measured width. No sanitizer/network-policy/cache-format changes or real-mail artifacts.
 - VM reader/core checks passed 2/2 in 5.91s, including wide/narrow word geometry, long prose, last-column horizontal reachability, reset, isolation and retained surfaces. Synthetic screenshot check passed (3/3 including lifecycle); both captures reviewed. Canonical UI pin gate passed. Host update is for manual inspection only.
+
+## Favorite account labels · 2026-11-05
+
+- Append the owning email address to built-in and custom favorite labels. Current-account shortcuts update with account changes; custom favorites retain their own source scope. Long labels elide and expose the complete label through the canonical tooltip. Keep the section title unscoped because custom favorites can belong to other accounts.
+- VM account/section checks passed (4/4 including lifecycle); final account-switch/custom-favorite scope regression passed (3/3 including lifecycle). Canonical UI pin gate passed. Host preview rebuilt/replaced for manual use.
