@@ -224,27 +224,34 @@ Item {
                         onClicked: { root.navigationOrigin = "custom"; root.mailboxOpened(); mail.openFavorite(modelData.accountId, modelData.folderId) }
                     }
                 }
-                Text {
-                    objectName: "smartMailboxesTitle"
-                    text: qsTr("Smart mailboxes"); color: root.muted
-                    font.pixelSize: 11; font.weight: Font.DemiBold
-                    topPadding: 16; bottomPadding: 4
-                }
-                Text {
-                    text: qsTr("Cached mail")
-                    color: root.muted; font.pixelSize: 9
-                    Layout.fillWidth: true; wrapMode: Text.Wrap
-                    bottomPadding: 6
-                }
-                Repeater {
-                    model: ["allInbox", "unread", "attachments"]
-                    delegate: MailboxAction {
-                        required property string modelData
-                        objectName: "smartMailbox_" + modelData
-                        text: MailLabels.smartMailboxTitle(modelData)
-                        iconName: modelData === "attachments" ? "copy" : "envelope"
-                        checked: !root.draftsVisible && mail.smartMailbox === modelData
-                        onClicked: { root.mailboxOpened(); mail.selectSmartMailbox(modelData) }
+                // Deferred until grouping, scope and configurable rules are designed.
+                ColumnLayout {
+                    objectName: "deferredSmartMailboxes"
+                    visible: false
+                    Layout.fillWidth: true
+                    spacing: 0
+                    Text {
+                        objectName: "smartMailboxesTitle"
+                        text: qsTr("Smart mailboxes"); color: root.muted
+                        font.pixelSize: 11; font.weight: Font.DemiBold
+                        topPadding: 16; bottomPadding: 4
+                    }
+                    Text {
+                        text: qsTr("Cached mail")
+                        color: root.muted; font.pixelSize: 9
+                        Layout.fillWidth: true; wrapMode: Text.Wrap
+                        bottomPadding: 6
+                    }
+                    Repeater {
+                        model: ["allInbox", "unread", "attachments"]
+                        delegate: MailboxAction {
+                            required property string modelData
+                            objectName: "smartMailbox_" + modelData
+                            text: MailLabels.smartMailboxTitle(modelData)
+                            iconName: modelData === "attachments" ? "copy" : "envelope"
+                            checked: !root.draftsVisible && mail.smartMailbox === modelData
+                            onClicked: { root.mailboxOpened(); mail.selectSmartMailbox(modelData) }
+                        }
                     }
                 }
                 Item { Layout.preferredHeight: 12 }

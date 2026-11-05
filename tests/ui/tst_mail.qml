@@ -604,7 +604,7 @@ TestCase {
             mock.currentAccountId = "default"
             mock.selectedMessage = Object.assign({}, originalMessage, {folder: "INBOX", text: "Synthetic message from the Work inbox."})
             messageModel.setProperty(0, "accountId", "work")
-            findChild(findChild(app, "sidebarBody"), "smartMailbox_allInbox").clicked()
+            mock.selectSmartMailbox("allInbox") // Retained implementation; navigation is deferred.
             compare(mock.smartMailbox, "allInbox")
             const row = findChild(app, "messageList").itemAtIndex(0)
             compare(row.sourceAccountId, "work")
@@ -659,15 +659,15 @@ TestCase {
     function test_sidebar_sections_and_smart_navigation() {
         const sidebar = findChild(app, "sidebarBody")
         verify(findChild(sidebar, "favoritesTitle").visible)
-        verify(findChild(sidebar, "smartMailboxesTitle").visible)
+        verify(!findChild(sidebar, "smartMailboxesTitle").visible)
         const flagged = findChild(sidebar, "favoriteShortcut_flagged")
         const unread = findChild(sidebar, "smartMailbox_unread")
         flagged.clicked()
         compare(mock.smartMailbox, "flagged")
         verify(flagged.checked)
-        unread.clicked()
-        compare(mock.smartMailbox, "unread")
-        verify(!flagged.checked && unread.checked)
+        verify(!unread.visible)
+        verify(!findChild(sidebar, "smartMailbox_allInbox").visible)
+        verify(!findChild(sidebar, "smartMailbox_attachments").visible)
         findChild(sidebar, "favoriteShortcut_inbox").clicked()
         compare(mock.smartMailbox, "")
         findChild(sidebar, "draftFolderButton").clicked()

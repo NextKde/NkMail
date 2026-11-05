@@ -311,7 +311,9 @@ CID-referenced raster images inside MIME messages render without remote-image pe
 
 Body cache format 2 retains the resolved images in sanitized HTML, making them available offline. Older selected cached messages are upgraded with a read-only fetch when credentials are available; their existing content stays visible while upgrading.
 
-### Unified inbox
+### Unified inbox (entry temporarily hidden)
+
+The smart-mailbox sidebar section is currently hidden at the maintainer's request. Hierarchy, scope and configurable smart-mailbox rules are deferred in GOAL.md; the implementation below is retained for future use. Favorites remain scoped to the current account.
 
 **All inboxes** combines cached inbox headers across saved accounts, retaining each row's account/folder/UIDVALIDITY/UID identity. The list shows the source account and opens content with that account's credentials. Search and unread filtering operate on the local cache; Refresh independently downloads the newest 50 inbox headers from each saved IMAP/POP account with available credentials. Periodic refresh also updates inactive accounts; one account failure does not stop the others. Older messages already cached remain available, and refreshing preserves the loaded aggregate window and current body. This is bounded recent-header synchronization, not a full-history mirror or server-deletion reconciliation. Older uncached mail can be fetched from its source account folder. The aggregate supports read/unread, flags, delete and archive, routed to each message's source account and mailbox epoch. Mixed-account selections are processed per account; partial failures are reported and never automatically retried. Archive uses each account's own cached archive destination. Move is available for a selection from one account and uses that account's folder list; cross-account moves are not offered. POP read/flag/delete remain local, and POP move/archive remain unavailable. Opening an unread row marks it read independently of the PEEK body fetch. Replies use the selected message's source account.
 
