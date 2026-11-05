@@ -720,8 +720,8 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - Empty lists show errors and safe mail-check retry; do not replay failed mailbox writes. Add menu, scope, reply/refresh and empty-error regression coverage.
 - VM final UI/i18n/catalog checks passed 3/3 in 62.43s; focused checks passed 5/5. Initial new test failed to locate a reparented popup; fixed test access and verified menu opening. Canonical UI gate passed. Synthetic capture reviewed. Host binary rebuilt and owned preview replaced for manual use only; no host tests or GUI verification.
 
-## First distributable preview · 2026-11-05 (in progress)
+## First distributable preview · 2026-11-05
 
-- Integrate stacked PRs #19–#30 through the final PR against main, preserving commit history and requiring release-gate before merge.
-- Prepare Arch x86_64 0.1.0rc1 package and complete source export, with pinned UI sources, licenses, checksums, dependency manifest and installation instructions. Packaging builds without OAuth fixture credentials and smoke-tests the installed binary in CI.
-- Pending: clean CI acceptance, main merge, package artifact verification and prerelease publication. No host execution/verification for this release work.
+- Integrated stacked PRs #19–#30 through PR #30 into main at 833e5b3c4aa401fac86a195781b9dabbbffa794b, preserving feature commits and the required release gate.
+- Arch x86_64 0.1.0rc1 packaging and complete source export include pinned UI sources, licenses, checksums, dependency manifest and installation instructions. Packaging builds without OAuth fixture credentials and smoke-tests the installed binary in CI. Wayland runtime is declared explicitly.
+- Clean PR acceptance: release-gate 10/10 passed in 106.74s, package built from the exported source, installed and passed CLI smoke tests (Actions run 42042100544). Main release build and artifacts are tracked by Actions run 42056400794. Publication uses that exact main commit and the v0.1.0-rc1 prerelease; see GitHub Releases for downloadable assets. No host execution/verification for this release work.
