@@ -112,7 +112,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Install build and runtime dependencies
-        run: pacman -Syu --noconfirm --needed git cmake ninja boost openssl dbus python qt6-base qt6-tools qt6-translations qt6-declarative qt6-webengine qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring hicolor-icon-theme fontconfig noto-fonts
+        run: pacman -Syu --noconfirm --needed git cmake ninja boost openssl dbus python qt6-base qt6-tools qt6-translations qt6-declarative qt6-webengine qt6-wayland qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring hicolor-icon-theme fontconfig noto-fonts
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           submodules: recursive
