@@ -694,3 +694,9 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - [ ] Define consistent account scope and cache/synchronization semantics for Unread/With attachments before restoring entries.
 - [ ] Implement configurable smart mailbox rules and saved conditions before presenting this as a complete Smart Mailboxes feature. Resume only when requested.
 - VM sidebar/retained aggregate UI checks passed (4/4 including lifecycle). Host preview rebuilt and replaced for manual use.
+
+## Notification table word wrapping · 2026-11-05
+
+- Reproduced vertical-letter status columns with synthetic 1%-width notification columns. The renderer's global overflow-wrap:anywhere reduced intrinsic minimum widths to glyph size; the new regression failed before the fix and passed after changing the envelope default to break-word.
+- Preserve sender styles and table layout. Track rendered width and expose native scrollbars for intrinsically wide content, retaining existing long-document scrolling. Long prose still wraps; switching documents resets measured width. No sanitizer/network-policy/cache-format changes or real-mail artifacts.
+- VM reader/core checks passed 2/2 in 5.91s, including wide/narrow word geometry, long prose, last-column horizontal reachability, reset, isolation and retained surfaces. Synthetic screenshot check passed (3/3 including lifecycle); both captures reviewed. Canonical UI pin gate passed. Host update is for manual inspection only.

@@ -137,6 +137,51 @@ TestCase {
         tryVerify(() => completed, 10000)
         return result
     }
+    function test_compact_table_columns_keep_word_width() {
+        // Notification tables use tiny preferred widths for their first columns.
+        // The host must not reduce their intrinsic minimum to a single letter.
+        const view = createTemporaryObject(browserComponent, testCase, {width: 660, height: 500, html:
+            '<div style="max-width:600px;margin:auto;font:14px/1.5 sans-serif"><h2>Some jobs were not successful</h2>'
+            + '<table style="width:100%;border-collapse:collapse"><thead><tr>'
+            + '<th id="status" style="width:1%;padding:12px">Status</th>'
+            + '<th style="width:1%;padding:12px">Job</th><th>Annotations</th></tr></thead>'
+            + '<tbody><tr><td style="padding:12px">Failed</td><td style="padding:12px">tests / Fedora 44 dependency check</td>'
+            + '<td>Review the synthetic workflow result.</td></tr></tbody></table></div>'})
+        tryVerify(() => view.documentReady, 20000)
+        function statusFits() {
+            return inspect(view, "(function(){const e=document.getElementById('status');const r=document.createRange();r.selectNodeContents(e);return r.getClientRects().length===1 && e.clientWidth>=60})()") === true
+        }
+        verify(statusFits(), "Status must stay a word, not a column of single letters")
+        verify(Number(inspect(view, "document.querySelector('table').getBoundingClientRect().height")) < 300, "A short notification must not become an excessively tall table")
+        if (server.capturePath.length) {
+            waitForRendering(view)
+            grabImage(view).save(server.capturePath + ".table-wide.png")
+        }
+        view.width = 330
+        tryVerify(statusFits)
+        if (server.capturePath.length) {
+            waitForRendering(view)
+            grabImage(view).save(server.capturePath + ".table.png")
+        }
+    }
+    function test_long_tokens_wrap_and_wide_tables_remain_reachable() {
+        const token = "long-identifier".repeat(50)
+        const view = createTemporaryObject(browserComponent, testCase, {width: 330, height: 300,
+            html: '<p>' + token + '</p>'})
+        tryVerify(() => view.documentReady, 20000)
+        verify(Number(inspect(view, "document.documentElement.scrollWidth")) <= 330,
+            "Long prose must still wrap inside the reader")
+        view.html = '<table style="width:100%"><tr><td style="white-space:nowrap">' + token
+            + '</td><td id="last">Last column</td></tr></table>'
+        tryVerify(() => view.documentReady && view.documentWidth > 330, 20000)
+        verify(view.settings.showScrollBars, "Wide sender tables need a visible horizontal scrollbar")
+        inspect(view, "window.scrollTo(100000,0)")
+        tryVerify(() => Number(inspect(view, "window.scrollX")) > 0)
+        verify(Number(inspect(view, "document.getElementById('last').getBoundingClientRect().right")) <= 331)
+        view.html = '<p>Short replacement message</p>'
+        tryVerify(() => view.documentReady && view.documentWidth <= 330)
+        verify(!view.settings.showScrollBars)
+    }
     function test_notification_layout_and_isolation() {
         const view = createTemporaryObject(browserComponent, testCase, {width: 660, height: 720, x: 40, y: 40, html: notification()})
         verify(view !== null)
