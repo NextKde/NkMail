@@ -15,6 +15,7 @@ QVariant MessageListModel::data(const QModelIndex &index, int role) const
         return {};
     const auto &s = m_messages.at(index.row());
     switch (role) {
+    case AccountIdRole: return s.accountId;
     case UidRole: return s.uid;
     case UidValidityRole: return s.uidValidity;
     case FolderRole: return s.folder;
@@ -34,7 +35,7 @@ QVariant MessageListModel::data(const QModelIndex &index, int role) const
 }
 QHash<int, QByteArray> MessageListModel::roleNames() const
 {
-    return {{UidRole, "uid"}, {UidValidityRole, "uidValidity"}, {FolderRole, "folder"},
+    return {{AccountIdRole, "accountId"}, {UidRole, "uid"}, {UidValidityRole, "uidValidity"}, {FolderRole, "folder"},
             {SenderRole, "sender"}, {SenderAddressRole, "senderAddress"},
             {SubjectRole, "subject"}, {DateRole, "date"}, {PreviewRole, "preview"},
             {UnreadRole, "unread"}, {FlaggedRole, "flagged"},
@@ -76,7 +77,7 @@ void MessageListModel::rebuildThreads()
     m_threadFirst.fill(false, size);
     QHash<QString, int> counts;
     for (int row = 0; row < size; ++row) {
-        m_threadKeys[row] = threadKeyFor(m_messages.at(row));
+        m_threadKeys[row] = m_messages.at(row).accountId + QChar(0x1f) + threadKeyFor(m_messages.at(row));
         ++counts[m_threadKeys.at(row)];
     }
     QSet<QString> seen;
@@ -90,19 +91,25 @@ void MessageListModel::rebuildThreads()
 }
 QString MessageListModel::identity(const Summary &s)
 {
-    return QString::number(s.folder.size()) + ':' + s.folder
+    return QString::number(s.accountId.size()) + ':' + s.accountId
+         + QString::number(s.folder.size()) + ':' + s.folder
          + QString::number(s.uidValidity.size()) + ':' + s.uidValidity
          + QString::number(s.uid.size()) + ':' + s.uid;
 }
 int MessageListModel::indexOf(const QString &folder, const QString &uidValidity,
-                               const QString &uid) const
+                               const QString &uid, const QString &accountId) const
 {
+    int found = -1;
     for (int row = 0; row < count(); ++row) {
         const auto &s = m_messages.at(row);
-        if (s.folder == folder && s.uidValidity == uidValidity && s.uid == uid)
-            return row;
+        if (s.folder == folder && s.uidValidity == uidValidity && s.uid == uid
+            && (accountId.isEmpty() || s.accountId.isEmpty() || s.accountId == accountId))
+        {
+            if (found >= 0) return -1; // An unscoped aggregate lookup is ambiguous.
+            found = row;
+        }
     }
-    return -1;
+    return found;
 }
 QVariantMap MessageListModel::get(int row) const
 {
@@ -110,7 +117,7 @@ QVariantMap MessageListModel::get(int row) const
 }
 bool MessageListModel::update(const Summary &message)
 {
-    const int row = indexOf(message.folder, message.uidValidity, message.uid);
+    const int row = indexOf(message.folder, message.uidValidity, message.uid, message.accountId);
     if (row < 0)
         return false;
     if (summaryMap(m_messages.at(row)) != summaryMap(message)) {
@@ -165,7 +172,7 @@ void MessageListModel::replace(const QList<Summary> &messages)
     }
     for (int row = 0; row < unique.size(); ++row) {
         const auto &s = unique.at(row);
-        const int old = indexOf(s.folder, s.uidValidity, s.uid);
+        const int old = indexOf(s.folder, s.uidValidity, s.uid, s.accountId);
         if (old < 0) {
             beginInsertRows({}, row, row);
             m_messages.insert(row, s);

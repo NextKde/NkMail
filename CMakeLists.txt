@@ -68,13 +68,17 @@ qt_add_resources(nkmail nkmail_window_controls PREFIX "/nkmail/platform"
 set_source_files_properties(qml/MailLabels.qml qml/MailStyle.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(nkmail
     URI NextKde.Mail VERSION 1.0 RESOURCE_PREFIX /qt/qml
-    QML_FILES qml/MailWheelHandler.qml qml/MailActivityIndicator.qml qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/MailMessageHeader.qml qml/MailHtmlBody.qml qml/Main.qml qml/WindowChrome.qml qml/MailWindowControls.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml qml/ProviderProfiles.js qml/ProviderPicker.qml qml/MailboxNavigation.js qml/ReaderLayout.js)
+    QML_FILES qml/MailSettingsInput.qml qml/MailWheelHandler.qml qml/MailActivityIndicator.qml qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/MailMessageHeader.qml qml/MailHtmlBody.qml qml/Main.qml qml/WindowChrome.qml qml/MailWindowControls.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml qml/ProviderProfiles.js qml/ProviderPicker.qml qml/MailboxNavigation.js qml/ReaderLayout.js)
 target_link_libraries(nkmail PRIVATE nkmail_core Kos::Ui Kos::UiPlugin
     Qt6::Quick Qt6::QuickControls2 Qt6::QuickDialogs2 Qt6::Concurrent Qt6::Network Qt6::DBus Qt6::Widgets Qt6::WebEngineQuick)
 target_compile_definitions(nkmail PRIVATE NKMAIL_VERSION="${PROJECT_VERSION}")
 install(TARGETS nkmail RUNTIME DESTINATION bin)
 install(FILES data/nkmail.desktop DESTINATION share/applications)
 install(FILES data/nkmail.svg DESTINATION share/icons/hicolor/scalable/apps)
+install(FILES LICENSE NOTICE.md DESTINATION share/licenses/nkmail)
+install(FILES third_party/mailio/LICENSE DESTINATION share/licenses/nkmail RENAME mailio-LICENSE)
+install(FILES third_party/nextkdeAppDemo/LICENSE DESTINATION share/licenses/nkmail RENAME Kos.Ui-LICENSE)
+install(FILES third_party/nextkdeAppDemo/NOTICE.md DESTINATION share/licenses/nkmail RENAME Kos.Ui-NOTICE.md)
 option(NKMAIL_BUILD_TESTS "Build isolated local regression tests" OFF)
 if(NKMAIL_BUILD_TESTS)
     enable_testing()
@@ -92,7 +96,7 @@ if(NKMAIL_BUILD_TESTS)
     qt_add_executable(nkmail_ui_tests tests/ui/main.cpp tests/ui/ReaderTestServer.h src/RichTextEditor.cpp src/RichTextEditor.h src/reader/MailWebProfile.cpp src/reader/MailWebProfile.h)
     qt_add_qml_module(nkmail_ui_tests
         URI NextKde.Mail.TestViews VERSION 1.0 RESOURCE_PREFIX /qt/qml
-        QML_FILES qml/MailWheelHandler.qml qml/MailActivityIndicator.qml qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/MailMessageHeader.qml qml/MailHtmlBody.qml qml/Main.qml qml/WindowChrome.qml qml/MailWindowControls.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml qml/ProviderProfiles.js qml/ProviderPicker.qml qml/MailboxNavigation.js qml/ReaderLayout.js)
+        QML_FILES qml/MailSettingsInput.qml qml/MailWheelHandler.qml qml/MailActivityIndicator.qml qml/MailToolbarGroup.qml qml/MailToolbar.qml qml/MailLabels.qml qml/MailSelection.qml qml/MailSidebar.qml qml/MessagePane.qml qml/MessageReader.qml qml/MailMessageHeader.qml qml/MailHtmlBody.qml qml/Main.qml qml/WindowChrome.qml qml/MailWindowControls.qml qml/MailAction.qml qml/MailStyle.qml qml/MailComposer.qml qml/AccountDialog.qml qml/ProviderProfiles.js qml/ProviderPicker.qml qml/MailboxNavigation.js qml/ReaderLayout.js)
     qt_add_resources(nkmail_ui_tests nkmail_test_provider_logos PREFIX "/" FILES ${NKMAIL_PROVIDER_LOGOS})
     qt_add_resources(nkmail_ui_tests nkmail_test_window_controls PREFIX "/nkmail/platform"
         BASE qml FILES qml/NativeWindowControls.qml)

@@ -1,5 +1,6 @@
 #include "RemoteImageLoader.h"
 #include <QJsonArray>
+#include <QCryptographicHash>
 #include <QJsonDocument>
 #include <QRegularExpression>
 #include <QNetworkAccessManager>
@@ -10,7 +11,6 @@
 #include <QPointer>
 #include <QBuffer>
 #include <QImageReader>
-#include <QDebug>
 namespace nkmail {
 namespace {
 bool remoteHttpUrl(const QString &value) {
@@ -30,6 +30,53 @@ QString htmlAttributeText(const QString &value) {
     out.replace(QStringLiteral("&amp;"), QStringLiteral("&"));
     return out;
 }
+QString permissionHash(const QString &value) {
+    return QString::fromLatin1(QCryptographicHash::hash(value.toUtf8(), QCryptographicHash::Sha256).toHex());
+}
+QString accountPermissionPrefix(const QString &account) {
+    return QStringLiteral("accounts/") + permissionHash(account) + u'/';
+}
+QString senderPermissionKey(const QString &account, const QString &sender) {
+    return accountPermissionPrefix(account) + QStringLiteral("senders/") + permissionHash(sender.trimmed().toCaseFolded());
+}
+}
+void RemoteImageLoader::configurePermissions(const QString &path) {
+    m_permissions = std::make_unique<QSettings>(path, QSettings::IniFormat);
+}
+bool RemoteImageLoader::alwaysAllow() const {
+    return m_permissions && m_permissions->value("alwaysAllow", false).toBool();
+}
+void RemoteImageLoader::setAlwaysAllow(bool allow) {
+    if (!m_permissions) return;
+    m_permissions->setValue("alwaysAllow", allow); m_permissions->sync();
+}
+bool RemoteImageLoader::senderAllowed(const QString &account, const QString &sender) const {
+    return m_permissions && !sender.trimmed().isEmpty()
+        && m_permissions->value(senderPermissionKey(account, sender), false).toBool();
+}
+void RemoteImageLoader::setSenderAllowed(const QString &account, const QString &sender, bool allow) {
+    if (!m_permissions || sender.trimmed().isEmpty()) return;
+    const auto name = senderPermissionKey(account, sender);
+    if (allow) m_permissions->setValue(name, true); else m_permissions->remove(name);
+    m_permissions->sync();
+}
+void RemoteImageLoader::allowMessage(const QString &account, const Summary &message) {
+    if (!m_permissions || message.uid.isEmpty() || message.uidValidity.isEmpty() || message.folder.isEmpty()) return;
+    m_permissions->setValue(accountPermissionPrefix(account) + QStringLiteral("messages/") + permissionHash(key(account, message)), true);
+    m_permissions->sync();
+}
+bool RemoteImageLoader::allowed(const QString &account, const Summary &message) const {
+    return alwaysAllow() || senderAllowed(account, message.senderAddress)
+        || (m_permissions && !message.uid.isEmpty() && !message.uidValidity.isEmpty() && !message.folder.isEmpty()
+            && m_permissions->value(accountPermissionPrefix(account) + QStringLiteral("messages/") + permissionHash(key(account, message)), false).toBool());
+}
+void RemoteImageLoader::forgetAccount(const QString &account) {
+    if (!m_permissions) return;
+    m_permissions->remove(accountPermissionPrefix(account)); m_permissions->sync();
+}
+void RemoteImageLoader::resetPermissions() {
+    if (!m_permissions) return;
+    m_permissions->clear(); m_permissions->sync();
 }
 QString RemoteImageLoader::key(const QString &accountId, const Summary &s, int formatVersion) {
     return QString::fromUtf8(QJsonDocument(QJsonArray{accountId, s.folder, s.uidValidity, s.uid, formatVersion}).toJson(QJsonDocument::Compact));
@@ -99,9 +146,6 @@ void RemoteImageLoader::load(const QString &key, const QString &input) {
                             results[index].second = QStringLiteral("<img width=\"%1\" height=\"%2\" src=\"data:%3;base64,%4\">")
                                 .arg(size.width()).arg(size.height()).arg(contentType, QString::fromLatin1(data.toBase64()));
                     }
-                    if (results[index].second.isEmpty() && qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
-                        qInfo() << "NkMail image request failed: network=" << int(reply->error())
-                            << "http=" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
                     active.remove(reply); ++completed; reply->deleteLater();
                     if ((stopping && active.isEmpty()) || completed == sources.size()) loop.quit();
                     else schedule();

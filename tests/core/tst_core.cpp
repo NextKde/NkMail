@@ -48,6 +48,34 @@ Page page(QList<Summary> messages, QString generation = QStringLiteral("100"))
 class CoreTests : public QObject {
     Q_OBJECT
 private slots:
+    void popLocalStateSurvivesRefreshRestartAndMailboxChanges() {
+        QTemporaryDir dir(temporaryTemplate()); MailDatabase db; QVERIFY(db.open(dir.path()));
+        QCOMPARE(accountFromMap({}).incomingProtocol, QString("imap"));
+        Account a; a.incomingProtocol = "pop3"; a.imapHost = "pop.example.invalid";
+        QCOMPARE(accountFromMap(accountMap(a)).incomingProtocol, QString("pop3"));
+        QVERIFY(db.saveAccount(a));
+        auto mail = message("opaque-B", "pop3-uidl-v1"); mail.unread = true;
+        auto incoming = page({mail}, mail.uidValidity); incoming.nextOffset = 1; incoming.hasMore = true;
+        QVERIFY(db.savePage(incoming));
+        auto local = mail; local.unread = false; local.flagged = true;
+        QVERIFY(db.updateFlags({local})); QVERIFY(db.savePage(incoming));
+        auto cached = db.cachedPage("INBOX"); QCOMPARE(cached.messages.size(), 1);
+        QVERIFY(!cached.messages.first().unread); QVERIFY(cached.messages.first().flagged);
+        Content content; content.summary = local; content.text = "Retained local body";
+        QVERIFY(db.saveContent(content));
+        QVERIFY(db.savePage(page({}, mail.uidValidity)));
+        QVERIFY(db.content("INBOX", mail.uidValidity, mail.uid));
+        QVERIFY(db.removePopMessages({mail})); db.close(); QVERIFY(db.open(dir.path()));
+        QVERIFY(db.savePage(incoming)); QCOMPARE(db.cachedPage("INBOX").messages.size(), 0);
+        QVERIFY(!db.saveContent(content));
+        const auto filtered = db.reconcilePopPage(incoming); QCOMPARE(filtered.nextOffset, 1); QVERIFY(filtered.hasMore);
+        QVERIFY(db.open(dir.path(), "other")); a.id = "other"; QVERIFY(db.saveAccount(a));
+        QVERIFY(db.savePage(incoming)); QCOMPARE(db.cachedPage("INBOX").messages.size(), 1);
+        QVERIFY(db.open(dir.path())); QVERIFY(db.removeAccount("default")); a.id = "default"; QVERIFY(db.saveAccount(a));
+        QVERIFY(db.savePage(incoming)); QCOMPARE(db.cachedPage("INBOX").messages.size(), 1);
+        a.incomingProtocol = "imap"; QVERIFY(db.saveAccount(a)); QCOMPARE(db.cachedPage("INBOX").messages.size(), 0);
+    }
+
     void oauthAccountMetadataNeverSerializesRefreshCredentials() {
         Account account; account.authMethod = "google_oauth";
         account.address = account.username = "reader@example.invalid";
@@ -60,6 +88,25 @@ private slots:
         QTemporaryDir root(temporaryTemplate()); MailDatabase db; QVERIFY(db.open(root.path()));
         QVERIFY(db.saveAccount(account)); QCOMPARE(db.account().authMethod, account.authMethod);
         QVERIFY(db.account().password.isEmpty());
+    }
+    void cidImagesResolveOnlyFromTrustedMessageParts() {
+        const QString image = QStringLiteral("data:image/png;base64,c3ludGhldGlj");
+        const auto html = sanitizeBrowserMailHtml(QStringLiteral(
+            "<img src='CID:logo%40fixture.invalid' alt='Logo' width='24' onerror='bad()'>"
+            "<img src='cid:missing@fixture.invalid' alt='Missing &amp; safe'>"
+            "<img src='https://fixture.invalid/tracker'>"
+            "<img src='data:image/svg+xml,bad'><img src='file:///private'>"), {{"logo@fixture.invalid", image}});
+        QVERIFY(html.contains("src=\"" + image + "\""));
+        QVERIFY(html.contains("width=\"24\""));
+        QVERIFY(html.contains("Missing &amp; safe"));
+        QCOMPARE(html.count("data-nkmail-src="), 1);
+        QVERIFY(!html.contains("onerror")); QVERIFY(!html.contains("svg+xml")); QVERIFY(!html.contains("file:"));
+        QVERIFY(!html.contains("cid:"));
+        QVERIFY(!sanitizeBrowserMailHtml("<img src='cid:logo@fixture.invalid' alt='Fallback'>").contains("<img"));
+        const auto repeated = sanitizeBrowserMailHtml(QString("<img src='cid:logo@fixture.invalid' alt='Budget'>").repeated(12),
+            {{"logo@fixture.invalid", QString("data:image/png;base64,") + QString(1024 * 1024, 'A')}});
+        QVERIFY(repeated.size() < 9 * 1024 * 1024);
+        QVERIFY(repeated.contains("Budget"));
     }
     void browserHtmlPreservesLayoutButNotActiveContent() {
         const auto html = sanitizeBrowserMailHtml(QStringLiteral(
@@ -115,6 +162,41 @@ private slots:
         QVERIFY(db.open(dir.path(), "first"));
         QVERIFY(db.invalidateUidValidity("Archive", "201"));
         QCOMPARE(db.smartPage("flagged", 0, 20).messages.size(), 1);
+    }
+    void unifiedInboxKeepsAccountIdentityAndCurrentEpochs() {
+        QTemporaryDir dir(temporaryTemplate()); MailDatabase db;
+        for (const auto &id : {"first", "second"}) {
+            QVERIFY(db.open(dir.path(), id));
+            Account a; a.id = id; a.address = QString(id) + "@example.invalid"; QVERIFY(db.saveAccount(a));
+            auto mail = message("1"); mail.subject = QString(id); mail.unread = QString(id) == "second";
+            QVERIFY(db.savePage(page({mail})));
+            auto archived = message("1", "100", "Archive");
+            Page archive; archive.folder = "Archive"; archive.uidValidity = "100"; archive.messages = {archived}; QVERIFY(db.savePage(archive));
+        }
+        const auto all = db.smartPage("allInbox", 0, 10);
+        QCOMPARE(all.messages.size(), 2);
+        QCOMPARE(all.messages[0].accountId, QString("first")); QCOMPARE(all.messages[1].accountId, QString("second"));
+        MessageListModel model; model.replace(all.messages);
+        QCOMPARE(model.count(), 2);
+        model.replace({all.messages[1], all.messages[0]});
+        QCOMPARE(model.get(0).value("accountId").toString(), QString("second"));
+        model.replace(all.messages); QCOMPARE(model.count(), 2);
+        QCOMPARE(model.indexOf("INBOX", "100", "1"), -1);
+        QCOMPARE(model.indexOf("INBOX", "100", "1", "first"), 0);
+        QCOMPARE(model.indexOf("INBOX", "100", "1", "second"), 1);
+        QVERIFY(MessageListModel::identity(all.messages[0]) != MessageListModel::identity(all.messages[1]));
+        auto changed = all.messages[1]; changed.flagged = true; QVERIFY(model.update(changed));
+        QVERIFY(!model.get(0).value("flagged").toBool()); QVERIFY(model.get(1).value("flagged").toBool());
+        auto firstPage = db.smartPage("allInbox", 0, 1); QVERIFY(firstPage.hasMore);
+        QCOMPARE(db.smartPage("allInbox", firstPage.nextOffset, 1).messages.first().accountId, QString("second"));
+        QCOMPARE(db.smartPage("allInbox", 0, 10, "second").messages.size(), 1);
+        QCOMPARE(db.smartPage("allInbox", 0, 10, {}, true).messages.size(), 1);
+        QVERIFY(db.invalidateUidValidity("INBOX", "101"));
+        QCOMPARE(db.smartPage("allInbox", 0, 10).messages.size(), 1);
+        QVERIFY(db.removeAccount("first")); QCOMPARE(db.smartPage("allInbox", 0, 10).messages.size(), 0);
+        Content wrongAccount; wrongAccount.summary = all.messages.first();
+        QVERIFY(!db.saveContent(wrongAccount));
+        QVERIFY(!db.savePage(page({all.messages.first()})));
     }
     void unreadCountsStayAccountScoped() {
         QTemporaryDir dir(temporaryTemplate());
@@ -636,7 +718,8 @@ void CoreTests::messageModelIdentity()
     QCOMPARE(model.indexOf("INBOX", "100", "2"), 0);
     QVERIFY(model.get(-1).isEmpty());
     QVERIFY(!model.data(model.index(0), Qt::UserRole - 1).isValid());
-    QCOMPARE(model.roleNames().size(), 14);
+    QCOMPARE(model.roleNames().size(), 15);
+    QCOMPARE(model.roleNames().value(MessageListModel::AccountIdRole), QByteArray("accountId"));
     model.replace({message("2", "101")});
     QVERIFY(!persistent.isValid());
     QCOMPARE(model.indexOf("INBOX", "100", "2"), -1);

@@ -10,7 +10,7 @@ public:
     enum Role { UidRole = Qt::UserRole + 1, UidValidityRole, FolderRole, SenderRole,
                 SenderAddressRole, SubjectRole, DateRole, PreviewRole, UnreadRole,
                 FlaggedRole, HasAttachmentsRole, ThreadKeyRole, ThreadCountRole,
-                ThreadFirstRole };
+                ThreadFirstRole, AccountIdRole };
     Q_ENUM(Role)
     explicit MessageListModel(QObject *parent = nullptr);
     int rowCount(const QModelIndex &parent = {}) const override;
@@ -24,7 +24,7 @@ public:
     void clear() { replace({}); }
     Q_INVOKABLE QVariantMap get(int row) const;
     Q_INVOKABLE int indexOf(const QString &folder, const QString &uidValidity,
-                            const QString &uid) const;
+                            const QString &uid, const QString &accountId = {}) const;
     static QString identity(const Summary &message);
 signals:
     void countChanged();

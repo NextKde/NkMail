@@ -26,13 +26,39 @@ Item {
         collapsedAccounts = next
     }
 
+    function accountAddress(accountId) {
+        if (accountId === mail.currentAccountId) return String(mail.account.address || "")
+        const account = (mail.accounts || []).find(a => a.id === accountId)
+        return account ? String(account.address || "") : ""
+    }
+    function scopedTitle(title, accountId) {
+        const address = accountAddress(accountId)
+        return address.length > 0 ? title + " (" + address + ")" : title
+    }
+
     // Gallery navigation owns row visuals; NkMail adds only mailbox counts.
     component MailboxAction: LiquidNavigationButton {
         id: action
+        property string scopeHint: ""
+        property string countHint: ""
+        property string secondaryText: ""
+        property bool unreadCount: true
+        property bool menuAvailable: false
+        signal menuRequested()
+        rightPadding: menuAvailable ? 34 : 12
+        MailAction {
+            objectName: "mailboxMoreButton"
+            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+            width: 24; height: 24; visible: action.menuAvailable
+            flat: true; iconOnly: true; iconName: "more"
+            accessibleText: qsTr("Folder options")
+            onClicked: action.menuRequested()
+        }
+        KosToolTip { target: action; text: action.scopeHint; onlyWhenTruncated: true; truncated: caption.truncated }
         property string countText: ""
         property string unreadText: ""
         Layout.fillWidth: true
-        Layout.preferredHeight: 28
+        Layout.preferredHeight: secondaryText.length ? 42 : 28
         specificationForm: true
         specificationFontSize: 12
         specificationSelectedVerticalInset: 2
@@ -59,20 +85,32 @@ Item {
                 anchors.leftMargin: action.iconName.length ? 24 : 0
                 anchors.rightMargin: unread.visible ? 6 : 0
                 anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: action.secondaryText.length ? -7 : 0
                 text: action.text
+                textFormat: Text.PlainText
                 color: action.checked ? action.specificationSelectedTextColor
                     : AppTheme.dark ? Qt.rgba(1, 1, 1, .92) : Qt.rgba(0, 0, 0, .92)
                 font: action.font
                 verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
             }
             Text {
+                anchors.left: caption.left; anchors.right: caption.right
+                anchors.top: caption.bottom
+                visible: action.secondaryText.length > 0
+                text: action.secondaryText; textFormat: Text.PlainText
+                font.pixelSize: 10; color: AppTheme.mutedText
+                elide: Text.ElideMiddle
+                KosToolTip { target: parent; text: action.scopeHint }
+            }
+            Text {
                 id: unread
+                KosToolTip { target: unread; text: action.countHint }
                 objectName: "mailboxUnread"
                 anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                 visible: text.length > 0
                 text: action.unreadText
                 font: action.font
-                color: action.checked ? action.specificationSelectedTextColor : AppTheme.accent
+                color: action.checked ? action.specificationSelectedTextColor : action.unreadCount ? AppTheme.accent : AppTheme.mutedText
                 textFormat: Text.PlainText
             }
             Text {
@@ -93,6 +131,16 @@ Item {
         property string accountId: ""
         property bool current: false
         property bool collapsed: false
+        signal menuRequested()
+        rightPadding: 34
+        KosToolTip { target: header; text: header.text; onlyWhenTruncated: true; truncated: title.truncated }
+        MailAction {
+            objectName: "accountMoreButton_" + header.accountId
+            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+            width: 24; height: 24; flat: true; iconOnly: true; iconName: "more"
+            accessibleText: qsTr("Account options")
+            onClicked: header.menuRequested()
+        }
         Layout.fillWidth: true
         Layout.preferredHeight: 28
         specificationForm: true
@@ -115,7 +163,7 @@ Item {
             }
             Text {
                 id: title
-                anchors.fill: parent; anchors.leftMargin: 18
+                anchors.fill: parent; anchors.leftMargin: 24
                 text: header.text
                 color: header.current ? AppTheme.text : AppTheme.mutedText
                 font.pixelSize: 13; font.weight: Font.DemiBold
@@ -156,10 +204,20 @@ Item {
                 width: parent.width
                 spacing: 0
                 Text {
-                    objectName: "favoritesTitle"
-                    text: qsTr("Favorites"); color: root.muted
+                    objectName: "currentAccountTitle"
+                    text: qsTr("Current account"); color: root.muted
                     font.pixelSize: 11; font.weight: Font.DemiBold
                     topPadding: 8; bottomPadding: 6
+                }
+                Text {
+                    id: currentAccountAddress
+                    objectName: "currentAccountAddress"
+                    Layout.fillWidth: true
+                    text: root.accountAddress(mail.currentAccountId)
+                    textFormat: Text.PlainText
+                    color: root.muted; font.pixelSize: 11
+                    elide: Text.ElideMiddle; bottomPadding: 6
+                    KosToolTip { target: currentAccountAddress; text: currentAccountAddress.text }
                 }
                 Repeater {
                     model: ["inbox", "flagged", "localDrafts", "sent"]
@@ -167,9 +225,13 @@ Item {
                         required property string modelData
                         readonly property var targetFolder: Navigation.systemFolder(mail.folders || [], modelData)
                         objectName: modelData === "localDrafts" ? "draftFolderButton" : "favoriteShortcut_" + modelData
-                        text: modelData === "flagged" ? MailLabels.smartMailboxTitle("flagged")
+                        readonly property string mailboxTitle: modelData === "flagged" ? MailLabels.smartMailboxTitle("flagged")
                             : modelData === "localDrafts" ? qsTr("Local drafts")
                             : modelData === "inbox" ? qsTr("Inbox") : qsTr("Sent")
+                        text: mailboxTitle
+                        scopeHint: root.scopedTitle(mailboxTitle, mail.currentAccountId)
+                        unreadCount: modelData !== "localDrafts"
+                        countHint: modelData === "localDrafts" ? qsTr("Drafts: %1").arg(unreadText) : qsTr("Unread: %1").arg(unreadText)
                         iconName: modelData === "flagged" ? "flag" : modelData === "localDrafts" ? "editRounded"
                             : modelData === "inbox" ? "envelope" : "forward"
                         enabled: modelData === "flagged" || modelData === "localDrafts" || !!targetFolder
@@ -191,11 +253,26 @@ Item {
                         }
                     }
                 }
+                Text {
+                    objectName: "favoritesTitle"
+                    text: qsTr("Favorites"); color: root.muted
+                    font.pixelSize: 11; font.weight: Font.DemiBold
+                    topPadding: 16; bottomPadding: 6
+                }
+                Text {
+                    visible: (mail.favorites || []).length === 0
+                    Layout.fillWidth: true
+                    text: qsTr("Add folders using their options menu.")
+                    color: root.muted; font.pixelSize: 11; wrapMode: Text.Wrap
+                }
                 Repeater {
                     objectName: "favoritesList"
                     model: mail.favorites || []
                     delegate: MailboxAction {
                         id: favoriteRow
+                        menuAvailable: true
+                        onMenuRequested: favoriteMenu.openAtAnchor()
+                        countHint: qsTr("Unread: %1").arg(unreadText)
                         TapHandler {
                             acceptedButtons: Qt.RightButton
                             onTapped: favoriteMenu.openAtAnchor()
@@ -214,6 +291,8 @@ Item {
                         }
                         required property var modelData
                         text: modelData.title
+                        secondaryText: root.accountAddress(modelData.accountId)
+                        scopeHint: root.scopedTitle(modelData.title, modelData.accountId)
                         iconName: MailLabels.folderIcon(modelData.folderId)
                         unreadText: {
                             root.unreadRevision
@@ -224,30 +303,42 @@ Item {
                         onClicked: { root.navigationOrigin = "custom"; root.mailboxOpened(); mail.openFavorite(modelData.accountId, modelData.folderId) }
                     }
                 }
-                Text {
-                    objectName: "smartMailboxesTitle"
-                    text: qsTr("Smart mailboxes"); color: root.muted
-                    font.pixelSize: 11; font.weight: Font.DemiBold
-                    topPadding: 16; bottomPadding: 4
-                }
-                Text {
-                    text: qsTr("Current account · cached mail")
-                    color: root.muted; font.pixelSize: 9
-                    Layout.fillWidth: true; wrapMode: Text.Wrap
-                    bottomPadding: 6
-                }
-                Repeater {
-                    model: ["unread", "attachments"]
-                    delegate: MailboxAction {
-                        required property string modelData
-                        objectName: "smartMailbox_" + modelData
-                        text: MailLabels.smartMailboxTitle(modelData)
-                        iconName: modelData === "unread" ? "envelope" : "copy"
-                        checked: !root.draftsVisible && mail.smartMailbox === modelData
-                        onClicked: { root.mailboxOpened(); mail.selectSmartMailbox(modelData) }
+                // Deferred until grouping, scope and configurable rules are designed.
+                ColumnLayout {
+                    objectName: "deferredSmartMailboxes"
+                    visible: false
+                    Layout.fillWidth: true
+                    spacing: 0
+                    Text {
+                        objectName: "smartMailboxesTitle"
+                        text: qsTr("Smart mailboxes"); color: root.muted
+                        font.pixelSize: 11; font.weight: Font.DemiBold
+                        topPadding: 16; bottomPadding: 4
+                    }
+                    Text {
+                        text: qsTr("Cached mail")
+                        color: root.muted; font.pixelSize: 9
+                        Layout.fillWidth: true; wrapMode: Text.Wrap
+                        bottomPadding: 6
+                    }
+                    Repeater {
+                        model: ["allInbox", "unread", "attachments"]
+                        delegate: MailboxAction {
+                            required property string modelData
+                            objectName: "smartMailbox_" + modelData
+                            text: MailLabels.smartMailboxTitle(modelData)
+                            iconName: modelData === "attachments" ? "copy" : "envelope"
+                            checked: !root.draftsVisible && mail.smartMailbox === modelData
+                            onClicked: { root.mailboxOpened(); mail.selectSmartMailbox(modelData) }
+                        }
                     }
                 }
-                Item { Layout.preferredHeight: 12 }
+                Text {
+                    objectName: "accountsTitle"
+                    text: qsTr("Accounts"); color: root.muted
+                    font.pixelSize: 11; font.weight: Font.DemiBold
+                    topPadding: 20; bottomPadding: 6
+                }
                 Repeater {
                     model: root.sidebarAccounts
                     delegate: ColumnLayout {
@@ -260,9 +351,11 @@ Item {
                         spacing: 0
                         AccountHeader {
                             id: accountRow
+                            readonly property alias optionsMenu: accountMenu
                             objectName: "accountHeader_" + accountSection.accountId
                             accountId: accountSection.accountId
                             current: accountSection.current
+                            onMenuRequested: accountMenu.openAtAnchor()
                             collapsed: accountSection.collapsed
                             text: accountSection.modelData.address || accountSection.modelData.name
                             Accessible.name: text
@@ -322,6 +415,10 @@ Item {
                             model: accountSection.collapsed ? [] : (root.unreadRevision, Navigation.ordered(accountSection.current ? root.mail.folders : (root.mail.foldersFor(accountSection.accountId) || [])))
                             delegate: MailboxAction {
                                 id: folderRow
+                                menuAvailable: true
+                                onMenuRequested: folderMenu.openAtAnchor()
+                                scopeHint: text
+                                countHint: qsTr("Unread: %1").arg(unreadText)
                                 Layout.leftMargin: 18
                                 required property var modelData
                                 // Keep the historical name for the active account; scope
@@ -376,50 +473,38 @@ Item {
                         }
                     }
                 }
-                Item {
-                    id: addAccountRow
+                MailAction {
+                    id: addAccountAction
                     objectName: "addAccountButton"
-                    Accessible.name: qsTr("添加账号")
+                    text: qsTr("添加账号")
+                    iconName: "plus"
+                    contentItem: Item {
+                        implicitWidth: addAccountContent.implicitWidth
+                        implicitHeight: addAccountContent.implicitHeight
+                        Row {
+                            id: addAccountContent
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 5
+                            VectorIcon { name: "plus"; size: 13; color: addAccountAction.textColor; anchors.verticalCenter: parent.verticalCenter }
+                            Text {
+                                objectName: "addAccountCaption"
+                                text: addAccountAction.text; color: addAccountAction.textColor
+                                font: addAccountAction.font
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+                    }
+                    // Sidebar text action: retain shared interaction without a filled button.
+                    flat: true
+                    surfaceColor: "transparent"
+                    textColor: AppTheme.defaultAccentSeed
+                    leftPadding: 12
+                    font.weight: Font.Normal
                     Layout.fillWidth: true
                     Layout.preferredHeight: 28
                     Layout.topMargin: 6
-                    readonly property bool hovered: addAccountMouse.containsMouse
-                    Rectangle {
-                        anchors.fill: parent; radius: 8
-                        color: addAccountRow.hovered
-                            ? (AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd") : "transparent"
-                        Behavior on color {
-                            ColorAnimation { duration: AppTheme.reduceMotion ? 0 : AppTheme.motionFast }
-                        }
-                    }
-                    Item {
-                        anchors.left: parent.left; anchors.leftMargin: 12
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: addIcon.implicitWidth + 5 + addLabel.implicitWidth
-                        height: 16
-                        VectorIcon {
-                            id: addIcon
-                            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                            name: "plus"; size: 13
-                            color: addAccountRow.hovered ? AppTheme.text : AppTheme.mutedText
-                        }
-                        Text {
-                            id: addLabel
-                            anchors.left: addIcon.right; anchors.leftMargin: 5
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: qsTr("添加账号")
-                            color: addAccountRow.hovered ? AppTheme.text : AppTheme.mutedText
-                            font.pixelSize: 12
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-                    MouseArea {
-                        id: addAccountMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.addAccountRequested()
-                    }
+                    onClicked: root.addAccountRequested()
                 }
             }
         }

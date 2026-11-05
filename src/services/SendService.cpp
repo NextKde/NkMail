@@ -2,6 +2,8 @@
 #include "DraftService.h"
 #include "storage/MailDatabase.h"
 #include "mail/MailTransport.h"
+#include "mail/HtmlSanitizer.h"
+#include <QFile>
 #include <QPointer>
 namespace nkmail {
 SendService::SendService(bool demo, MailDatabase &database, DraftService &drafts,
@@ -47,7 +49,29 @@ void SendService::submitDraft(const Draft &draft) {
         QByteArray raw;
         try { result = transport->send(account, draft, &raw); }
         catch (...) { result.state = SendResult::Unknown; result.message = SendService::tr("Connection ended before the result could be confirmed."); }
-        if (self) QMetaObject::invokeMethod(self, [self, result, account, raw, id = draft.id] {
+        Content localCopy; bool copyComplete = true;
+        if (result.state == SendResult::Accepted && account.incomingProtocol == "pop3") {
+            try {
+                auto &copy = localCopy; copy.summary.folder = "Sent"; copy.summary.uidValidity = "pop-local-v1";
+                copy.summary.uid = draft.id; copy.summary.subject = draft.subject;
+                copy.summary.sender = account.name; copy.summary.senderAddress = account.address;
+                copy.summary.recipients = draft.to; copy.to = draft.to; copy.cc = draft.cc;
+                copy.summary.date = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+                copy.text = draft.body; copy.html = sanitizeMailHtml(draft.html);
+                copy.displayHtml = sanitizeBrowserMailHtml(draft.html); copy.bodyFormatVersion = CurrentBodyFormatVersion;
+                copy.attachments = draft.attachments;
+                for (auto &attachment : copy.attachments) {
+                    if (attachment.bytes.isEmpty() && !attachment.path.isEmpty()) {
+                        QFile file(attachment.path);
+                        if (!file.open(QIODevice::ReadOnly) || file.size() > 15 * 1024 * 1024) copyComplete = false;
+                        else { attachment.bytes = file.read(15 * 1024 * 1024 + 1); if (attachment.bytes.size() != attachment.size) copyComplete = false; }
+                    }
+                    attachment.path.clear();
+                }
+                copy.summary.hasAttachments = !copy.attachments.isEmpty(); copy.summary.preview = draft.body.simplified().left(160);
+            } catch (...) { copyComplete = false; } // SMTP acceptance must still be persisted.
+        }
+        if (self) QMetaObject::invokeMethod(self, [self, result, account, raw, localCopy, copyComplete, id = draft.id] {
             if (!self) return;
             const QString state = result.state == SendResult::Accepted ? "accepted" : result.state == SendResult::Rejected ? "rejected" : "unknown";
             if (!self->m_database->markDraftState(id, state)) {
@@ -57,6 +81,15 @@ void SendService::submitDraft(const Draft &draft) {
             emit self->draftsChanged();
             if (result.state == SendResult::Accepted) {
                 self->setStatus(SendService::tr("SMTP server accepted this message · delivery not confirmed")); emit self->draftAccepted(id);
+                if (account.incomingProtocol == "pop3") {
+                    const auto &copy = localCopy;
+                    Page localPage; localPage.folder = "Sent"; localPage.uidValidity = "pop-local-v1"; localPage.messages = {copy.summary};
+                    const bool saved = copyComplete && self->m_database->savePage(localPage) && self->m_database->saveContent(copy);
+                    self->m_sending = false;
+                    self->setStatus(saved ? SendService::tr("SMTP server accepted this message · local Sent copy saved")
+                        : SendService::tr("SMTP server accepted this message · local Sent copy failed; accepted draft retained"));
+                    return;
+                }
                 if (account.serverSavesSent) {
                     self->m_sending = false;
                     self->setStatus(SendService::tr("SMTP server accepted this message · server manages the Sent copy"));

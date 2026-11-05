@@ -1,0 +1,29 @@
+pkgname=nkmail
+pkgver=0.1.0rc1
+pkgrel=1
+pkgdesc='Native Qt Quick mail client for NextKde (preview)'
+arch=('x86_64')
+url='https://github.com/NextKde/NkMail'
+license=('GPL-3.0-or-later')
+depends=('qt6-base>=6.8' 'qt6-declarative>=6.8' 'qt6-webengine>=6.8'
+         'qt6-wayland' 'qt6-5compat' 'qt6-svg' 'qt6-translations' 'qtkeychain-qt6'
+         'boost-libs' 'openssl' 'dbus' 'hicolor-icon-theme')
+makedepends=('cmake>=3.30' 'ninja' 'boost' 'qt6-tools')
+optdepends=('gnome-keyring: credential storage through Secret Service'
+            'kwallet: alternative desktop credential storage')
+source=("nkmail-${pkgver}.tar.gz")
+# CI replaces this with the SHA-256 of the complete, commit-pinned source archive.
+sha256sums=('@SOURCE_SHA256@')
+options=('!debug')
+
+build() {
+    cmake -S "nkmail-${pkgver}" -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+        -DNKMAIL_BUILD_TESTS=OFF -DNKMAIL_GOOGLE_OAUTH_CLIENT_FILE= \
+        -DNKMAIL_REQUIRE_GOOGLE_OAUTH=OFF
+    cmake --build build --parallel 2
+}
+
+package() {
+    DESTDIR="$pkgdir" cmake --install build
+}

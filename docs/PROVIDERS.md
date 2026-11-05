@@ -16,13 +16,13 @@
 | 126 | imap.126.com | smtp.126.com:465 隐式 TLS | 开启客户端协议及授权码 |
 | Yahoo | imap.mail.yahoo.com | smtp.mail.yahoo.com:465 隐式 TLS | 应用专用密码 |
 | AOL | imap.aol.com | smtp.aol.com:465 隐式 TLS | 应用专用密码 |
-| 其他邮箱 | 用户填写 | 用户填写 | 当前支持的 IMAP/SMTP 密码认证 |
+| 其他邮箱 | 用户填写 | 用户填写 | 当前支持的 IMAP/POP + SMTP 密码认证 |
 
-Microsoft / Exchange 入口明确标为尚未支持，禁止进入密码验证。Microsoft OAuth 尚未实现。
+Microsoft / Exchange 已从添加账号列表移除；其所需 OAuth 尚未实现。它仍支持标准邮件协议，移除入口是因为当前认证方式无法接入。
 
 ## 不止是填服务器
 
-- 密码接入保存前分别验证 IMAP 与 SMTP 登录，不通过发送邮件来验证 SMTP。新增 Gmail 账号使用应用专用密码；浏览器 OAuth 入口已隐藏。
+- 密码接入保存前分别验证所选 IMAP/POP 与 SMTP 登录，不通过发送邮件来验证 SMTP。新增 Gmail 账号使用应用专用密码；浏览器 OAuth 入口已隐藏。
 - 所有接入复用同一接收/正文净化/附件/回复转发/SMTP 发送服务；提供商预设不另建一套发送逻辑。
 - 能力协商：仅服务器声明 ID 时发送 RFC 2971 客户端标识，仅包含静态 NkMail 名称，不发送用户/设备标识。可选 ID 被服务器拒绝不阻断后续标准协议。
 - 服务器 `\Sent` 优先于文件夹名字，用于本地化/自定义已发送文件夹；`\All` 显示为所有邮件，可作为归档目的地。
@@ -32,7 +32,7 @@ Microsoft / Exchange 入口明确标为尚未支持，禁止进入密码验证�
 
 ## 验证边界
 
-使用合成 loopback 验证 TLS/STARTTLS、证书拒绝、IMAP 读取和附件、MIME/SMTP 收件人及发送状态、ID 能力协商、特殊文件夹角色。提供商自动识别、每项预设、Microsoft 阻断、已发送副本策略另有 UI/核心/控制器测试。
+使用合成 loopback 验证 TLS/STARTTLS、证书拒绝、IMAP 读取和附件、MIME/SMTP 收件人及发送状态、ID 能力协商、特殊文件夹角色。提供商自动识别、每项预设、Microsoft 入口移除、已发送副本策略另有 UI/核心/控制器测试。
 
 曾完成指定账号的只读接入与 Gmail OAuth 读取检查，但没有逐提供商完成当前应用密码流程或实际送达验收；不能把 loopback 通过标为每家服务商实测通过。服务商账户策略、授权码有效性、组织限制需要后续专用测试账户验证。
 
@@ -53,10 +53,18 @@ Microsoft / Exchange 入口明确标为尚未支持，禁止进入密码验证�
 
 ## Gmail 登录诊断 · 2026-11-04
 
-Gmail 同时提供 IMAP 和 POP；启用 POP 不会让账户变成只能使用 POP。当前 NkMail 的接收协议为 IMAP，没有 POP 客户端实现；现已补上 Google OAuth / 网页授权登录。Google 预设使用 imap.gmail.com:993 和 smtp.gmail.com:465。
+Gmail 同时提供 IMAP 和 POP；启用 POP 不会让账户变成只能使用 POP。此段记录的是历史诊断。当时只实现 IMAP；2026-11-04 已新增 POP。Google 网页授权后端仍保留，但添加账号入口使用应用专用密码。Google 预设使用 imap.gmail.com:993 和 smtp.gmail.com:465。
 
 Google 当前的客户端接入说明要求使用“使用 Google 账号登录”，或在账户允许时，开启两步验证并生成应用专用密码。普通 Google 账户密码不能直接替代应用专用密码。其他邮箱能否使用普通密码取决于服务商政策，因此通用表单使用“密码 / 授权码”，提供商说明再明确具体要求。
 
 本次在指定 VM 使用系统 CA 和证书校验配置探测 IMAP 993 / POP 995；两次均在 TCP 建连阶段超时，未进入 TLS 或认证阶段。没有提交真实账户凭据，不能据此判断密码有效性，也不能把 VM 的连接结果直接当成本机失败原因。未改动真实邮箱。
 
 参考：[Gmail 客户端接入与个人账户 IMAP](https://support.google.com/mail/answer/7126229?hl=zh-Hans)、[Google 应用专用密码](https://support.google.com/accounts/answer/185833?hl=zh-Hans)、[Gmail POP 配置](https://support.google.com/mail/answer/7104828?hl=zh-Hans)。其中旧 POP 帮助中关于普通密码及“安全性较低的应用”的建议，与当前账号接入政策不一致，不采用该旧建议。
+
+## POP 接入（2026-11-04）
+
+添加账号可选 IMAP 或 POP，发件统一使用 SMTP。POP 预设包括 Gmail、QQ、腾讯企业邮、163、126、Yahoo 和 AOL；自建或其他邮箱可手填服务器。iCloud 不提供 POP，因此只显示 IMAP。
+
+采用 UIDL 稳定标识，TOP 不可用时有限量回退 RETR；不发送 DELE。已读、旗标、本地删除和已发送副本只保存在本机，跨刷新与重启保留。POP 不提供服务器文件夹、服务器搜索或服务器已读状态；后台刷新现在会读取其他 POP 账号最新 50 封邮件头；POP 不提供服务器未读数，通知仍未实现。TLS/STARTTLS 均校验证书，服务器不支持 UIDL 时拒绝用易变化的邮件序号冒充身份。
+
+协议依据：[RFC 1939](https://www.rfc-editor.org/rfc/rfc1939)、[RFC 2595](https://www.rfc-editor.org/rfc/rfc2595)。测试使用虚拟机合成服务器，不读取或改动真实邮箱。

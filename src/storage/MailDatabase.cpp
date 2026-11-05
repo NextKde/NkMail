@@ -13,7 +13,7 @@
 
 namespace nkmail {
 namespace {
-constexpr int SchemaVersion = 5;
+constexpr int SchemaVersion = 6;
 QString json(const QVariantMap &map)
 {
     return QString::fromUtf8(QJsonDocument::fromVariant(map).toJson(QJsonDocument::Compact));
@@ -22,9 +22,10 @@ QVariantMap mapFromJson(const QVariant &value)
 {
     return QJsonDocument::fromJson(value.toString().toUtf8()).object().toVariantMap();
 }
-bool validIdentity(const Summary &s)
+bool validIdentity(const Summary &s, const QString &accountId)
 {
-    return !s.folder.isEmpty() && !s.uidValidity.isEmpty() && !s.uid.isEmpty();
+    return !s.folder.isEmpty() && !s.uidValidity.isEmpty() && !s.uid.isEmpty()
+        && (s.accountId.isEmpty() || s.accountId == accountId);
 }
 bool exec(QSqlDatabase db, const QString &sql, const QVariantList &values, QString *error)
 {
@@ -136,7 +137,7 @@ bool MailDatabase::updateFlags(const QList<Summary> &messages)
     Transaction tx(m_db);
     if (!tx.active()) return fail(m_db.lastError().text());
     for (const auto &s : messages) {
-        if (!validIdentity(s) || validity(s.folder) != s.uidValidity)
+        if (!validIdentity(s, m_accountId) || validity(s.folder) != s.uidValidity)
             return fail(QCoreApplication::translate("MailErrors", "Cannot update flags for a stale mailbox"));
         for (const auto &table : {"summaries", "contents"}) {
             QSqlQuery query(m_db);
@@ -275,7 +276,8 @@ bool MailDatabase::migrate()
                 return false;
     }
     if (version < 5 && !exec(m_db, QStringLiteral("ALTER TABLE folders ADD COLUMN role TEXT NOT NULL DEFAULT ''"), {}, &m_error)) return false;
-    if (!exec(m_db, QStringLiteral("PRAGMA user_version=5"), {}, &m_error))
+    if (version < 6 && !exec(m_db, QStringLiteral("CREATE TABLE pop_hidden (account TEXT NOT NULL, folder TEXT NOT NULL, uid_validity TEXT NOT NULL, uid TEXT NOT NULL, PRIMARY KEY(account,folder,uid_validity,uid))"), {}, &m_error)) return false;
+    if (!exec(m_db, QStringLiteral("PRAGMA user_version=6"), {}, &m_error))
         return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
@@ -335,14 +337,14 @@ bool MailDatabase::saveAccount(const Account &account)
             if (previous.id.trimmed().isEmpty())
                 previous.id = QStringLiteral("default");
             position = existing.value(1).toInt();
-            const bool differentMailbox = previous.id != a.id || previous.address != a.address
+            const bool differentMailbox = previous.incomingProtocol != a.incomingProtocol || previous.id != a.id || previous.address != a.address
                 || previous.username != a.username || previous.imapHost != a.imapHost
                 || previous.imapPort != a.imapPort || previous.imapStartTls != a.imapStartTls;
             existing.finish();
             if (differentMailbox) {
                 // Folder/UID identity is scoped to an account, never just a server UID.
                 // Keep unsent local drafts, but never show another account's cache.
-                for (const auto &table : {"contents", "summaries", "folder_state", "retired_validities", "folders"})
+                for (const auto &table : {"contents", "summaries", "folder_state", "retired_validities", "folders", "pop_hidden"})
                     if (!exec(m_db, QStringLiteral("DELETE FROM ") + QLatin1String(table) + QStringLiteral(" WHERE account=?"), {a.id}, &m_error))
                         return false;
             }
@@ -367,7 +369,7 @@ bool MailDatabase::removeAccount(const QString &id)
     Transaction tx(m_db);
     if (!tx.active())
         return fail(m_db.lastError().text());
-    for (const auto &table : {"folders", "folder_state", "summaries", "contents", "retired_validities", "drafts"})
+    for (const auto &table : {"folders", "folder_state", "summaries", "contents", "retired_validities", "drafts", "pop_hidden"})
         if (!exec(m_db, QStringLiteral("DELETE FROM ") + QLatin1String(table) + QStringLiteral(" WHERE account=?"), {accountId}, &m_error))
             return false;
     if (!exec(m_db, QStringLiteral("DELETE FROM accounts WHERE id=?"), {accountId}, &m_error))
@@ -463,12 +465,50 @@ bool MailDatabase::invalidateUidValidity(const QString &folder, const QString &u
         return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
-bool MailDatabase::savePage(const Page &page)
+Page MailDatabase::reconcilePopPage(const Page &page) const
 {
+    if (!check() || account().incomingProtocol != "pop3") return page;
+    Page result = page; result.messages.clear();
+    for (auto summary : page.messages) {
+        QSqlQuery hidden(m_db);
+        hidden.prepare("SELECT 1 FROM pop_hidden WHERE account=? AND folder=? AND uid_validity=? AND uid=?");
+        const QVariantList keys{m_accountId, summary.folder, summary.uidValidity, summary.uid};
+        for (const auto &key : keys) hidden.addBindValue(key);
+        if (!hidden.exec()) { fail(hidden.lastError().text()); return {}; }
+        if (hidden.next()) continue;
+        QSqlQuery existing(m_db);
+        existing.prepare("SELECT payload FROM summaries WHERE account=? AND folder=? AND uid_validity=? AND uid=?");
+        for (const auto &key : keys) existing.addBindValue(key);
+        if (!existing.exec()) { fail(existing.lastError().text()); return {}; }
+        if (existing.next()) {
+            const auto old = summaryFromMap(mapFromJson(existing.value(0)));
+            summary.unread = old.unread; summary.flagged = old.flagged;
+            summary.preview = old.preview; summary.hasAttachments = old.hasAttachments;
+        }
+        result.messages.append(summary);
+    }
+    return result;
+}
+bool MailDatabase::removePopMessages(const QList<Summary> &messages)
+{
+    if (!check() || account().incomingProtocol != "pop3") return false;
+    Transaction tx(m_db); if (!tx.active()) return fail(m_db.lastError().text());
+    for (const auto &s : messages) {
+        if (!validIdentity(s, m_accountId) || validity(s.folder) != s.uidValidity) return false;
+        if (!exec(m_db, "INSERT OR IGNORE INTO pop_hidden(account,folder,uid_validity,uid) VALUES(?,?,?,?)",
+                  {m_accountId,s.folder,s.uidValidity,s.uid}, &m_error)
+            || !removeMessage(s.folder,s.uidValidity,s.uid)) return false;
+    }
+    return tx.commit() || fail(m_db.lastError().text());
+}
+bool MailDatabase::savePage(const Page &input)
+{
+    const auto page = reconcilePopPage(input);
+    if (!m_error.isEmpty()) return false;
     if (!check())
         return false;
     for (const auto &s : page.messages)
-        if (!validIdentity(s) || s.folder != page.folder || s.uidValidity != page.uidValidity)
+        if (!validIdentity(s, m_accountId) || s.folder != page.folder || s.uidValidity != page.uidValidity)
             return fail(QCoreApplication::translate("MailErrors", "Page contains an invalid or mismatched message identity"));
     Transaction tx(m_db);
     if (!tx.active())
@@ -496,6 +536,8 @@ Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, cons
         return page;
     QSqlQuery q(m_db);
     QString sql = QStringLiteral("SELECT payload FROM summaries WHERE account=? AND folder=? AND uid_validity=? ORDER BY length(uid) DESC,uid DESC");
+    if (account().incomingProtocol == "pop3")
+        sql = QStringLiteral("SELECT payload FROM summaries WHERE account=? AND folder=? AND uid_validity=? ORDER BY json_extract(payload,'$.date') DESC,uid DESC");
     const bool filtered = unreadOnly || !search.isEmpty();
     if (!filtered)
         sql += QStringLiteral(" LIMIT ? OFFSET ?");
@@ -539,19 +581,28 @@ Page MailDatabase::smartPage(const QString &kind, int offset, int limit, const Q
 {
     Page result;
     if (!check() || offset < 0 || limit <= 0 || limit > 10000
-        || (kind != "flagged" && kind != "unread" && kind != "attachments")) return result;
-    // Every row retains its source folder and UIDVALIDITY. Account scope stays
-    // bound to this database; no cross-account identity guessing is permitted.
+        || (kind != "flagged" && kind != "unread" && kind != "attachments" && kind != "allInbox")) return result;
+    // The aggregate joins each row to its own account and current mailbox
+    // epoch; identical folder/UID values across accounts remain distinct.
     QList<Summary> matches;
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral("SELECT payload FROM summaries WHERE account=?"));
-    query.addBindValue(m_accountId);
+    const bool unified = kind == QLatin1String("allInbox");
+    query.prepare(unified
+        ? QStringLiteral("SELECT s.payload,s.account FROM summaries s JOIN accounts a ON a.id=s.account "
+                         "JOIN folder_state f ON f.account=s.account AND f.folder=s.folder AND f.uid_validity=s.uid_validity "
+                         "WHERE UPPER(s.folder)='INBOX'")
+        : QStringLiteral("SELECT payload,account FROM summaries WHERE account=?"));
+    if (!unified) query.addBindValue(m_accountId);
     if (!query.exec()) { fail(query.lastError().text()); return result; }
     QMap<QString, QString> validities;
     while (query.next()) {
-        const auto summary = summaryFromMap(mapFromJson(query.value(0)));
-        if (!validities.contains(summary.folder)) validities.insert(summary.folder, validity(summary.folder));
-        if (validities.value(summary.folder) != summary.uidValidity || (unreadOnly && !summary.unread)) continue;
+        auto summary = summaryFromMap(mapFromJson(query.value(0)));
+        if (unified) summary.accountId = query.value(1).toString();
+        else {
+            if (!validities.contains(summary.folder)) validities.insert(summary.folder, validity(summary.folder));
+            if (validities.value(summary.folder) != summary.uidValidity) continue;
+        }
+        if (unreadOnly && !summary.unread) continue;
         if ((kind == "flagged" && !summary.flagged) || (kind == "unread" && !summary.unread)
             || (kind == "attachments" && !summary.hasAttachments)) continue;
         const auto text = summary.sender + '\n' + summary.senderAddress + '\n' + summary.recipients
@@ -562,8 +613,8 @@ Page MailDatabase::smartPage(const QString &kind, int offset, int limit, const Q
     std::stable_sort(matches.begin(), matches.end(), [](const Summary &a, const Summary &b) {
         const auto ad = QDateTime::fromString(a.date, Qt::ISODate), bd = QDateTime::fromString(b.date, Qt::ISODate);
         if (ad != bd) return ad > bd;
-        return a.folder + QChar(0x1f) + a.uidValidity + QChar(0x1f) + a.uid
-            < b.folder + QChar(0x1f) + b.uidValidity + QChar(0x1f) + b.uid;
+        return a.accountId + QChar(0x1f) + a.folder + QChar(0x1f) + a.uidValidity + QChar(0x1f) + a.uid
+            < b.accountId + QChar(0x1f) + b.folder + QChar(0x1f) + b.uidValidity + QChar(0x1f) + b.uid;
     });
     result.messages = matches.mid(offset, limit);
     result.nextOffset = offset + result.messages.size();
@@ -595,8 +646,15 @@ bool MailDatabase::saveContent(const Content &content)
     if (!check())
         return false;
     const auto &s = content.summary;
-    if (!validIdentity(s))
+    if (!validIdentity(s, m_accountId))
         return fail(QCoreApplication::translate("MailErrors", "Content requires a complete message identity"));
+    if (account().incomingProtocol == "pop3") {
+        QSqlQuery hidden(m_db);
+        hidden.prepare("SELECT 1 FROM pop_hidden WHERE account=? AND folder=? AND uid_validity=? AND uid=?");
+        for (const auto &key : QVariantList{m_accountId,s.folder,s.uidValidity,s.uid}) hidden.addBindValue(key);
+        if (!hidden.exec()) return fail(hidden.lastError().text());
+        if (hidden.next()) return fail(QCoreApplication::translate("MailErrors", "This POP message was deleted locally."));
+    }
     const QString current = validity(s.folder);
     if (!m_error.isEmpty())
         return false;

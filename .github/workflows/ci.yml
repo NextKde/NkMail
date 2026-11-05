@@ -103,3 +103,53 @@ jobs:
           useradd --create-home nkmail-ci
           chown -R nkmail-ci:nkmail-ci "$GITHUB_WORKSPACE" "$XDG_RUNTIME_DIR"
           runuser -u nkmail-ci -- env XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" ctest --test-dir build/ci-release --output-on-failure --no-tests=error --timeout 120
+
+  arch-package:
+    name: Arch Linux preview package
+    needs: release-gate
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 30
+    steps:
+      - name: Install build and runtime dependencies
+        run: pacman -Syu --noconfirm --needed git cmake ninja boost openssl dbus python qt6-base qt6-tools qt6-translations qt6-declarative qt6-webengine qt6-wayland qt6-5compat qt6-svg qtkeychain-qt6 gnome-keyring hicolor-icon-theme fontconfig noto-fonts
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Export complete source and package recipe
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/third_party/nextkdeAppDemo"
+          python scripts/export_release_source.py dist
+          cp packaging/arch/PKGBUILD dist/PKGBUILD
+          source_sha=$(sha256sum dist/nkmail-0.1.0rc1.tar.gz | cut -d ' ' -f1)
+          sed -i "s/@SOURCE_SHA256@/$source_sha/" dist/PKGBUILD
+          useradd --create-home nkmail-package
+          chown -R nkmail-package:nkmail-package dist
+      - name: Build from exported source as ordinary user
+        run: runuser -u nkmail-package -- bash -c 'cd dist && makepkg --noconfirm'
+      - name: Install and smoke-test the actual package
+        run: |
+          pacman -U --noconfirm dist/nkmail-0.1.0rc1-1-x86_64.pkg.tar.zst
+          test -f /usr/share/applications/nkmail.desktop
+          test -f /usr/share/icons/hicolor/scalable/apps/nkmail.svg
+          test -f /usr/share/licenses/nkmail/Kos.Ui-LICENSE
+          test ! -e dist/src/build/.qt/rcc/qrc_google_oauth_project_config.cpp
+          runuser -u nkmail-package -- python tests/cli/check_cli.py /usr/bin/nkmail
+      - name: Create checksums and dependency record
+        run: |
+          pacman -Q > dist/BUILD-DEPENDENCIES.txt
+          cd dist
+          sha256sum nkmail-*.pkg.tar.zst nkmail-*.tar.gz PKGBUILD BUILD-DEPENDENCIES.txt > SHA256SUMS
+      - name: Upload preview distribution
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nkmail-arch-x86_64
+          if-no-files-found: error
+          path: |
+            dist/*.pkg.tar.zst
+            dist/*.tar.gz
+            dist/PKGBUILD
+            dist/SHA256SUMS
+            dist/BUILD-DEPENDENCIES.txt

@@ -94,7 +94,7 @@ ApplicationWindow {
     function value(map, key) { return MailLabels.value(map, key) }
     function selectedIndex() {
         if (!hasMessage) return -1
-        return mail.messages.indexOf(window.value(message, "folder") || mail.currentFolder, window.value(message, "uidValidity"), mail.selectedUid)
+        return mail.messages.indexOf(window.value(message, "folder") || mail.currentFolder, window.value(message, "uidValidity"), mail.selectedUid, mail.currentAccountId)
     }
     function mailboxTitle(folder) { return MailLabels.mailboxTitle(folder) }
     function folderIcon(id) { return MailLabels.folderIcon(id) }
@@ -306,12 +306,25 @@ ApplicationWindow {
                     objectName: "folderTitle"
                     x: listHeader.leadingInset
                     y: windowChrome.controlsCenterY - height / 2
-                    width: window.narrow ? readerHeader.titleWidth : Math.max(0, parent.width - x - 14 - (unreadFilterButton.visible ? unreadFilterButton.width + 8 : 0))
+                    width: Math.max(0, parent.width - x - 14 - (checkMailButton.visible ? checkMailButton.width + 8 : 0) - (unreadFilterButton.visible ? unreadFilterButton.width + 8 : 0))
                     height: MailStyle.toolbarButtonHeight
                     text: mail.unreadOnly && !window.draftsVisible ? qsTr("%1 · Unread (cached)").arg(window.folderTitle()) : window.folderTitle()
                     color: window.ink; font.pixelSize: 19; font.weight: Font.Bold
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight; textFormat: Text.PlainText
+                }
+                MailAction {
+                    id: checkMailButton
+                    objectName: "checkMailButton"
+                    anchors.right: unreadFilterButton.left
+                    anchors.rightMargin: 8
+                    y: windowChrome.controlsCenterY - height / 2
+                    visible: messagePane.visible && !window.draftsVisible
+                    text: mail.busy ? qsTr("Checking mail…") : qsTr("Check for mail")
+                    accessibleText: qsTr("Check mail for %1").arg(mail.account.address || "")
+                    enabled: !mail.busy && !mail.sending && (mail.configured || mail.demo)
+                    floatingAction: true; shellBackdrop: chromeBackdrop
+                    onClicked: mail.refresh()
                 }
                 MailAction {
                     id: unreadFilterButton
@@ -575,6 +588,14 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
                 MailAction {
+                    objectName: "retryInitialReceiptNotice"
+                    visible: !!mail.error && !!mail.initialReceipt && mail.initialReceipt.state === "failed" && mail.error === mail.initialReceipt.error
+                    enabled: !mail.busy && !mail.sending
+                    implicitHeight: 24
+                    text: qsTr("Retry mail check")
+                    onClicked: mail.retryInitialReceipt(mail.initialReceipt.accountId)
+                }
+                MailAction {
                     visible: !!mail.error || !!window.lifecycleNotice
                     implicitHeight: 24
                     text: qsTr("Dismiss")
@@ -597,81 +618,136 @@ ApplicationWindow {
         onOpened: unreadFilterCheck.forceActiveFocus()
         width: Math.min(300, window.width - 16)
         implicitHeight: listOptionsColumn.implicitHeight + topPadding + bottomPadding
-        height: implicitHeight
-        contentItem: ColumnLayout {
-            id: listOptionsColumn
-            spacing: 8
-            Keys.onPressed: event => {
-                if (!(event.modifiers & Qt.ControlModifier)) return
-                if (event.key === Qt.Key_F) {
-                    event.accepted = true
-                    readerHeader.openSearch()
-                } else if (event.key === Qt.Key_N && (mail.configured || mail.demo)) {
-                    event.accepted = true
-                    listOptions.close(); window.compose("new")
-                } else if (event.key === Qt.Key_R && !mail.busy) {
-                    event.accepted = true
-                    listOptions.close(); mail.refresh()
+        height: Math.min(implicitHeight, window.height - 32)
+        contentItem: ScrollView {
+            id: imageOptionsScroll
+            clip: true
+            contentWidth: availableWidth
+            contentHeight: listOptionsColumn.implicitHeight
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ColumnLayout {
+                width: imageOptionsScroll.availableWidth
+                id: listOptionsColumn
+                spacing: 8
+                Keys.onPressed: event => {
+                    if (!(event.modifiers & Qt.ControlModifier)) return
+                    if (event.key === Qt.Key_F) {
+                        event.accepted = true
+                        readerHeader.openSearch()
+                    } else if (event.key === Qt.Key_N && (mail.configured || mail.demo)) {
+                        event.accepted = true
+                        listOptions.close(); window.compose("new")
+                    } else if (event.key === Qt.Key_R && !mail.busy) {
+                        event.accepted = true
+                        listOptions.close(); mail.refresh()
+                    }
                 }
-            }
-            LiquidCheckBox {
-                id: unreadFilterCheck
-                objectName: "unreadFilterCheck"
-                Layout.fillWidth: true
-                text: qsTr("Unread messages only (cached)")
-                checked: mail.unreadOnly
-                onToggled: mail.unreadOnly = checked
-            }
-            LiquidCheckBox {
-                objectName: "senderInitialsCheck"
-                Layout.fillWidth: true
-                text: qsTr("Sender initials")
-                checked: window.showAvatars
-                onToggled: window.showAvatars = checked
-            }
-            LiquidCheckBox {
-                objectName: "groupThreadsCheck"
-                Layout.fillWidth: true
-                text: qsTr("按会话聚合")
-                checked: window.groupThreads
-                onToggled: window.groupThreads = checked
-            }
-            LiquidCheckBox {
-                objectName: "notifyCheck"
-                Layout.fillWidth: true
-                text: qsTr("新邮件通知")
-                checked: mail.notifyEnabled
-                onToggled: mail.notifyEnabled = checked
-            }
-            LiquidCheckBox {
-                objectName: "summaryCheck"
-                Layout.fillWidth: true
-                text: qsTr("Show message summaries")
-                checked: window.showSummary
-                onToggled: window.showSummary = checked
-            }
-            LiquidCheckBox {
-                objectName: "richTextCheck"
-                Layout.fillWidth: true
-                text: qsTr("富文本显示")
-                checked: window.showRichText
-                onToggled: window.showRichText = checked
-            }
-            LiquidPopoverItem {
-                objectName: "overflowRefresh"
-                Layout.fillWidth: true
-                visible: readerHeader.compactActions
-                text: qsTr("Check for mail"); iconName: "refreshRounded"
-                enabled: !mail.busy && (mail.configured || mail.demo)
-                onTriggered: { listOptions.close(); mail.refresh() }
-            }
-            LiquidPopoverItem {
-                objectName: "overflowCompose"
-                Layout.fillWidth: true
-                visible: readerHeader.compactActions
-                text: qsTr("New message"); iconName: "editRounded"
-                enabled: mail.configured || mail.demo
-                onTriggered: { listOptions.close(); window.compose("new") }
+                SettingsGroup {
+                    objectName: "displaySettingsGroup"
+                    SettingsItem {
+                        title: qsTr("Unread messages only (cached)")
+                        SettingsSwitch {
+                            accessibleName: qsTr("Unread messages only (cached)")
+                            id: unreadFilterCheck
+                            objectName: "unreadFilterCheck"
+                            checked: mail.unreadOnly
+                            onToggled: checked => mail.unreadOnly = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("Sender initials")
+                        SettingsSwitch {
+                            accessibleName: qsTr("Sender initials")
+                            objectName: "senderInitialsCheck"
+                            checked: window.showAvatars
+                            onToggled: checked => window.showAvatars = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("按会话聚合")
+                        SettingsSwitch {
+                            accessibleName: qsTr("按会话聚合")
+                            objectName: "groupThreadsCheck"
+                            checked: window.groupThreads
+                            onToggled: checked => window.groupThreads = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("新邮件通知")
+                        SettingsSwitch {
+                            accessibleName: qsTr("新邮件通知")
+                            objectName: "notifyCheck"
+                            checked: mail.notifyEnabled
+                            onToggled: checked => mail.notifyEnabled = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("Show message summaries")
+                        SettingsSwitch {
+                            accessibleName: qsTr("Show message summaries")
+                            objectName: "summaryCheck"
+                            checked: window.showSummary
+                            onToggled: checked => window.showSummary = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("富文本显示")
+                        SettingsSwitch {
+                            accessibleName: qsTr("富文本显示")
+                            objectName: "richTextCheck"
+                            checked: window.showRichText
+                            onToggled: checked => window.showRichText = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("Always show remote images")
+                        SettingsSwitch {
+                            accessibleName: qsTr("Always show remote images")
+                            objectName: "alwaysShowImagesCheck"
+                            checked: mail.alwaysShowRemoteImages === true
+                            onToggled: checked => mail.alwaysShowRemoteImages = checked
+                        }
+                    }
+                    SettingsItem {
+                        title: qsTr("Allow images from this sender")
+                        visible: String(window.message.senderAddress || "").length > 0
+                        SettingsSwitch {
+                            accessibleName: qsTr("Allow images from this sender")
+                            objectName: "senderImagesCheck"
+                            checked: mail.senderImagesAllowed === true
+                            onToggled: checked => mail.senderImagesAllowed = checked
+                        }
+                    }
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: qsTr("Remote images can reveal that you opened a message.")
+                    color: AppTheme.mutedText
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
+                }
+                LiquidPopoverItem {
+                    objectName: "resetImagePermissions"
+                    Layout.fillWidth: true
+                    text: qsTr("Reset image permissions")
+                    onTriggered: { mail.resetImagePermissions(); listOptions.close() }
+                }
+                LiquidPopoverItem {
+                    objectName: "overflowRefresh"
+                    Layout.fillWidth: true
+                    visible: readerHeader.compactActions
+                    text: qsTr("Check for mail"); iconName: "refreshRounded"
+                    enabled: !mail.busy && (mail.configured || mail.demo)
+                    onTriggered: { listOptions.close(); mail.refresh() }
+                }
+                LiquidPopoverItem {
+                    objectName: "overflowCompose"
+                    Layout.fillWidth: true
+                    visible: readerHeader.compactActions
+                    text: qsTr("New message"); iconName: "editRounded"
+                    enabled: mail.configured || mail.demo
+                    onTriggered: { listOptions.close(); window.compose("new") }
+                }
             }
         }
     }
@@ -713,18 +789,18 @@ ApplicationWindow {
         LiquidPopoverItem { text: qsTr("Forward"); iconName: "forward"; enabled: !mail.sending; onTriggered: window.compose("forward") }
         LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: window.detailsVisible = true }
         LiquidPopoverItem {
-            text: qsTr("删除"); iconName: "trash"
-            enabled: window.hasMessage && !readerHeader.messageOpsVisible
+            text: mail.account.incomingProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"); iconName: "trash"
+            enabled: !mail.busy && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.deleteMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: qsTr("归档"); iconName: "archive"
-            enabled: window.hasMessage && !readerHeader.messageOpsVisible
+            enabled: mail.account.incomingProtocol !== "pop3" && !mail.busy && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.archiveMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: window.message.flagged ? qsTr("取消旗标") : qsTr("标为旗标"); iconName: "flag"
-            enabled: window.hasMessage && !readerHeader.messageOpsVisible
+            enabled: !mail.busy && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.toggleFlagged(window.selectedIndex())
         }
     }
@@ -790,27 +866,27 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+R"; enabled: !composer.visible && !accountDialog.visible && !mail.busy; onActivated: mail.refresh() }
     Shortcut {
         sequence: "Delete"
-        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: !mail.busy && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.deleteMessage(window.selectedIndex())
     }
     Shortcut {
         sequence: "Ctrl+Backspace"
-        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: !mail.busy && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.deleteMessage(window.selectedIndex())
     }
     Shortcut {
         sequence: "Ctrl+Shift+U"
-        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: !mail.busy && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.setMessageRead(window.selectedIndex(), !!window.message.unread)
     }
     Shortcut {
         sequence: "Ctrl+Shift+L"
-        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: !mail.busy && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.toggleFlagged(window.selectedIndex())
     }
     Shortcut {
         sequence: "Ctrl+Shift+A"
-        enabled: !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: !mail.busy && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.archiveMessage(window.selectedIndex())
     }
 }

@@ -120,3 +120,21 @@ capture itself can schedule rendering and must not be used as proof that a passi
 restore has no black frame. The original failure and successful texture-lifetime
 comparison were confirmed by the user on native Wayland, threaded OpenGL/EGL,
 Intel Mesa; production-adapter acceptance on that setup is recorded separately.
+
+
+## Reusable IMAP read session
+
+The protocol fixture exercises implicit TLS and STARTTLS with two distinct UIDs,
+including header-page-to-body reuse. It asserts one LOGIN for successful reuse,
+new authentication after account/password changes or explicit reset, one bounded
+reconnect after a closed connection, no repeated reconnect on a second failure,
+no automatic retry after protocol NO, rejection of changed UIDVALIDITY before
+body FETCH, and certificate verification after a trust-anchor change. Commands
+must remain EXAMINE/BODY.PEEK with no STORE/EXPUNGE/SELECT writes. Controller tests
+also require queued cleanup on disconnect and account switch.
+
+The reuse timing fixture introduces a synthetic 150ms login delay and reports
+first/second read durations. Connection/login counts are the regression contract;
+wall-clock timings are illustrative and are not real-provider benchmarks. Idle
+cleanup runs on the same serialized worker, so an operation already in progress
+finishes before queued cleanup; reuse eligibility independently expires at 60s.

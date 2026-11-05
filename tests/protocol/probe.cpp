@@ -4,6 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTextStream>
+#include <QElapsedTimer>
 #include <thread>
 #include <mailio/imap.hpp>
 #include <mailio/smtp.hpp>
@@ -19,12 +20,18 @@ int main(int argc, char **argv)
     a.imapPort = a.smtpPort = QString::fromLocal8Bit(argv[3]).toInt();
     a.imapStartTls = a.smtpStartTls = QString::fromLocal8Bit(argv[4]) == QStringLiteral("starttls");
     a.caFile = QString::fromLocal8Bit(argv[5]);
-    const auto operation = QString::fromLocal8Bit(argv[1]);
+    auto operation = QString::fromLocal8Bit(argv[1]);
+    if (operation.startsWith("pop-")) { a.incomingProtocol = "pop3"; operation = operation.mid(4); }
     const auto scenario = QString::fromLocal8Bit(argv[6]);
     QJsonObject result;
     std::thread worker([&] {
         try {
-            if (operation == "oauth-imap") {
+            if (operation == "read-pop") {
+                const auto page = nkmail::MailioBackend::page(a, "INBOX", 0, 1);
+                if (page.messages.size() != 1) throw std::runtime_error("Invalid POP page");
+                const auto content = nkmail::MailioBackend::content(a, "INBOX", page.uidValidity, page.messages.first().uid);
+                result = {{"uid", content.summary.uid}, {"text", content.text}, {"hasMore", page.hasMore}, {"nextOffset", page.nextOffset}};
+            } else if (operation == "oauth-imap") {
                 mailio::imap connection(a.imapHost.toStdString(), a.imapPort, std::chrono::milliseconds(5000));
                 connection.ssl_options(mailio::dialog_ssl::ssl_options_t{boost::asio::ssl::context::tls_client, boost::asio::ssl::verify_peer, a.caFile.toStdString()});
                 connection.start_tls(a.imapStartTls);
@@ -48,8 +55,21 @@ int main(int argc, char **argv)
                 QJsonArray array;
                 for (const auto &s : p.messages) array.append(QJsonObject{{"uid", s.uid}, {"subject", s.subject}, {"unread", s.unread}, {"flagged", s.flagged}});
                 result = {{"uidValidity", p.uidValidity}, {"messages", array}, {"hasMore", p.hasMore}, {"nextOffset", p.nextOffset}};
+            } else if (operation == QStringLiteral("content-reuse")) {
+                QElapsedTimer clock; clock.start();
+                const QString firstUid = scenario == "reuse-page"
+                    ? nkmail::MailioBackend::page(a, "INBOX", 0, 1, true).messages.first().uid
+                    : nkmail::MailioBackend::content(a, "INBOX", "42", "102", true).summary.uid;
+                const auto firstMs = clock.elapsed(); clock.restart();
+                if (scenario == "reuse-reset") nkmail::MailioBackend::resetReadConnection();
+                if (scenario == "reuse-account") a.id = "another-account";
+                if (scenario == "reuse-password") a.password = "replacement-secret";
+                if (scenario == "reuse-trust") a.caFile.clear();
+                const auto second = nkmail::MailioBackend::content(a, "Archive", "42", "103", true);
+                result = {{"first", firstUid}, {"second", second.summary.uid}, {"folder", second.summary.folder}, {"firstMs", firstMs}, {"secondMs", clock.elapsed()}};
+                nkmail::MailioBackend::resetReadConnection();
             } else if (operation == QStringLiteral("content")) {
-                const auto c = nkmail::MailioBackend::content(a, QStringLiteral("INBOX"), scenario == QStringLiteral("stale") ? QStringLiteral("99") : QStringLiteral("42"), QStringLiteral("102"));
+                const auto c = nkmail::MailioBackend::content(a, QStringLiteral("INBOX"), scenario == QStringLiteral("stale") ? QStringLiteral("99") : (a.incomingProtocol == "pop3" ? QStringLiteral("pop3-uidl-v1") : QStringLiteral("42")), a.incomingProtocol == "pop3" ? QStringLiteral("opaque-B") : QStringLiteral("102"));
                 QJsonArray attachments;
                 for (const auto &at : c.attachments) attachments.append(QJsonObject{{"name", at.name}, {"bytes", QString::fromLatin1(at.bytes.toBase64())}, {"path", at.path}});
                 result = {{"uidValidity", c.summary.uidValidity}, {"uid", c.summary.uid}, {"subject", c.summary.subject}, {"text", c.text}, {"displayHtml", c.displayHtml}, {"bodyFormatVersion", c.bodyFormatVersion}, {"attachments", attachments}, {"to", c.to}, {"cc", c.cc}, {"replyTo", c.replyTo}};

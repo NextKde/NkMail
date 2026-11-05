@@ -121,20 +121,10 @@
             <translation>服务器</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="179" />
-            <source>IMAP server</source>
-            <translation>IMAP 服务器</translation>
-        </message>
-        <message>
             <location filename="../qml/AccountDialog.qml" line="180" />
             <location filename="../qml/AccountDialog.qml" line="190" />
             <source>Port</source>
             <translation>端口</translation>
-        </message>
-        <message>
-            <location filename="../qml/AccountDialog.qml" line="180" />
-            <source>IMAP port</source>
-            <translation>IMAP 端口</translation>
         </message>
         <message>
             <location filename="../qml/AccountDialog.qml" line="182" />
@@ -185,11 +175,6 @@
             <translation>系统证书</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="205" />
-            <source>Reading does not change server flags. Explicit mail actions can update or delete messages.</source>
-            <translation>阅读不会更改服务器标记。主动执行邮件操作可修改或删除邮件。</translation>
-        </message>
-        <message>
             <location filename="../qml/AccountDialog.qml" line="214" />
             <source>Disconnect</source>
             <translation>断开连接</translation>
@@ -228,6 +213,66 @@
             <location filename="../qml/AccountDialog.qml" line="192" />
             <source>To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.</source>
             <translation>如需将此账号改为应用专用密码登录，请在下方填写 Google 应用专用密码并验证。已缓存的邮件会保留。</translation>
+        </message>
+        <message>
+            <source>Incoming port</source>
+            <translation>收件端口</translation>
+        </message>
+        <message>
+            <source>Incoming server</source>
+            <translation>收件服务器</translation>
+        </message>
+        <message>
+            <source>Incoming · POP</source>
+            <translation>收件 · POP</translation>
+        </message>
+        <message>
+            <source>POP keeps server copies. Read status, flags and deletion apply only on this device. Sent copies are saved locally; server folders are unavailable.</source>
+            <translation>POP 保留服务器副本。已读、旗标和删除仅在本机生效，已发送副本保存在本地，不支持服务器文件夹。</translation>
+        </message>
+        <message>
+            <source>Protocol</source>
+            <translation>协议</translation>
+        </message>
+        <message>
+            <source>Connection options</source>
+            <translation>连接选项</translation>
+        </message>
+        <message>
+            <source>Incoming STARTTLS</source>
+            <translation>收件 STARTTLS</translation>
+        </message>
+        <message>
+            <source>Outgoing STARTTLS</source>
+            <translation>发件 STARTTLS</translation>
+        </message>
+        <message>
+            <source>Receiving your first messages…</source>
+            <translation>正在收取首批邮件…</translation>
+        </message>
+        <message>
+            <source>Account saved · mail check failed</source>
+            <translation>账号已保存 · 收信失败</translation>
+        </message>
+        <message>
+            <source>Your inbox is ready</source>
+            <translation>收件箱已就绪</translation>
+        </message>
+        <message>
+            <source>Connecting securely and downloading the newest message headers. You can close this window while mail is fetched.</source>
+            <translation>正在安全连接并下载最新邮件列表。收取期间可以关闭此窗口。</translation>
+        </message>
+        <message>
+            <source>Open your inbox to read mail. Use Check for mail above the message list, or Ctrl+R, to check again.</source>
+            <translation>打开收件箱即可阅读邮件。再次收信可点击邮件列表上方的“检查新邮件”，或按 Ctrl+R。</translation>
+        </message>
+        <message>
+            <source>Retry mail check</source>
+            <translation>重试收信</translation>
+        </message>
+        <message>
+            <source>Open inbox</source>
+            <translation>打开收件箱</translation>
         </message>
     </context>
     <context>
@@ -846,9 +891,49 @@
             <source>Unsupported account authentication method.</source>
             <translation>不支持此账号的认证方式。</translation>
         </message>
+        <message>
+            <source>POP message exceeds the download size limit.</source>
+            <translation>POP 邮件超过下载大小限制。</translation>
+        </message>
+        <message>
+            <source>POP page exceeds the download size limit.</source>
+            <translation>POP 邮件列表超过单次下载大小限制。</translation>
+        </message>
+        <message>
+            <source>POP server must support UIDL to identify messages safely.</source>
+            <translation>POP 服务器必须支持 UIDL，才能安全识别邮件。</translation>
+        </message>
+        <message>
+            <source>POP server returned an invalid or oversized UIDL list.</source>
+            <translation>POP 服务器返回的 UIDL 列表无效或过大。</translation>
+        </message>
+        <message>
+            <source>POP server returned duplicate message identities.</source>
+            <translation>POP 服务器返回了重复的邮件标识。</translation>
+        </message>
+        <message>
+            <source>POP supports only the server inbox.</source>
+            <translation>POP 仅支持服务器收件箱。</translation>
+        </message>
+        <message>
+            <source>This POP message was deleted locally.</source>
+            <translation>这封 POP 邮件已在本地删除。</translation>
+        </message>
+        <message>
+            <source>This operation is not supported by POP.</source>
+            <translation>POP 不支持此操作。</translation>
+        </message>
+        <message>
+            <source>Unsupported incoming mail protocol or authentication.</source>
+            <translation>不支持此收件协议或认证方式。</translation>
+        </message>
     </context>
     <context>
         <name>MailLabels</name>
+        <message>
+            <source>All inboxes</source>
+            <translation>所有收件箱</translation>
+        </message>
         <message>
             <location filename="../qml/MailLabels.qml" line="7" />
             <source>Flagged</source>
@@ -1007,8 +1092,8 @@
         </message>
         <message>
             <location filename="../qml/MailSidebar.qml" line="217" />
-            <source>Current account · cached mail</source>
-            <translation>当前账户 · 已缓存邮件</translation>
+            <source>Cached mail</source>
+            <translation>已缓存邮件</translation>
         </message>
         <message>
             <location filename="../qml/MailSidebar.qml" line="361" />
@@ -1016,6 +1101,34 @@
             <source>添加账号</source>
             <translation>添加账号</translation>
         </message>
+        <message>
+            <source>Accounts</source>
+            <translation>账号</translation>
+        </message>
+    <message>
+        <source>Folder options</source>
+        <translation>文件夹选项</translation>
+    </message>
+    <message>
+        <source>Account options</source>
+        <translation>账号选项</translation>
+    </message>
+    <message>
+        <source>Current account</source>
+        <translation>当前账号</translation>
+    </message>
+    <message>
+        <source>Drafts: %1</source>
+        <translation>草稿数：%1</translation>
+    </message>
+    <message>
+        <source>Unread: %1</source>
+        <translation>未读数：%1</translation>
+    </message>
+    <message>
+        <source>Add folders using their options menu.</source>
+        <translation>通过文件夹的选项菜单添加收藏。</translation>
+    </message>
     </context>
     <context>
         <name>MailToolbar</name>
@@ -1024,11 +1137,7 @@
             <source>Back to messages</source>
             <translation>返回邮件列表</translation>
         </message>
-        <message>
-            <location filename="../qml/MailToolbar.qml" line="101" />
-            <source>收取</source>
-            <translation>收取</translation>
-        </message>
+
         <message>
             <location filename="../qml/MailToolbar.qml" line="101" />
             <source>撰写</source>
@@ -1106,9 +1215,29 @@
             <source>Close search</source>
             <translation>关闭搜索</translation>
         </message>
+        <message>
+            <source>Delete locally</source>
+            <translation>本地删除</translation>
+        </message>
     </context>
     <context>
         <name>Main</name>
+        <message>
+            <source>Allow images from this sender</source>
+            <translation>允许此发件人显示图片</translation>
+        </message>
+        <message>
+            <source>Always show remote images</source>
+            <translation>始终显示远程图片</translation>
+        </message>
+        <message>
+            <source>Remote images can reveal that you opened a message.</source>
+            <translation>远程图片可能让发件人获知你已打开邮件。</translation>
+        </message>
+        <message>
+            <source>Reset image permissions</source>
+            <translation>重置图片授权</translation>
+        </message>
         <message>
             <location filename="../qml/Main.qml" line="20" />
             <source>NkMail</source>
@@ -1320,9 +1449,29 @@ Alex
             <source>Save attachment</source>
             <translation>保存附件</translation>
         </message>
+        <message>
+            <source>Delete locally</source>
+            <translation>本地删除</translation>
+        </message>
+        <message>
+            <source>Retry mail check</source>
+            <translation>重试收信</translation>
+        </message>
+    <message>
+        <source>Checking mail…</source>
+        <translation>正在收取…</translation>
+    </message>
+    <message>
+        <source>Check mail for %1</source>
+        <translation>收取 %1 的邮件</translation>
+    </message>
     </context>
     <context>
         <name>MessagePane</name>
+        <message>
+            <source>Open source folder</source>
+            <translation>打开来源文件夹</translation>
+        </message>
         <message>
             <source>Add an account</source>
             <translation>添加账号</translation>
@@ -1488,9 +1637,29 @@ Alex
             <source>Delete</source>
             <translation>删除</translation>
         </message>
+        <message>
+            <source>Delete locally</source>
+            <translation>本地删除</translation>
+        </message>
+    <message>
+        <source>Mail could not be displayed</source>
+        <translation>无法显示邮件</translation>
+    </message>
+    <message>
+        <source>Retry mail check</source>
+        <translation>重试收信</translation>
+    </message>
     </context>
     <context>
         <name>MessageReader</name>
+        <message>
+            <source>Show images for this message</source>
+            <translation>本封显示图片</translation>
+        </message>
+        <message>
+            <source>Allow images from this sender</source>
+            <translation>允许此发件人显示图片</translation>
+        </message>
         <message>
             <source>Connect to load the original message formatting.</source>
             <translation>连接邮箱以加载这封邮件的原始排版。</translation>
@@ -1543,11 +1712,6 @@ Alex
             <location filename="../qml/MessageReader.qml" line="131" />
             <source>%1 张远程图片已隐藏</source>
             <translation>%1 张远程图片已隐藏</translation>
-        </message>
-        <message>
-            <location filename="../qml/MessageReader.qml" line="136" />
-            <source>显示图片</source>
-            <translation>显示图片</translation>
         </message>
         <message>
             <location filename="../qml/MessageReader.qml" line="137" />
@@ -1627,21 +1791,6 @@ Alex
             <translation>腾讯企业邮箱</translation>
         </message>
         <message>
-            <location filename="../qml/ProviderPicker.qml" line="13" />
-            <source>Microsoft OAuth and native Exchange are not available yet. Browser sign-in requires an application registration.</source>
-            <translation>暂未提供 Microsoft OAuth 和原生 Exchange 接入，浏览器登录需要先注册应用。</translation>
-        </message>
-        <message>
-            <location filename="../qml/ProviderPicker.qml" line="16" />
-            <source>Enable IMAP/SMTP in your webmail settings and use the client authorization code when required.</source>
-            <translation>请在网页版邮箱设置中开启 IMAP/SMTP，按服务商要求使用客户端授权码。</translation>
-        </message>
-        <message>
-            <location filename="../qml/ProviderPicker.qml" line="17" />
-            <source>Enter the IMAP and SMTP settings supplied by your mail administrator.</source>
-            <translation>填写邮箱管理员提供的 IMAP 和 SMTP 配置。</translation>
-        </message>
-        <message>
             <location filename="../qml/ProviderPicker.qml" line="18" />
             <source>Use an app-specific password generated in your provider account settings.</source>
             <translation>使用在邮箱服务商账户设置中生成的应用专用密码。</translation>
@@ -1652,14 +1801,21 @@ Alex
             <translation>选择邮箱提供商</translation>
         </message>
         <message>
-            <location filename="../qml/ProviderPicker.qml" line="40" />
-            <source> · Not available yet</source>
-            <translation> · 暂未支持</translation>
-        </message>
-        <message>
             <location filename="../qml/ProviderPicker.qml" line="15" />
             <source>Enable two-step verification in your Google account and generate an app password. Use that app password here, not your Google account password.</source>
             <translation>请在 Google 账号中开启两步验证并生成应用专用密码，在此填写该专用密码，而非 Google 账号的登录密码。</translation>
+        </message>
+        <message>
+            <source>Enable IMAP or POP and SMTP in your webmail settings and use the client authorization code when required.</source>
+            <translation>在网页版邮箱设置中开启 IMAP 或 POP 及 SMTP，并按要求使用客户端授权码。</translation>
+        </message>
+        <message>
+            <source>Enter the IMAP or POP and SMTP settings supplied by your mail administrator.</source>
+            <translation>输入邮箱管理员提供的 IMAP 或 POP 及 SMTP 设置。</translation>
+        </message>
+        <message>
+            <source>Connect with IMAP and SMTP using an Apple app-specific password. Apple Account sign-in is not available.</source>
+            <translation>通过 IMAP 和 SMTP 连接，需使用 Apple 应用专用密码。不支持 Apple 账户网页登录。</translation>
         </message>
     </context>
     <context>
@@ -2089,6 +2245,50 @@ Alex
             <source>Enter a Google app password in account settings to reconnect this account.</source>
             <translation>请在账号设置中填写 Google 应用专用密码，以重新连接此账号。</translation>
         </message>
+        <message>
+            <source>Choose IMAP or POP for incoming mail.</source>
+            <translation>请选择 IMAP 或 POP 收件协议。</translation>
+        </message>
+        <message>
+            <source>POP does not support server folders.</source>
+            <translation>POP 不支持服务器文件夹。</translation>
+        </message>
+        <message>
+            <source>Some inboxes could not be updated</source>
+            <translation>部分收件箱未能更新</translation>
+        </message>
+        <message>
+            <source>Refreshing all inboxes…</source>
+            <translation>正在刷新所有收件箱…</translation>
+        </message>
+        <message>
+            <source>All inboxes updated</source>
+            <translation>所有收件箱已更新</translation>
+        </message>
+        <message>
+            <source>First mail check completed</source>
+            <translation>首次收信完成</translation>
+        </message>
+        <message>
+            <source>First mail check failed</source>
+            <translation>首次收信失败</translation>
+        </message>
+        <message>
+            <source>Mail check interrupted. You can retry.</source>
+            <translation>收信已中断，可以重试。</translation>
+        </message>
+        <message>
+            <source>Receiving your first messages…</source>
+            <translation>正在收取首批邮件…</translation>
+        </message>
+        <message>
+            <source>All inboxes · cached messages</source>
+            <translation>所有收件箱 · 缓存邮件</translation>
+        </message>
+        <message>
+            <source>Select messages from one account before moving them.</source>
+            <translation>移动邮件时请选择同一个账号的邮件。</translation>
+        </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
@@ -2121,6 +2321,14 @@ Alex
             <location filename="../src/services/MailboxCommands.cpp" line="55" />
             <source>Mailbox operation failed. Refresh before retrying.</source>
             <translation>邮箱操作失败。请先收取邮件再重试。</translation>
+        </message>
+        <message>
+            <source>POP does not support moving messages between server folders.</source>
+            <translation>POP 不支持在服务器文件夹之间移动邮件。</translation>
+        </message>
+        <message>
+            <source>Choose a destination folder before archiving.</source>
+            <translation>归档前请选择目标文件夹。</translation>
         </message>
     </context>
     <context>
@@ -2237,6 +2445,14 @@ Alex
             <source>Send cancelled</source>
             <translation>已撤销发送</translation>
         </message>
+        <message>
+            <source>SMTP server accepted this message · local Sent copy failed; accepted draft retained</source>
+            <translation>SMTP 服务器已接收邮件 · 本地已发送副本保存失败，已保留已接收状态的草稿</translation>
+        </message>
+        <message>
+            <source>SMTP server accepted this message · local Sent copy saved</source>
+            <translation>SMTP 服务器已接收邮件 · 已保存本地已发送副本</translation>
+        </message>
     </context>
     <context>
         <name>GoogleOAuth</name>
@@ -2306,6 +2522,36 @@ Alex
         <message>
             <source>Loading…</source>
             <translation>正在加载…</translation>
+        </message>
+    </context>
+    <context>
+        <name>nkmail::InboxSync</name>
+        <message>
+            <source>Account needs a password.</source>
+            <translation>账号需要密码。</translation>
+        </message>
+        <message>
+            <source>Invalid inbox response.</source>
+            <translation>收件箱响应无效。</translation>
+        </message>
+    </context>
+    <context>
+        <name>nkmail::AggregateCommands</name>
+        <message>
+            <source>Message source account is unavailable.</source>
+            <translation>邮件来源账号不可用。</translation>
+        </message>
+        <message>
+            <source>Destination unavailable for this account. Open its folder and refresh before retrying.</source>
+            <translation>此账号的目标文件夹不可用。请打开该账号的文件夹并刷新后重试。</translation>
+        </message>
+        <message>
+            <source>Account needs a password. Open account settings to reconnect.</source>
+            <translation>账号需要密码。请打开账号设置重新连接。</translation>
+        </message>
+        <message>
+            <source>Message source account changed.</source>
+            <translation>邮件来源账号已变更。</translation>
         </message>
     </context>
 </TS>

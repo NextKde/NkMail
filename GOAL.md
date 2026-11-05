@@ -581,12 +581,147 @@ The scoped local implementation is substantially complete, but real-provider rea
 
 ## Current delivery queue · 2026-11-04
 
-1. Event-driven retained-surface adapter and VM regressions are complete; final native desktop manual acceptance and PR #18 release-gate remain.
-2. Provider/testing documentation reconciled; merge the final PR only after its own required release-gate passes.
-3. Optimize uncached body latency through a separately designed IMAP session reuse strategy; retain account/session cancellation and TLS/PEEK guarantees.
+1. Event-driven retained-surface adapter accepted by the user; PR #18 merged after release-gate.
+2. Provider/testing documentation reconciled. PR #19 includes IMAP session reuse and the body/flag race fix; merge only after its required release-gate passes.
+3. IMAP header/body session reuse implemented on codex/imap-body-session; VM regressions pass. Real-provider latency and final PR release-gate remain to verify.
 4. Cross-account unified inbox and read-only aggregates with explicit account/folder/UIDVALIDITY/UID routing.
 5. Favorite ordering and unknown/stale unread-count semantics; complete copy-to/junk workflows and message/rfc822 attachment forwarding.
 6. CID embedded images; controlled provider/app-password acceptance. QQ credential restoration remains user-deferred.
 7. Deferred product scope: IDLE/background service, Microsoft/Exchange, colored flags/reminders/muting/blocking/rules. Public Google OAuth onboarding/review remains deliberately deferred, not an app-password release blocker.
 
 Old unchecked lists and provider statements above are historical evidence, not an additional duplicate backlog.
+
+
+## Reuse short-lived IMAP connections for uncached bodies · 2026-11-04
+
+- Header pages and uncached bodies opt into a worker-thread-local connection on the existing dedicated serial MailboxSync queue. A recent header page can warm the first body read; successive bodies reuse authentication. No prefetch or write-session pooling.
+- Identity digest covers account/user/endpoint/authentication/TLS/custom trust anchor and credentials. Reuse expires after 60s; the owner queues idle cleanup and explicit cleanup on switch, settings save, removal and disconnect. All cleanup stays on the worker; worker teardown closes its thread-local session.
+- Every operation still uses read-only EXAMINE; bodies check UIDVALIDITY before UID BODY.PEEK. Transport failure on a reused connection gets at most one fresh attempt. Fresh-connection failure, protocol errors, UIDVALIDITY changes and TLS rejection do not loop. Send/write retry semantics are unchanged.
+- VM full suite passed 10/10 in 98.24s. Final protocol follow-up (actual server UIDVALIDITY change and controlled timing) passed in 25.79s. Fixtures cover header/body reuse, two UIDs, cross-folder reading, account/password/trust changes, explicit reset, closed connection, bounded double failure, protocol NO and controller cleanup.
+- With an artificial 150ms login delay, fixture reads measured 214→4ms (implicit TLS) and 168→2ms (STARTTLS). This proves avoided handshake/authentication work, not real-provider end-to-end latency. Cold/expired sessions and body transfer/parse still take time. No real mailbox writes or automated host validation.
+
+## Uncached body and flag-update race · 2026-11-04
+
+- Opening an unread row starts a body read and then marks it read. Flag-command dispatch invalidated both the list and body generations; completion invalidated the body again and rebuilt selection from header-only content, removing the loading state. The otherwise successful body callback was discarded.
+- Body delivery now depends on the selection generation, independent of list refresh/filter/flag changes. Account/folder/selection changes and completed removal still invalidate it. Flag completion updates selection flags in place, preserving pending/error/body state; a late PEEK snapshot preserves current read/star flags before caching.
+- Four deterministic VM regressions reproduced the old bug: read/star updates completing before/after the body. All four failed before the fix. Tests also cover large HTML delivery through callback/cache/selection. After the fix, the full VM suite passed 10/10 in 100.16s, including all four race cases.
+- Temporary MIME/DOM/dispatch diagnostics and the diagnostic empty-cache bypass have been removed. No real-mail content or raw logs are published. Host builds/replacements are for user manual inspection; automated tests run only in the VM.
+
+## Post-fix diagnostic cleanup · 2026-11-04
+
+- User confirmed the uncached-body blank issue is resolved. Removed the remaining opt-in IMAP phase timing and image-request diagnostic output, their logging includes and a duplicate include. Lifecycle fixes, error handling and race regression coverage remain intact.
+- Remote images currently require per-message consent and use an 8 MiB in-memory rendered-body cache. Persistent per-message consent and sender exceptions are not implemented; no automatic-loading policy was changed in this cleanup.
+- Cleanup validation: VM controller and loopback protocol tests passed 2/2 in 32.77s; host preview rebuilt and replaced for manual use.
+
+## Persistent remote image permissions · 2026-11-04
+
+- Added persistent per-message permission, account-scoped sender allow rules and an opt-in global auto-load switch. Defaults remain blocked. Display options can revoke the current sender or reset all permissions; account removal cleans up its rules. Policy storage stays in RemoteImageLoader, with hashed account/message/sender keys.
+- Auto-loading happens only for the currently presented message and reuses the bounded cookie-free loader. Per-message consent includes folder and UIDVALIDITY, preventing UID reuse across folders/epochs from inheriting permission. Image bytes remain in-memory rather than becoming a persistent disk cache.
+- Added policy persistence/isolation/revocation tests, synthetic loopback controller coverage for restart and sender/global loading, and UI action/settings/width checks. Tests and screenshot run in the VM only. Controller/protocol/core/CLI checks passed in the initial suite; after removing the obsolete translation and waiting for QML layout in the new geometry test, reader/i18n/catalog checks passed and the final complete UI suite passed in 49.81s.
+
+- Image action polish: switched reader actions to the existing compact MailAction adapter (14 px image/sender icons, 28 px rounded material buttons); renamed the sender option to “允许此发件人显示图片” / “Allow images from this sender” in both the reader and display settings. Display options remain in the right toolbar or More → Display on narrow windows.
+- VM reader/UI/i18n/catalog checks passed 4/4; final icon-and-label width/interaction checks passed, and the updated narrow-reader screenshot was reviewed.
+
+## CID embedded message images · 2026-11-04
+
+- Resolve case-insensitive cid: schemes and percent-encoded IDs against current-message MIME parts, normalizing mailio's non-strict angle-bracket IDs. Duplicate IDs are ambiguous and do not select an arbitrary part.
+- Validate decoded raster type/size/pixels before creating application-owned data URLs; raw sender data/file URLs and SVG remain blocked. Missing, invalid and budget-exceeding resources use escaped alt text. Inline images stay out of the attachment list unless explicitly attached.
+- Cache format 2 stores resolved image HTML; version 0/1 messages upgrade only when selected and connected, preserving their fallback during the read. Existing remote permissions remain independent.
+- VM core/controller/UI/i18n/catalog checks passed in the full run. CID protocol fixtures passed over TLS and STARTTLS after correcting an invalid synthetic PNG and normalizing Content-ID brackets. Reader checks passed in 9.76s; reviewed the synthetic embedded-image capture. No host automated validation or real mailbox writes.
+
+## Cached cross-account unified inbox · 2026-11-04
+
+- Added a clearly labeled cached, read-only inbox aggregate. Source account is part of list identity/thread grouping and shown in each row; SQL joins only saved accounts and current folder epochs. Cross-account cache writes are rejected.
+- Opening a row switches credential/body/reply context while preserving the unified view and loaded pages. Pending uncached bodies resume after credential restoration. Aggregate views block flag/move/delete commands in the controller and UI; the row menu opens the original account folder.
+- First VM run exposed a missing account argument in incremental list replacement: equal UIDs matched another account's row and attempted an invalid move. Fixed the lookup and added duplicate-identity reorder coverage, plus controller pagination and UI routing checks. Final VM suite passed 10/10 in 105.87s, including UI, core, controller, CID protocol and reader checks. The canonical UI pin gate and 32 dependency guards also passed. Synthetic screenshot reviewed; host compiled for manual use only.
+- Still pending: remote synchronization across all accounts, copy-to/junk workflows, message/rfc822 forwarding, persistent image-byte cache, favorite ordering/stale counts, and the explicitly deferred provider/background-service scope. This milestone does not claim those features are complete.
+
+## POP3 incoming mail and supported-provider picker · 2026-11-04
+
+- User explicitly requested POP alongside IMAP and removal of unavailable provider choices. Added incomingProtocol (legacy defaults to IMAP), secure POP3 on the existing mailio transport, a protocol selector and POP presets. Microsoft/Exchange is removed from the picker; iCloud remains IMAP-only.
+- POP requires stable UIDL, bounds lists/downloads, re-resolves opaque IDs per session, uses TOP with RETR fallback, validates TLS/STLS and never sends DELE. Bodies reuse the MIME/CID sanitizer and remote-image policy.
+- Local read/star/delete state survives refresh/restart. Schema 6 adds account-scoped deletion tombstones; account/endpoint changes clear them with their cache. Local cached rows survive server removal and paginate independently of the server. SMTP-accepted POP messages get a local Sent copy, preserving accepted/unknown retry rules.
+- Initial protocol run passed including renumbering, missing/duplicate/invalid UIDL, TOP fallback, dot unstuffing, limits and certificate/STLS rejection. Core/controller/UI runs passed 3/3 before the final pagination follow-up. Full VM suite passed 10/10 in 111.88s. Final Sent-cache/UI refinements passed controller/UI/i18n/catalog checks 4/4 in 59.91s. UI pin gate and 32 dependency guards passed; synthetic account-dialog capture reviewed. Final POP SMTP/folder protocol follow-up passed in 31.82s.
+- Boundaries: no POP server deletion, remote folders/move/archive/server search, inactive-account unread polling or POP notifications. Downloaded bodies remain local; headers alone cannot recover a server-removed body. No real mailbox writes or host automated verification.
+
+## Apply canonical settings-form components · 2026-11-04
+
+- User identified account-field/select/choice styling inconsistent with the shared specification. Source audit confirmed explicit Settings.md rules: grouped SettingsTextField/SettingsSwitch and the value-only LiquidSelect settings variant. The app had selected generic capsule/checkbox/combobox controls instead. No shared library or pin changes are needed.
+- Converted account fields and display toggles, retained owner-controlled state, added explicit switch accessibility names, corrected the protocol select and removed the account-dialog opacity override. Provider rows now derive from the actual catalog and use exclusive radio semantics; this also removes the stale undefined provider row left by the previous removal.
+- VM captures reviewed for light/dark forms and expanded select; focused editing/binding/provider/narrow-layout checks passed. The initial full UI run found only an unsupported keyClicks helper in the new test; corrected to keyClick and the focused checks passed. Final VM UI/i18n/catalog checks passed 3/3 in 56.22s. The upstream pin check remains blocked by repeated GitHub API TLS EOF failures (also without proxy environment). No integration PR is created until that required check succeeds; no checks bypassed. Host preview rebuilt/replaced for manual inspection.
+
+- Address placeholder follow-up: the new-account email hint is a real placeholder, now hidden whenever the field has active input focus and restored on blur while empty. Existing/typed address text is preserved. Validation uses the existing VM account editing and wizard regressions; no new style-only test was added.
+
+- Grouped input follow-up: MailSettingsInput is a thin preset of canonical SettingsTextField (filled, white in light mode, dark-theme surface retained). Account row editors share its compact 24px/6px style; standalone email block stays unchanged. VM account editing/binding and wizard failure regressions passed (4/4 including lifecycle); host preview rebuilt and replaced for manual use.
+
+- Grouped input sizing: reduced MailSettingsInput from 24px to 20px and vertical padding to 1px, retaining 12px text and the existing row layout.
+  VM account editing/binding regression passed (3/3 including lifecycle). Host preview rebuilt and replaced for user inspection.
+
+- Grouped input colors: default #d1d1d6, active input focus uses canonical AppTheme.defaultAccentSeed blue; contrasting text and inverted selection keep editing legible.
+  VM account editing/binding regression passed (3/3 including lifecycle); host preview rebuilt and replaced for manual inspection.
+
+- Corrected grouped input focus per user clarification: keep #d1d1d6 background and dark text, show only a 1px canonical-blue border on active input focus. This explicitly requested border supersedes the prior no-focus-border styling for this input.
+  VM account editing/binding regression passed (3/3 including lifecycle); host preview rebuilt and replaced for manual inspection.
+
+## Multi-account recent inbox synchronization · 2026-11-04
+
+- Unified-inbox Refresh now downloads the newest 50 inbox headers per saved IMAP/POP account with available credentials. Periodic refresh also updates inactive-account inbox caches. The aggregate remains read-only; older uncached pages still require the source folder.
+- InboxSync owns independent serial scheduling and per-account cache binding. Failures/missing passwords do not stop subsequent accounts; in-flight edited/deleted/cancelled results are discarded. Foreground writes cancel background results to avoid restoring stale flags. POP local flags/deletion tombstones survive refresh.
+- Aggregate refresh preserves loaded pagination and the selected body, with explicit invalidation on source UIDVALIDITY changes. Progress uses the existing busy UI while source switching remains available. Synthetic regressions cover failures, credential isolation, missing credentials, POP reconciliation, deleted/edited accounts, cancellation and source switching during pending reads.
+- Initial VM controller/i18n/catalog checks passed 3/3. Full VM suite passed 10/10 in 115.99s; final progress UI/controller/i18n/catalog checks passed 4/4 in 65.19s. Synthetic aggregate capture reviewed. Host preview rebuilt/replaced for manual inspection; no host automated validation. Canonical UI pin check and dependency guards now pass in the VM; previous GitHub API TLS blocker did not recur on this run.
+
+- Previous settings iteration is now reviewable as PR #24, stacked on #23; the blocked dependency check was rerun successfully before PR creation.
+
+## Automatic first receipt and discoverable refresh · 2026-11-04
+
+- New password accounts now fetch their first inbox automatically. First-account refresh waits for queued session credential restoration and checks account/generation before starting; background additions refresh only their own inbox without switching the reader. Background refresh failures surface through the existing actionable error UI.
+- Added a visible, labeled Check for mail action above the message list and completion-page guidance with Ctrl+R. iCloud guidance explicitly describes IMAP/SMTP with an app-specific password; this does not add Apple sign-in or claim provider acceptance.
+- VM regression exposed the first-account credential timing race; fixed it rather than leaving a silent refresh failure. The updated synthetic test covers first receipt, background cache isolation and no SMTP submission. Full VM UI/controller/i18n/catalog suite passed 4/4 in 82.55s; UI pin and 32 dependency guards passed. Narrow-window action/busy-state coverage passed. No host compilation, app launch or automated checks.
+- Remaining scope: aggregate mailbox writes, full-history/server reconciliation, junk/copy/.eml workflows, IDLE/POP notifications, disk image cache and favorites; real-provider acceptance and release-gate remain required.
+
+## First-receipt progress/retry and unified inbox actions · 2026-11-05
+
+- Found the earlier automatic-first-receipt commit already present. Replaced its static completion guidance with account-scoped loading/ready/failed state, folder discovery, explicit retry and Open inbox actions. Closing the dialog leaves receipt running. Background additions keep the existing reader; retry does not add another account or send SMTP mail. Removed completion-page Disconnect for unrelated accounts, duplicate errors and the misleading blanket read-only note.
+- AggregateCommands partitions immutable source rows by account/folder/UIDVALIDITY, resolves scoped credentials and reuses MailboxCommands with a separate account-bound cache. Read/flag/delete/archive support mixed-account selections; move requires one account and uses that account's folders. Partial failures retain successful changes and report errors without retrying writes. POP local state and deletion tombstones remain intact.
+- Opening an unread aggregate row can automatically mark it read. Credential restoration may resume its selected pending body while that flag command is queued; removal still invalidates the selection token. Added a regression for this ordering as well as first-receipt folder/header failures/retry, equal UIDs across accounts, partial failures for all four operations, source-specific moves, mixed-account move rejection and POP local deletion.
+- Initial runs exposed obsolete read-only status assertions and a UI fixture without a destination folder; updated those fixtures for the new behavior. Controller suite and focused receipt/aggregate UI checks then passed. Full VM suite passed 10/10 in 121.98s; final completion-page UI/controller/i18n/catalog checks passed 4/4 in 72.88s; the focused capture run also passed (4/4 including lifecycle). Host preview rebuilt/replaced for user inspection. Canonical UI pin gate and 32 dependency guards passed. Synthetic screenshots reviewed; no real-mail writes or host automated verification.
+
+## Deferred smart mailbox navigation · 2026-11-05
+
+- User requested hiding the smart-mailbox section (All inboxes, Unread, With attachments) and deferring aggregation work. Sidebar entry points are hidden; existing backend/cache support is retained without further aggregate development.
+- Favorites remain account-scoped: Inbox is the current account's inbox; Flagged filters cached messages across that account's folders; Local drafts queries drafts for the bound account.
+- [ ] Redesign sidebar hierarchy with clear section headings, expandable parents and indented children; distinguish unified mailboxes from rule-based smart mailboxes.
+- [ ] Define consistent account scope and cache/synchronization semantics for Unread/With attachments before restoring entries.
+- [ ] Implement configurable smart mailbox rules and saved conditions before presenting this as a complete Smart Mailboxes feature. Resume only when requested.
+- VM sidebar/retained aggregate UI checks passed (4/4 including lifecycle). Host preview rebuilt and replaced for manual use.
+
+## Notification table word wrapping · 2026-11-05
+
+- Reproduced vertical-letter status columns with synthetic 1%-width notification columns. The renderer's global overflow-wrap:anywhere reduced intrinsic minimum widths to glyph size; the new regression failed before the fix and passed after changing the envelope default to break-word.
+- Preserve sender styles and table layout. Track rendered width and expose native scrollbars for intrinsically wide content, retaining existing long-document scrolling. Long prose still wraps; switching documents resets measured width. No sanitizer/network-policy/cache-format changes or real-mail artifacts.
+- VM reader/core checks passed 2/2 in 5.91s, including wide/narrow word geometry, long prose, last-column horizontal reachability, reset, isolation and retained surfaces. Synthetic screenshot check passed (3/3 including lifecycle); both captures reviewed. Canonical UI pin gate passed. Host update is for manual inspection only.
+
+## Favorite account labels · 2026-11-05
+
+- Append the owning email address to built-in and custom favorite labels. Current-account shortcuts update with account changes; custom favorites retain their own source scope. Long labels elide and expose the complete label through the canonical tooltip. Keep the section title unscoped because custom favorites can belong to other accounts.
+- VM account/section checks passed (4/4 including lifecycle); final account-switch/custom-favorite scope regression passed (3/3 including lifecycle). Canonical UI pin gate passed. Host preview rebuilt/replaced for manual use.
+
+## Sidebar account hierarchy · 2026-11-05
+
+- Add an Accounts section heading aligned and styled identically to Favorites. Expandable account rows remain children of Accounts, with their folders one level further indented. Replace the muted custom MouseArea add-account row with a shared MailAction, retaining keyboard/accessibility behavior. Following user feedback, present it as left-aligned blue plus-and-text without a filled background.
+- VM UI/i18n/catalog passed 3/3 in 59.98s; hierarchy/disclosure follow-up 4/4 and final caption/capture 3/3 including lifecycle passed. Initial capture exposed an icon-only shared content layout; final icon-and-text adapter verified visually. Canonical UI pin gate passed. Host preview rebuilt/replaced for manual inspection.
+
+- Plain blue Add account follow-up: VM sidebar and empty-profile account-entry checks passed (4/4 including lifecycle), synthetic capture refreshed, host preview rebuilt/replaced for manual use.
+
+## Mail usability review follow-up · 2026-11-05
+
+- Separate current-account shortcuts from fixed favorites, with a shared current address and secondary address lines for custom favorites. Preserve hidden aggregate navigation. Add full-account tooltips, explicit count meanings and muted draft totals.
+- Expose existing account/folder/favorite menus with direct options actions; preserve account disclosure behavior. Prioritize replies at ordinary widths and compact to icons when needed. Consolidate direct refresh in the list header with account scope and checking state.
+- Empty lists show errors and safe mail-check retry; do not replay failed mailbox writes. Add menu, scope, reply/refresh and empty-error regression coverage.
+- VM final UI/i18n/catalog checks passed 3/3 in 62.43s; focused checks passed 5/5. Initial new test failed to locate a reparented popup; fixed test access and verified menu opening. Canonical UI gate passed. Synthetic capture reviewed. Host binary rebuilt and owned preview replaced for manual use only; no host tests or GUI verification.
+
+## First distributable preview · 2026-11-05 (in progress)
+
+- Integrate stacked PRs #19–#30 through the final PR against main, preserving commit history and requiring release-gate before merge.
+- Prepare Arch x86_64 0.1.0rc1 package and complete source export, with pinned UI sources, licenses, checksums, dependency manifest and installation instructions. Packaging builds without OAuth fixture credentials and smoke-tests the installed binary in CI.
+- Pending: clean CI acceptance, main merge, package artifact verification and prerelease publication. No host execution/verification for this release work.

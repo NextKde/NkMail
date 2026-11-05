@@ -27,6 +27,29 @@ Rectangle {
     signal detailsRequested()
     signal saveAttachmentRequested(int index)
 
+    component ImageAction: MailAction {
+        id: imageAction
+        implicitWidth: imageActionContent.implicitWidth + leftPadding + rightPadding
+        toolbarAction: false
+        iconSize: 14
+        secondary: true
+        contentItem: Row {
+            id: imageActionContent
+            spacing: 6
+            VectorIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                name: imageAction.iconName
+                size: imageAction.iconSize
+                color: imageAction.textColor
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: imageAction.text
+                font: imageAction.font
+                color: imageAction.textColor
+            }
+        }
+    }
     objectName: "messageReader"
     color: "transparent"
     ColumnLayout {
@@ -165,32 +188,49 @@ Rectangle {
                             onClicked: root.reconnectRequested()
                         }
                     }
-                    RowLayout {
+                    ColumnLayout {
                         objectName: "blockedImagesBar"
                         Layout.fillWidth: true
                         spacing: 8
                         visible: root.mail.blockedImageCount > 0 || root.mail.remoteImagesLoading === true
-                        MailActivityIndicator {
-                            objectName: "remoteImagesSpinner"
-                            visible: root.mail.remoteImagesLoading === true
-                            running: visible
-                            Layout.preferredWidth: 20; Layout.preferredHeight: 20
-                        }
-                        Text {
-                            text: root.mail.remoteImagesLoading === true ? qsTr("Loading images…")
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            MailActivityIndicator {
+                                objectName: "remoteImagesSpinner"
+                                visible: root.mail.remoteImagesLoading === true
+                                running: visible
+                                Layout.preferredWidth: 20; Layout.preferredHeight: 20
+                            }
+                            Text {
+                                text: root.mail.remoteImagesLoading === true ? qsTr("Loading images…")
                                 : root.mail.failedImageCount > 0 ? qsTr("Some images could not be loaded. Retry to load them again.")
                                 : qsTr("%1 张远程图片已隐藏").arg(root.mail.blockedImageCount)
-                            color: root.muted; font.pixelSize: 11
-                            Layout.fillWidth: true
+                                color: root.muted; font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                                Layout.fillWidth: true
+                            }
                         }
-                        KosButton {
-                            objectName: "remoteImagesButton"
-                            text: root.mail.failedImageCount > 0 ? qsTr("Retry") : qsTr("显示图片")
-                            secondary: true
-                            implicitHeight: 30
-                            enabled: root.mail.remoteImagesLoading !== true
-                            Accessible.name: qsTr("Load remote images")
-                            onClicked: root.mail.loadRemoteImages()
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            ImageAction {
+                                objectName: "remoteImagesButton"
+                                iconName: root.mail.failedImageCount > 0 ? "refreshRounded" : "wallpaper"
+                                text: root.mail.failedImageCount > 0 ? qsTr("Retry") : qsTr("Show images for this message")
+                                enabled: root.mail.remoteImagesLoading !== true
+                                Accessible.name: qsTr("Load remote images")
+                                onClicked: root.mail.loadRemoteImages()
+                            }
+                            ImageAction {
+                                objectName: "allowSenderImagesButton"
+                                iconName: "artist"
+                                text: qsTr("Allow images from this sender")
+                                visible: String(root.message.senderAddress || "").length > 0
+                                && root.mail.senderImagesAllowed !== true && root.mail.alwaysShowRemoteImages !== true
+                                enabled: root.mail.remoteImagesLoading !== true
+                                onClicked: root.mail.senderImagesAllowed = true
+                            }
                         }
                     }
                     ColumnLayout {

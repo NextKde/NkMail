@@ -4,6 +4,7 @@
 #include <QSet>
 #include <QStringList>
 #include <QStringView>
+#include <QUrl>
 
 namespace nkmail {
 namespace {
@@ -369,7 +370,7 @@ TagParse parseTag(QStringView s, qsizetype start)
 }
 }
 
-static QString sanitize(const QString &input, bool browser)
+static QString sanitize(const QString &input, bool browser, const QHash<QString, QString> &inlineImages = {})
 {
     if (input.isEmpty())
         return QString();
@@ -382,6 +383,7 @@ static QString sanitize(const QString &input, bool browser)
     QStringList openTags;
     QString dropName;
     int dropDepth = 0;
+    qsizetype inlineBudget = 8 * 1024 * 1024;
 
     qsizetype i = 0;
     while (i < n) {
@@ -454,14 +456,31 @@ static QString sanitize(const QString &input, bool browser)
                 } else if (dropVoidTags().contains(tag.name)) {
                     // Dropped with no content.
                 } else if (tag.name == QStringLiteral("img")) {
-                    // Keep only a placeholder: remote images are downloaded on
-                    // demand, so the URL lives in data-nkmail-src and every other
-                    // attribute (width, style, on*) is discarded. Non-http(s)
-                    // sources drop the tag entirely.
+                    // CID resources come only from validated MIME image parts.
+                    // HTTP(S) images remain consent-gated placeholders. Sender
+                    // supplied data/file URLs never become active sources.
                     if (!tag.closing) {
                         const QString src =
                                 tag.hasSrc ? decodeEntities(QStringView(tag.src)).trimmed() : QString();
-                        if (safeRemoteSrc(src)) {
+                        if (src.startsWith(QStringLiteral("cid:"), Qt::CaseInsensitive)) {
+                            const auto id = QUrl::fromPercentEncoding(src.mid(4).toUtf8());
+                            const auto dataUrl = browser ? inlineImages.value(id) : QString{};
+                            if (!dataUrl.isEmpty() && dataUrl.size() <= inlineBudget) {
+                                inlineBudget -= dataUrl.size();
+                                out += QStringLiteral("<img src=\"");
+                                appendEscapedString(out, dataUrl);
+                                out += QStringLiteral("\" alt=\"");
+                                appendEscapedString(out, decodeEntities(QStringView(tag.alt)));
+                                out += u'"';
+                                for (auto it = tag.layout.cbegin(); it != tag.layout.cend(); ++it) {
+                                    out += u' ' + it.key() + QStringLiteral("=\"");
+                                    appendEscapedString(out, it.value()); out += u'"';
+                                }
+                                out += u'>';
+                            } else {
+                                appendEscapedString(out, decodeEntities(QStringView(tag.alt)));
+                            }
+                        } else if (safeRemoteSrc(src)) {
                             const QString alt =
                                     tag.hasAlt ? decodeEntities(QStringView(tag.alt)).trimmed() : QString();
                             out += QLatin1String("<img data-nkmail-src=\"");
@@ -545,5 +564,5 @@ static QString sanitize(const QString &input, bool browser)
 }
 
 QString sanitizeMailHtml(const QString &input) { return sanitize(input, false); }
-QString sanitizeBrowserMailHtml(const QString &input) { return sanitize(input, true); }
+QString sanitizeBrowserMailHtml(const QString &input, const QHash<QString, QString> &inlineImages) { return sanitize(input, true, inlineImages); }
 }

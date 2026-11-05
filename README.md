@@ -1,8 +1,15 @@
 # NkMail
 
-A native Qt Quick mail client for NextKde. The interface takes cues from macOS Mail, uses canonical **Kos.Ui** from nextkdeAppDemo, and uses **mailio** for IMAP, SMTP and MIME.
+A native Qt Quick mail client for NextKde. The interface takes cues from macOS Mail, uses canonical **Kos.Ui** from nextkdeAppDemo, and uses **mailio** for IMAP, POP3, SMTP and MIME.
 
 > Under active local development. See [GOAL.md](GOAL.md) for the actual acceptance checklist and [progress](docs/progress/README.md) for verified milestones. A rendered preview is not proof of provider compatibility.
+
+## Install or try the preview
+
+See [installation and first-use instructions](docs/INSTALL.md). Preview releases
+provide an Arch Linux x86_64 package, complete source bundle (including Kos.Ui),
+checksums and a rebuild recipe. Other Linux distributions require a source build
+with Qt 6.8+; no universal Linux binary or Windows/macOS package is provided.
 
 ## Current scope
 
@@ -22,7 +29,7 @@ Choose **Google / Gmail**, enter your email address, and continue with a Google
 **app password** generated after enabling two-step verification. The normal Google
 account password is not supported. Some organization/security policies disable app
 passwords. See [Google's instructions](https://support.google.com/accounts/answer/185833).
-NkMail uses Gmail IMAP/SMTP; POP is not implemented. Remembering credentials uses
+NkMail supports IMAP or POP3 incoming mail with SMTP sending. Gmail requires an app password where permitted by account policy. Remembering credentials uses
 the system keychain, with no plaintext fallback.
 
 Browser OAuth sign-in is hidden from account setup. The existing OAuth backend is
@@ -30,6 +37,22 @@ retained for compatibility with previously added accounts; new users do not need
 Google Cloud configuration. Existing OAuth accounts can switch to an app password
 through account settings without removing their cached mail. The earlier
 [OAuth distributor notes](docs/GOOGLE_OAUTH.md) are retained for future development.
+
+## Uncached message latency
+
+Header pages and on-demand bodies share a short-lived IMAP connection on the
+account synchronization worker. Opening a body after a recent header fetch, or
+opening another uncached body, avoids another TLS/authentication exchange. Each
+read still uses read-only EXAMINE and UID-based BODY.PEEK; body reads revalidate
+UIDVALIDITY before fetching.
+
+Sessions expire after 60 seconds of idle reuse eligibility, with queued idle
+cleanup, and are reset on account switching, edits/removal and disconnect.
+Credential, endpoint and custom trust-anchor changes prevent reuse. A network
+failure on a reused read connection permits one fresh connection attempt; protocol
+errors and new-connection failures do not loop. Sending and mailbox mutations do
+not use this retry path. Cold connections and downloading large messages still
+incur network latency; this change does not prefetch unseen mail.
 
 ## Languages
 
@@ -138,8 +161,8 @@ System dependencies above must still be installed.
 
 ## Clone and build
 
-Run all build, test and application commands below **inside the designated virtual machine**.
-Host-side source editing is allowed; host-side execution/validation is not.
+Contributors in the maintainer workspace run validation in the designated VM.
+Users may build and run on their own compatible Linux desktop; see the installation guide.
 
 ```sh
 git clone --recurse-submodules https://github.com/NextKde/NkMail.git
@@ -282,3 +305,40 @@ row 10.5px from the right and 12.5px from the top (4px below Calendar), centred 
 NextKde window-controls protocol and enabled KOS window appearance. The older pinned
 fallback keeps its existing hover-glyph preference; global fallback glyph preference
 integration awaits a tested canonical UI release exposing that property.
+
+### Remote image preferences
+
+Remote images are blocked by default. “Show images for this message” remembers consent for that account/folder/UIDVALIDITY/UID across restarts. “Allow images from this sender” remembers the exact sender address within the current account. Display options also provide an optional global “Always show remote images” switch, a current-sender toggle and “Reset image permissions”. Removing an account removes its message/sender permissions. Disabling a policy prevents future automatic downloads; images already loaded can remain visible.
+
+Permissions persist locally; downloaded image bodies still use a bounded in-memory cache and may be fetched again after restarting. Automatic loading uses the same image limits, TLS checks, cookie-free requests and retry UI as explicit loading. No server-side mailbox changes are made by image preferences.
+
+### Embedded message images
+
+CID-referenced raster images inside MIME messages render without remote-image permission or network access. PNG, JPEG, GIF and WebP parts are matched by Content-ID (including URL-encoded CID references), checked for valid decoding and capped at 2 MiB / 16 million pixels each. Inline expansion is capped at 8 MiB per rendered body. SVG, broken/missing/ambiguous references and oversized resources fall back to alternative text. Remote HTTP images remain permission-gated. Inline image parts do not clutter the attachment list; explicit attachments remain available.
+
+Body cache format 2 retains the resolved images in sanitized HTML, making them available offline. Older selected cached messages are upgraded with a read-only fetch when credentials are available; their existing content stays visible while upgrading.
+
+### Unified inbox (entry temporarily hidden)
+
+The smart-mailbox sidebar section is currently hidden at the maintainer's request. Hierarchy, scope and configurable smart-mailbox rules are deferred in GOAL.md; the implementation below is retained for future use. Current-account shortcuts follow the active account; personal favorites retain their own source account.
+
+**All inboxes** combines cached inbox headers across saved accounts, retaining each row's account/folder/UIDVALIDITY/UID identity. The list shows the source account and opens content with that account's credentials. Search and unread filtering operate on the local cache; Refresh independently downloads the newest 50 inbox headers from each saved IMAP/POP account with available credentials. Periodic refresh also updates inactive accounts; one account failure does not stop the others. Older messages already cached remain available, and refreshing preserves the loaded aggregate window and current body. This is bounded recent-header synchronization, not a full-history mirror or server-deletion reconciliation. Older uncached mail can be fetched from its source account folder. The aggregate supports read/unread, flags, delete and archive, routed to each message's source account and mailbox epoch. Mixed-account selections are processed per account; partial failures are reported and never automatically retried. Archive uses each account's own cached archive destination. Move is available for a selection from one account and uses that account's folder list; cross-account moves are not offered. POP read/flag/delete remain local, and POP move/archive remain unavailable. Opening an unread row marks it read independently of the PEEK body fetch. Replies use the selected message's source account.
+
+### POP accounts
+
+Choose **POP** in the incoming-protocol selector when adding an account. Default security is implicit TLS (995); STARTTLS uses port 110 and never falls back to plaintext. The server must provide stable UIDL identifiers. Header pages use TOP, with a bounded RETR fallback when TOP is unavailable. Bodies and attachments use the same sanitized MIME reader as IMAP.
+
+POP keeps all server copies: NkMail never sends DELE. Read/star state and **Delete locally** belong to this device; deletion tombstones prevent a refresh from restoring locally deleted mail. Cached messages remain available when server copies disappear, though an uncached body cannot be recovered after server removal. SMTP-accepted mail receives a local Sent copy; ambiguous sends are never retried. Folder moves/archive and server search are unavailable, and inactive POP accounts do not provide server unread polling or notifications. Switching incoming protocol on an existing account requires re-adding it.
+
+The add-account list shows supported password/app-password providers and a manual IMAP/POP + SMTP option. Microsoft/Exchange is absent because its required authentication is not implemented; hiding it does not mean Microsoft lacks standard mail protocols. iCloud offers IMAP only. Provider presets are not a claim of live-account certification; verification checks both incoming and outgoing servers without sending mail.
+
+### First mail check after account setup
+
+After verification and saving a new account, NkMail automatically discovers its
+folders and downloads the newest inbox headers. The completion page shows live
+progress, success or the actual failure; **Retry mail check** reuses the saved
+account instead of creating another account. **Open inbox** navigates to the new
+account. Closing the dialog leaves receipt running; a failed check also has a
+retry action in the main window notice. Adding a second account does not replace
+the current reader. Bodies remain on demand, and an empty inbox is a successful
+check. Verification and receipt do not submit SMTP mail.

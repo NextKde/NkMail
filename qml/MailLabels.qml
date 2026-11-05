@@ -4,6 +4,7 @@ import Kos.Ui
 import "MailboxNavigation.js" as Navigation
 QtObject {
     function smartMailboxTitle(kind) {
+        if (kind === "allInbox") return qsTr("All inboxes")
         if (kind === "flagged") return qsTr("Flagged")
         if (kind === "unread") return qsTr("Unread")
         if (kind === "attachments") return qsTr("With attachments")

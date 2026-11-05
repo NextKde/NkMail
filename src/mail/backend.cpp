@@ -1,15 +1,18 @@
-#include <QCoreApplication>
 #include "backend.h"
 
 #include "HtmlSanitizer.h"
+#include "Pop3Session.h"
 #include "auth/GoogleOAuth.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QBuffer>
+#include <QImageReader>
 #include <QFile>
 #include <QFileInfo>
-#include <QDebug>
 #include <QElapsedTimer>
+#include <QCryptographicHash>
+#include <memory>
 #include <QRegularExpression>
 #include <QStringConverter>
 #include <QTextDocument>
@@ -31,6 +34,29 @@ constexpr auto Timeout = std::chrono::milliseconds(15000);
 using Mime = mailio::mime;
 using Imap = mailio::imap;
 using Message = mailio::message;
+
+// The dedicated serial MailboxSync worker owns this session; no socket crosses
+// threads or profiles. Direct backend callers remain one-shot unless opted in.
+struct ReadConnection {
+    std::unique_ptr<Imap> imap;
+    QByteArray identity;
+    QElapsedTimer idle;
+};
+thread_local ReadConnection readConnection;
+QByteArray readIdentity(const Account &a) {
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    for (const auto &field : {a.id, a.address, a.username, a.password, a.authMethod,
+                            a.imapHost, QString::number(a.imapPort),
+                            QString::number(a.imapStartTls), a.caFile}) {
+        hash.addData(field.toUtf8()); hash.addData(QByteArray(1, '\0'));
+    }
+    if (!a.caFile.isEmpty()) {
+        QFile ca(a.caFile);
+        if (ca.open(QIODevice::ReadOnly)) hash.addData(ca.readAll());
+    }
+    return hash.result();
+}
+
 
 std::string utf8(const QString &s) { return s.toUtf8().toStdString(); }
 QString unicode(const std::string &s, const std::string &charset = "UTF-8")
@@ -56,6 +82,9 @@ void singleLine(const QString &s)
 void accountValid(const Account &a, bool smtp)
 {
     workerOnly();
+    if ((a.incomingProtocol != "imap" && a.incomingProtocol != "pop3")
+        || (a.incomingProtocol == "pop3" && a.authMethod != "password"))
+        throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unsupported incoming mail protocol or authentication."));
     if (a.authMethod != "password" && a.authMethod != "google_oauth")
         throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unsupported account authentication method."));
     if (a.authMethod == "google_oauth" && (!a.caFile.isEmpty()
@@ -127,6 +156,25 @@ void login(Imap &imap, const Account &a)
         catch (const mailio::imap_error &) { GoogleTokens::invalidateAccess(a.password); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Google authorization needs attention. Enter a Google app password in account settings to reconnect.")); }
     } else imap.authenticate(utf8(a.username), utf8(a.password), Imap::auth_method_t::LOGIN);
     if (imap.capabilities().count("ID")) imap.client_id("NkMail");
+}
+Imap &readSession(const Account &a, bool reuseConnection, bool &reused)
+{
+    const auto key = readIdentity(a);
+    if (!reuseConnection || readConnection.identity != key || !readConnection.idle.isValid()
+        || readConnection.idle.elapsed() >= 60000) MailioBackend::resetReadConnection();
+    reused = bool(readConnection.imap);
+    if (!readConnection.imap) {
+        auto connection = std::make_unique<Imap>(utf8(a.imapHost), a.imapPort, Timeout);
+        login(*connection, a);
+        readConnection.imap = std::move(connection);
+        readConnection.identity = key;
+    }
+    return *readConnection.imap;
+}
+void finishReadSession(bool reuseConnection)
+{
+    if (reuseConnection) readConnection.idle.restart();
+    else MailioBackend::resetReadConnection();
 }
 Imap::fetch_options_t options(bool headers)
 {
@@ -231,7 +279,19 @@ QString mimeType(Mime::content_type_t type)
     }
     return major + u'/' + (type.media_subtype().empty() ? QStringLiteral("octet-stream") : unicode(type.media_subtype()));
 }
-struct Decoded { QStringList plain, html, rawHtml; QList<Attachment> attachments; qint64 bytes = 0; int nodes = 0; };
+QString rasterDataUrl(const std::string &data)
+{
+    if (data.empty() || data.size() > 2 * 1024 * 1024) return {};
+    QByteArray bytes(data.data(), qsizetype(data.size()));
+    QBuffer buffer(&bytes); buffer.open(QIODevice::ReadOnly);
+    QImageReader reader(&buffer);
+    const auto format = reader.format().toLower();
+    if (format != "png" && format != "jpeg" && format != "gif" && format != "webp") return {};
+    const auto size = reader.size();
+    if (!size.isValid() || qint64(size.width()) * size.height() > 16000000 || reader.read().isNull()) return {};
+    return QStringLiteral("data:image/%1;base64,%2").arg(QString::fromLatin1(format), QString::fromLatin1(bytes.toBase64()));
+}
+struct Decoded { QHash<QString, QString> inlineImages; QStringList plain, html, rawHtml; QList<Attachment> attachments; qint64 bytes = 0; int nodes = 0; };
 void decodePart(Mime part, Decoded &out, int depth = 0)
 {
     if (depth > 24 || ++out.nodes > 500) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Message MIME structure exceeds safety limits."));
@@ -239,6 +299,17 @@ void decodePart(Mime part, Decoded &out, int depth = 0)
     const auto data = part.content();
     out.bytes += qint64(data.size());
     if (out.bytes > MaxDecoded) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Message exceeds safety limits."));
+    auto contentId = unicode(part.content_id()).trimmed();
+    // mailio non-strict parsing retains the header's angle brackets.
+    if (contentId.startsWith(u'<') && contentId.endsWith(u'>'))
+        contentId = contentId.mid(1, contentId.size() - 2);
+    const auto imageUrl = contentId.isEmpty() ? QString{} : rasterDataUrl(data);
+    if (!imageUrl.isEmpty()) {
+        // Duplicate IDs are ambiguous: never silently choose a different part.
+        if (out.inlineImages.contains(contentId)) out.inlineImages[contentId].clear();
+        else out.inlineImages.insert(contentId, imageUrl);
+        if (part.content_disposition() != Mime::content_disposition_t::ATTACHMENT) return;
+    }
     const bool attached = part.content_disposition() == Mime::content_disposition_t::ATTACHMENT || !part.name().empty();
     if (attached && type.media_type() != Mime::media_type_t::MULTIPART) {
         if (qint64(data.size()) > MaxAttachment || out.attachments.size() >= 100)
@@ -292,6 +363,59 @@ Mime::content_type_t attachmentType(const QString &value)
     else if (major == QStringLiteral("video")) type = Mime::media_type_t::VIDEO;
     return {type, utf8(match.captured(2))};
 }
+Content decodedContent(const Message &m, const QString &folder, const QString &validity, const QString &uid)
+{
+    Content c; c.summary = summary(m, folder, validity, 1); c.summary.uid = uid;
+    c.messageId = unicode(m.message_id());
+    c.replyTo = unicode(m.reply_address().address);
+    c.to = addressList(m.recipients()); c.cc = addressList(m.cc_recipients());
+    Decoded decoded; decodePart(m, decoded);
+    c.text = (decoded.plain.isEmpty() ? decoded.html : decoded.plain).join(QStringLiteral("\n\n"));
+    c.html = sanitizeMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
+    c.displayHtml = sanitizeBrowserMailHtml(decoded.rawHtml.join(QStringLiteral("\n")), decoded.inlineImages);
+    c.bodyFormatVersion = CurrentBodyFormatVersion;
+    c.attachments = std::move(decoded.attachments);
+    c.summary.hasAttachments = !c.attachments.isEmpty();
+    c.summary.preview = c.text.simplified().left(160);
+    return c;
+}
+constexpr auto PopValidity = "pop3-uidl-v1";
+void popFolder(const QString &folder) {
+    if (folder != "INBOX") throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "POP supports only the server inbox."));
+}
+Page popPage(const Account &a, const QString &folder, int offset, int limit) {
+    popFolder(folder);
+    Pop3Session session(a);
+    const auto ids = session.identities();
+    Page page; page.folder = folder; page.uidValidity = QLatin1String(PopValidity); page.nextOffset = offset;
+    int skipped = 0; qsizetype bytes = 0;
+    for (auto it = ids.rbegin(); it != ids.rend(); ++it) {
+        if (skipped++ < offset) continue;
+        if (page.messages.size() == limit) { page.hasMore = true; break; }
+        const auto raw = session.message(it->first, true);
+        if ((bytes += raw.size()) > MaxMessage) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "POP page exceeds the download size limit."));
+        Message message; message.line_policy(mailio::codec::line_len_policy_t::NONE); message.parse(raw.toStdString());
+        auto item = summary(message, folder, page.uidValidity, it->first); item.uid = it->second;
+        page.messages.append(item); ++page.nextOffset;
+    }
+    return page;
+}
+Content popContent(const Account &a, const QString &folder, const QString &validity, const QString &uid) {
+    popFolder(folder);
+    if (validity != QLatin1String(PopValidity)) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Folder identity changed. Refresh the message list."));
+    Pop3Session session(a);
+    const auto ids = session.identities();
+    for (const auto &[number, identity] : ids) if (identity == uid) {
+        const auto raw = session.message(number, false);
+        Message message; message.line_policy(mailio::codec::line_len_policy_t::NONE); message.parse(raw.toStdString());
+        return decodedContent(message, folder, validity, uid);
+    }
+    throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Message no longer exists."));
+}
+void requireImap(const Account &a) {
+    if (a.incomingProtocol != "imap") throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "This operation is not supported by POP."));
+}
+
 void addIds(const QString &field, const std::function<void(const std::string &)> &add)
 {
     singleLine(field);
@@ -393,6 +517,10 @@ InboxStats MailioBackend::inboxStats(const Account &a)
 {
     try {
         accountValid(a, false);
+        if (a.incomingProtocol == "pop3") {
+            Pop3Session session(a); const auto ids = session.identities();
+            return {QLatin1String(PopValidity), int(ids.size()), -1, {}};
+        }
         Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
         // Read-only SELECT plus one STATUS: no message bodies or headers are fetched.
         imap.select(std::string("INBOX"), true);
@@ -412,6 +540,10 @@ QList<Folder> MailioBackend::folders(const Account &a)
 {
     try {
         accountValid(a, false);
+        if (a.incomingProtocol == "pop3") {
+            Pop3Session session(a); const auto ids = session.identities();
+            return {{"INBOX", "Inbox", int(ids.size()), "inbox"}, {"Sent", "Sent", 0, "sent"}};
+        }
         Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
         const auto tree = imap.list_folders(std::string());
         const auto delimiter = unicode(imap.folder_delimiter());
@@ -442,24 +574,20 @@ QList<Folder> MailioBackend::folders(const Account &a)
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to list folders. Check account, connection and trusted TLS certificate.")); }
 }
-Page MailioBackend::page(const Account &a, const QString &folder, int offset, int limit)
+Page MailioBackend::page(const Account &a, const QString &folder, int offset, int limit, bool reuseConnection)
 {
-    QElapsedTimer elapsed; elapsed.start();
-    const auto trace = [&](const char *phase) {
-        if (qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
-            qInfo().noquote() << "NkMail sync phase:" << phase << "elapsed-ms=" << elapsed.elapsed();
-    };
-    trace("page-start");
+    bool retryReusedConnection = false;
     try {
         accountValid(a, false); folderValid(folder);
         if (offset < 0 || limit < 1 || limit > 100) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Invalid page bounds."));
-        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
-        trace("page-authenticated");
+        if (a.incomingProtocol == "pop3") return popPage(a, folder, offset, limit);
+        bool reused = false;
+        auto &imap = readSession(a, reuseConnection, reused);
+        retryReusedConnection = reused && reuseConnection;
         const auto stat = imap.select(utf8(folder), true);
         if (!stat.uid_validity) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Server did not provide UIDVALIDITY."));
-        trace("page-selected");
         Page p; p.folder = folder; p.uidValidity = QString::number(stat.uid_validity); p.nextOffset = offset;
-        if (static_cast<unsigned long>(offset) >= stat.messages_no) return p;
+        if (static_cast<unsigned long>(offset) >= stat.messages_no) { finishReadSession(reuseConnection); return p; }
         const auto end = stat.messages_no - static_cast<unsigned long>(offset);
         const auto begin = end >= static_cast<unsigned long>(limit) ? end - limit + 1 : 1;
         std::list<unsigned long> uids;
@@ -467,7 +595,6 @@ Page MailioBackend::page(const Account &a, const QString &folder, int offset, in
         imap.search({Imap::search_condition_t(Imap::search_condition_t::SID_LIST,
                      std::list<Imap::messages_range_t>{{begin, end}})}, uids, true);
         if (uids.size() > static_cast<size_t>(limit)) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Server returned an invalid page."));
-        trace("page-searched");
         imap.literal_limit(256 * 1024);
         std::list<Imap::messages_range_t> ranges;
         for (const auto uid : uids) ranges.emplace_back(uid, uid);
@@ -475,20 +602,24 @@ Page MailioBackend::page(const Account &a, const QString &folder, int offset, in
         // window and render newest first regardless of server response order.
         const auto messages = ranges.empty() ? std::map<unsigned long, mailio::message>{}
             : imap.fetch(ranges, options(true), mailio::codec::line_len_policy_t::NONE);
-        trace("page-headers-fetched");
         for (auto it = uids.rbegin(); it != uids.rend(); ++it) {
             const auto found = messages.find(*it);
             if (found != messages.end()) p.messages << summary(found->second, folder, p.uidValidity, *it);
         }
         p.nextOffset = offset + int(end - begin + 1); p.hasMore = begin > 1;
-        trace("page-complete");
+        finishReadSession(reuseConnection);
         return p;
-    } catch (const BackendError &) { trace("page-failed"); throw; }
-      catch (...) { trace("page-failed"); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message headers. Check account, connection and trusted TLS certificate.")); }
+    } catch (const mailio::dialog_error &) {
+        resetReadConnection();
+        if (retryReusedConnection) return page(a, folder, offset, limit, true);
+        throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message headers. Check account, connection and trusted TLS certificate."));
+    } catch (const BackendError &) { resetReadConnection(); throw; }
+      catch (...) { resetReadConnection(); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message headers. Check account, connection and trusted TLS certificate.")); }
 }
 QList<QVariantMap> MailioBackend::search(const Account &a, const QString &folder, const QString &validity,
                                         const QString &query, int limit)
 {
+    requireImap(a);
     try {
         accountValid(a, false); folderValid(folder);
         if (query.isEmpty() || query.size() > 4096) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Invalid search query."));
@@ -525,44 +656,42 @@ QList<QVariantMap> MailioBackend::search(const Account &a, const QString &folder
     } catch (const BackendError &) { throw; }
       catch (...) { throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to search messages. Check account, connection and trusted TLS certificate.")); }
 }
-Content MailioBackend::content(const Account &a, const QString &folder, const QString &validity, const QString &uid)
+void MailioBackend::resetReadConnection()
 {
-    QElapsedTimer elapsed; elapsed.start();
-    const auto trace = [&](const char *phase) {
-        if (qEnvironmentVariableIsSet("NKMAIL_SYNC_DIAGNOSTICS"))
-            qInfo().noquote() << "NkMail sync phase:" << phase << "elapsed-ms=" << elapsed.elapsed();
-    };
-    trace("content-start");
+    workerOnly();
+    readConnection.imap.reset();
+    readConnection.identity.clear();
+    readConnection.idle.invalidate();
+}
+
+Content MailioBackend::content(const Account &a, const QString &folder, const QString &validity, const QString &uid, bool reuseConnection)
+{
+    bool retryReusedConnection = false;
     try {
         accountValid(a, false); folderValid(folder);
+        if (a.incomingProtocol == "pop3") return popContent(a, folder, validity, uid);
         const auto expected = identity(validity), id = identity(uid);
-        Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
-        trace("content-authenticated");
+        bool reused = false;
+        auto &imap = readSession(a, reuseConnection, reused);
+        retryReusedConnection = reused && reuseConnection;
         const auto stat = imap.select(utf8(folder), true);
         if (stat.uid_validity != expected) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Folder identity changed. Refresh the message list."));
-        trace("content-selected");
         imap.literal_limit(MaxMessage);
         const auto messages = imap.fetch({{id, id}}, options(false), mailio::codec::line_len_policy_t::NONE);
-        trace("content-downloaded");
         const auto found = messages.find(id);
         if (found == messages.end()) throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Message no longer exists."));
         const auto &m = found->second;
-        Content c; c.summary = summary(m, folder, validity, id);
-        c.messageId = unicode(m.message_id());
-        c.replyTo = unicode(m.reply_address().address);
-        c.to = addressList(m.recipients()); c.cc = addressList(m.cc_recipients());
-        Decoded decoded; decodePart(m, decoded);
-        c.text = (decoded.plain.isEmpty() ? decoded.html : decoded.plain).join(QStringLiteral("\n\n"));
-        c.html = sanitizeMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
-        c.displayHtml = sanitizeBrowserMailHtml(decoded.rawHtml.join(QStringLiteral("\n")));
-        c.bodyFormatVersion = 1;
-        c.attachments = std::move(decoded.attachments);
-        c.summary.hasAttachments = !c.attachments.isEmpty();
-        c.summary.preview = c.text.simplified().left(160);
-        trace("content-complete");
+        Content c = decodedContent(m, folder, validity, uid);
+        finishReadSession(reuseConnection);
         return c;
-    } catch (const BackendError &) { trace("content-failed"); throw; }
-      catch (...) { trace("content-failed"); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate.")); }
+    } catch (const mailio::dialog_error &) {
+        resetReadConnection();
+        if (retryReusedConnection) {
+            return content(a, folder, validity, uid, true);
+        }
+        throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate."));
+    } catch (const BackendError &) { resetReadConnection(); throw; }
+      catch (...) { resetReadConnection(); throw BackendError(QT_TRANSLATE_NOOP("MailErrors", "Unable to read message. Check account, connection and trusted TLS certificate.")); }
 }
 void MailioBackend::verifySmtp(const Account &a)
 {
@@ -606,6 +735,7 @@ SendResult MailioBackend::send(const Account &a, const Draft &d, QByteArray *raw
 }
 QString MailioBackend::sentFolder(const Account &a)
 {
+    requireImap(a);
     try {
         accountValid(a, false);
         Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
@@ -649,6 +779,7 @@ QString MailioBackend::sentFolder(const Account &a)
 }
 void MailioBackend::appendSent(const Account &a, const QString &folder, const QByteArray &raw)
 {
+    requireImap(a);
     try {
         accountValid(a, false); folderValid(folder);
         Imap imap(utf8(a.imapHost), a.imapPort, Timeout); login(imap, a);
@@ -660,6 +791,7 @@ void MailioBackend::removeOrMove(const Account &a, const QString &folder,
                                const QString &validity, const QStringList &uids,
                                const QString &destination)
 {
+    requireImap(a);
     if (uids.isEmpty()) return;
     bool writeStarted = false;
     try {
@@ -688,6 +820,7 @@ void MailioBackend::removeOrMove(const Account &a, const QString &folder,
 void MailioBackend::storeFlags(const Account &a, const QString &folder, const QString &validity,
                                const QString &uid, const QStringList &flags, bool add)
 {
+    requireImap(a);
     try {
         accountValid(a, false); folderValid(folder);
         const auto expected = identity(validity), id = identity(uid);
@@ -702,6 +835,7 @@ void MailioBackend::storeFlags(const Account &a, const QString &folder, const QS
 void MailioBackend::copyTo(const Account &a, const QString &folder, const QString &validity,
                            const QString &uid, const QString &destination)
 {
+    requireImap(a);
     try {
         accountValid(a, false); folderValid(folder); folderValid(destination);
         const auto expected = identity(validity), id = identity(uid);
@@ -715,6 +849,7 @@ void MailioBackend::copyTo(const Account &a, const QString &folder, const QStrin
 void MailioBackend::expunge(const Account &a, const QString &folder, const QString &validity,
                             const QString &uid, bool *usedFullExpunge)
 {
+    requireImap(a);
     if (usedFullExpunge) *usedFullExpunge = false;
     try {
         accountValid(a, false); folderValid(folder);
@@ -737,6 +872,7 @@ void MailioBackend::expunge(const Account &a, const QString &folder, const QStri
 void MailioBackend::storeFlagsMany(const Account &a, const QString &folder, const QString &validity,
                                    const QStringList &uids, const QStringList &flags, bool add)
 {
+    requireImap(a);
     if (uids.isEmpty()) return;
     try {
         accountValid(a, false); folderValid(folder);
@@ -753,6 +889,7 @@ void MailioBackend::storeFlagsMany(const Account &a, const QString &folder, cons
 void MailioBackend::copyMany(const Account &a, const QString &folder, const QString &validity,
                              const QStringList &uids, const QString &destination)
 {
+    requireImap(a);
     if (uids.isEmpty()) return;
     try {
         accountValid(a, false); folderValid(folder); folderValid(destination);
@@ -768,6 +905,7 @@ void MailioBackend::copyMany(const Account &a, const QString &folder, const QStr
 void MailioBackend::expungeMany(const Account &a, const QString &folder, const QString &validity,
                                 const QStringList &uids, bool *usedFullExpunge)
 {
+    requireImap(a);
     if (usedFullExpunge) *usedFullExpunge = false;
     if (uids.isEmpty()) return;
     try {

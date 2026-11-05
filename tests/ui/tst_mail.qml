@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import QtTest
+import NextKde.Mail.ReaderTests 1.0
 import Kos.Ui
 import "../../qml/MailboxNavigation.js" as Navigation
 import "../../qml/ReaderLayout.js" as ReaderLayout
@@ -14,6 +15,7 @@ TestCase {
     width: 1280
     height: 820
     property var app: null
+    ReaderTestServer { id: imagePolicyCapture }
 
     Item {
         id: mock
@@ -25,10 +27,13 @@ TestCase {
         property string currentAccountId: "default"
         property var selectedMessage: ({uid: "1", uidValidity: "1", sender: "Studio Example", senderAddress: "studio@example.invalid", subject: "A quieter inbox", date: "2026-10-29T09:00:00Z", to: "alex@example.invalid", cc: "", messageId: "<one@example.invalid>", text: "<img src=https://example.invalid/tracker>\nPlain text only.", attachments: []})
         property string selectedUid: "1"
+        property bool alwaysShowRemoteImages: false
+        property bool senderImagesAllowed: false
         property int blockedImageCount: 0
         property bool remoteImagesLoading: false
         property int failedImageCount: 0
         function loadRemoteImages() {}
+        function resetImagePermissions() { alwaysShowRemoteImages = false; senderImagesAllowed = false }
         property string currentFolder: "INBOX"
         property string smartMailbox: ""
         function selectSmartMailbox(kind) { smartMailbox = kind }
@@ -58,16 +63,21 @@ TestCase {
         signal draftAccepted(string id)
         ListModel {
             id: messageModel
-            function indexOf(folder, validity, uid) {
+            function indexOf(folder, validity, uid, accountId) {
                 for (let i = 0; i < count; ++i) {
                     const message = get(i)
-                    if (message.folder === folder && message.uidValidity === validity && message.uid === uid) return i
+                    if (message.folder === folder && message.uidValidity === validity && message.uid === uid && (!accountId || !message.accountId || message.accountId === accountId)) return i
                 }
                 return -1
             }
-            ListElement { uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false; threadKey: ""; threadCount: 1; threadFirst: true }
+            ListElement { accountId: ""; uid: "1"; uidValidity: "1"; folder: "INBOX"; sender: "Studio Example"; senderAddress: "studio@example.invalid"; subject: "A quieter inbox"; date: "2026-10-29T09:00:00Z"; preview: "A synthetic message."; unread: true; flagged: false; hasAttachments: false; threadKey: ""; threadCount: 1; threadFirst: true }
         }
         property var accountSetup: setupMock
+        property var initialReceipt: ({})
+        property string receiptRetryId: ""
+        property string receiptOpenId: ""
+        function retryInitialReceipt(id) { receiptRetryId = id; initialReceipt = {accountId: id, state: "loading", error: ""} }
+        function openAccountInbox(id) { receiptOpenId = id }
         function configureAccount(config, password, remember) { return !busy }
         property int googleSaveCount: 0
         function configureGoogleAccount(existingId) { googleSaveCount++; if (busy) return false; setupMock.googleAuthorized = false; return true }
@@ -92,7 +102,10 @@ TestCase {
         function openFavorite(accountId, folderId) { currentAccountId = accountId }
         function switchAccount(accountId) { currentAccountId = accountId }
         function loadMore() {}
-        function openMessage(uid, validity) { selectedUid = uid }
+        property var lastOpened: []
+        property int markReadCount: 0
+        function setMessageRead(row, read) { markReadCount++ }
+        function openMessage(uid, validity, folder, accountId) { lastOpened = [uid, validity, folder, accountId]; selectedUid = uid; if (accountId) currentAccountId = accountId }
         function newDraft(mode) { return {id: "test-draft", to: "", cc: "", bcc: "", subject: "", body: "", inReplyTo: "", references: "", state: "draft", attachments: []} }
         function loadDraft(id) { return drafts.find(d => d.id === id) || ({}) }
         function saveDraft(draft) {
@@ -138,6 +151,7 @@ TestCase {
         AppTheme.reduceMotion = true
         AppTheme.appearanceMode = "light"
         failOnWarning(/.*/)
+        mock.alwaysShowRemoteImages = false; mock.senderImagesAllowed = false;
         mock.blockedImageCount = 0; mock.remoteImagesLoading = false; mock.failedImageCount = 0
         mock.failSave = false; mock.saveCount = 0; mock.lastSaved = ({})
         mock.googleSaveCount = 0; setupMock.googleConfigured = false; setupMock.googleStarts = 0; setupMock.googleCancels = 0; setupMock.googleAuthorized = false; setupMock.busy = false; setupMock.stage = ""
@@ -184,6 +198,42 @@ TestCase {
         const stopped = grabImage(indicator)
         wait(180)
         verify(stopped.equals(grabImage(indicator)))
+    }
+    function test_image_permission_settings() {
+        const popup = findChild(app, "listOptionsPopover")
+        popup.open()
+        tryCompare(popup, "opened", true)
+        const global = findChild(app, "alwaysShowImagesCheck")
+        const sender = findChild(app, "senderImagesCheck")
+        tryVerify(() => popup.height <= app.height - 16 && global.width > 0)
+        mouseClick(global)
+        compare(mock.alwaysShowRemoteImages, true)
+        mouseClick(sender)
+        compare(mock.senderImagesAllowed, true)
+        const reset = findChild(app, "resetImagePermissions")
+        reset.triggered()
+        compare(mock.alwaysShowRemoteImages, false)
+        compare(mock.senderImagesAllowed, false)
+    }
+    function test_sender_image_permission_action() {
+        mock.blockedImageCount = 1
+        const reader = createTemporaryObject(readerComponent, app.contentItem, {mail: mock,
+            message: {sender: "Example sender", senderAddress: "notice@example.invalid", subject: "Image permissions", text: "Synthetic message body"},
+            hasMessage: true, width: 400, height: 550, color: "#ffffff"})
+        const button = findChild(reader, "allowSenderImagesButton")
+        tryCompare(button, "visible", true)
+        tryVerify(() => button.parent.width > 0 && button.x + button.width <= button.parent.width + 1)
+        tryVerify(() => button.contentItem.implicitWidth <= button.availableWidth + 1)
+        if (imagePolicyCapture.capturePath.length > 0) {
+            waitForRendering(reader)
+            grabImage(reader).save(imagePolicyCapture.capturePath)
+        }
+        mouseClick(button)
+        compare(mock.senderImagesAllowed, true)
+        tryCompare(button, "visible", false)
+        mock.senderImagesAllowed = false
+        mock.alwaysShowRemoteImages = true
+        tryCompare(button, "visible", false)
     }
     function test_remote_image_loading_and_retry_are_visible() {
         mock.blockedImageCount = 1
@@ -239,7 +289,15 @@ TestCase {
             verifyActivityPixelsMove(findChild(app, "messageListSpinner"), findChild(app, "messagePane"))
             mock.status = "Fetching message headers…"
             tryCompare(empty, "description", mock.status)
+            mock.busy = false
+            mock.error = "Synthetic receipt failure"
+            tryCompare(empty, "description", mock.error)
+            const previousRefresh = mock.refreshCount
+            empty.actionTriggered()
+            compare(mock.refreshCount, previousRefresh + 1)
         } finally {
+            mock.error = ""
+
             messageModel.clear()
             for (const row of original) messageModel.append(row)
             mock.status = previousStatus
@@ -542,6 +600,55 @@ TestCase {
         verify(row.selected)
         mock.selectedMessage = original
     }
+    function test_unified_inbox_routes_source_and_enables_mutations() {
+        const originalFolders = mock.folders
+        const originalAccount = mock.currentAccountId
+        const originalAccountData = mock.account
+        const originalAccounts = mock.accounts
+        const originalMessage = mock.selectedMessage
+        try {
+            mock.folders = [{id: "INBOX", title: "Inbox"}, {id: "Archive", title: "Archive"}]
+            mock.accounts = [{id: "default", name: "Personal"}, {id: "work", name: "Work"}]
+            mock.currentAccountId = "default"
+            mock.selectedMessage = Object.assign({}, originalMessage, {folder: "INBOX", text: "Synthetic message from the Work inbox."})
+            messageModel.setProperty(0, "accountId", "work")
+            mock.selectSmartMailbox("allInbox") // Retained implementation; navigation is deferred.
+            compare(mock.smartMailbox, "allInbox")
+            const row = findChild(app, "messageList").itemAtIndex(0)
+            compare(row.sourceAccountId, "work")
+            compare(findChild(row, "sourceAccountLabel").text, "Work")
+            verify(!row.selected)
+            verify(!row.canCompose)
+            const reads = mock.markReadCount
+            row.openRow()
+            compare(mock.lastOpened, ["1", "1", "INBOX", "work"])
+            compare(mock.markReadCount, reads + 1)
+            mock.account = {id: "work", name: "Work", address: "work@example.invalid"}
+            verify(row.selected)
+            const deleted = mock.lastContextRows
+            row.contextCommand("delete")
+            compare(mock.lastContextRows, [0])
+            verify(findChild(row, "moveToMenuItem").enabled)
+            verify(findChild(app, "selectionOpsGroup").enabled)
+            verify(findChild(app, "messageOpsGroup").enabledActions[0])
+            mock.busy = true
+            verify(!findChild(app, "selectionOpsGroup").enabled)
+            verify(!findChild(row, "moveToMenuItem").enabled)
+            mock.busy = false
+            if (imagePolicyCapture.capturePath.length > 0) {
+                wait(100)
+                grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".unified.png")
+            }
+        } finally {
+            messageModel.setProperty(0, "accountId", "")
+            mock.currentAccountId = originalAccount
+            mock.folders = originalFolders
+            mock.accounts = originalAccounts
+            mock.account = originalAccountData
+            mock.selectedMessage = originalMessage
+            mock.smartMailbox = ""
+        }
+    }
     function test_account_header_only_toggles_children() {
         const sidebar = createTemporaryObject(sidebarComponent, testCase, {
             mail: mock, surface: testCase, sidebarAccounts: [{id: "another", address: "other@example.invalid"}],
@@ -549,6 +656,11 @@ TestCase {
         })
         const original = mock.currentAccountId
         const header = findChild(sidebar, "accountHeader_another")
+        const options = findChild(sidebar, "accountMoreButton_another")
+        verify(options !== null)
+        options.clicked()
+        tryCompare(header.optionsMenu, "opened", true)
+        header.optionsMenu.close()
         verify(header !== null)
         header.clicked()
         compare(mock.currentAccountId, original)
@@ -560,15 +672,46 @@ TestCase {
     function test_sidebar_sections_and_smart_navigation() {
         const sidebar = findChild(app, "sidebarBody")
         verify(findChild(sidebar, "favoritesTitle").visible)
-        verify(findChild(sidebar, "smartMailboxesTitle").visible)
+        const accountsTitle = findChild(sidebar, "accountsTitle")
+        verify(accountsTitle.visible)
+        compare(accountsTitle.x, findChild(sidebar, "favoritesTitle").x)
+        compare(accountsTitle.font.pixelSize, findChild(sidebar, "favoritesTitle").font.pixelSize)
+        const addButton = findChild(sidebar, "addAccountButton")
+        verify(!addButton.primaryAction)
+        verify(addButton.flat)
+        verify(findChild(addButton, "addAccountCaption").visible)
+        compare(findChild(addButton, "addAccountCaption").text, addButton.text)
+        verify(addButton.width > 100 && addButton.height >= 28)
+        if (imagePolicyCapture.capturePath.length > 0) {
+            wait(100)
+            grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".sidebar.png")
+        }
+        verify(!findChild(sidebar, "smartMailboxesTitle").visible)
         const flagged = findChild(sidebar, "favoriteShortcut_flagged")
+        const originalAccountData = mock.account
+        const originalAccounts = mock.accounts
+        const originalFavorites = mock.favorites
+        verify(flagged.scopeHint.indexOf(mock.account.address) >= 0)
+        verify(findChild(sidebar, "favoriteShortcut_inbox").scopeHint.indexOf(mock.account.address) >= 0)
+        verify(findChild(sidebar, "draftFolderButton").scopeHint.indexOf(mock.account.address) >= 0)
+        try {
+            mock.account = Object.assign({}, originalAccountData, {address: "changed@example.invalid"})
+            verify(flagged.scopeHint.indexOf("changed@example.invalid") >= 0)
+            compare(findChild(sidebar, "currentAccountAddress").text, "changed@example.invalid")
+            mock.accounts = originalAccounts.concat([{id: "other-scope", address: "other@example.invalid"}])
+            mock.favorites = [{accountId: "other-scope", folderId: "INBOX", title: "Other inbox"}]
+            const favorites = findChild(sidebar, "favoritesList")
+            tryCompare(favorites, "count", 1)
+            verify(favorites.itemAt(0).scopeHint.indexOf("other@example.invalid") >= 0)
+            verify(favorites.itemAt(0).scopeHint.indexOf("changed@example.invalid") < 0)
+        } finally { mock.account = originalAccountData; mock.accounts = originalAccounts; mock.favorites = originalFavorites }
         const unread = findChild(sidebar, "smartMailbox_unread")
         flagged.clicked()
         compare(mock.smartMailbox, "flagged")
         verify(flagged.checked)
-        unread.clicked()
-        compare(mock.smartMailbox, "unread")
-        verify(!flagged.checked && unread.checked)
+        verify(!unread.visible)
+        verify(!findChild(sidebar, "smartMailbox_allInbox").visible)
+        verify(!findChild(sidebar, "smartMailbox_attachments").visible)
         findChild(sidebar, "favoriteShortcut_inbox").clicked()
         compare(mock.smartMailbox, "")
         findChild(sidebar, "draftFolderButton").clicked()
@@ -824,17 +967,11 @@ TestCase {
         app.width = 1400          // 搜索输入框只在 >=1320 时显示
         wait(30)
         const scene = findChild(app, "mailScene")
-        let refresh = findChild(app, "refreshButton")
-        if (refresh) {
-            const point = refresh.mapToItem(scene, refresh.width / 2, refresh.height / 2)
-            mouseClick(scene, point.x, point.y)
-        } else {
-            const group = findChild(app, "mailboxActionGroup")
-            verify(group !== null)
-            const point = group.mapToItem(scene, group.width / 4, group.height / 2)
-            mouseClick(scene, point.x, point.y)
-        }
+        const refresh = findChild(app, "checkMailButton")
+        mouseClick(refresh)
         compare(mock.refreshCount, 1)
+        verify(findChild(app, "replyActionGroup").visible)
+        compare(findChild(app, "refreshButton"), null)
         const search = findChild(app, "searchField")
         mouseClick(search)
         tryCompare(search, "activeFocus", true)
@@ -1303,13 +1440,113 @@ TestCase {
         compare(Profiles.forAddress(" USER@GMAIL.COM "), "google")
         compare(Profiles.forAddress("person@company.invalid"), "manual")
         compare(Profiles.forAddress("person@gmail.com.attacker.invalid"), "manual")
+        compare(Profiles.ids.indexOf("microsoft"), -1)
+        compare(visualChild(picker, "providerLogo_microsoft"), null)
+        compare(visualChild(picker, "provider_undefined"), null)
         dialog.step = 0
-        findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("microsoft")
-        dialog.nextStep()
-        compare(dialog.step, 0)
-        tryCompare(visualChild(picker, "providerLogo_microsoft"), "status", Image.Ready)
+        wait(30)
+        const selectedProvider = visualChild(picker, "provider_icloud")
+        mouseClick(selectedProvider); mouseClick(selectedProvider)
+        verify(selectedProvider.checked)
         compare(Profiles.logo("manual"), "")
         dialog.close()
+    }
+    function test_account_settings_editing_and_switch_bindings() {
+        const dialog = findChild(app, "accountDialog")
+        const oldDemo = mock.demo
+        try {
+            mock.demo = false
+            dialog.addAccount()
+            findChild(dialog, "providerChoice").currentIndex = Profiles.ids.indexOf("qq")
+            dialog.nextStep()
+            const name = findChild(dialog, "accountName")
+            name.forceActiveFocus(); keyClick(Qt.Key_N)
+            compare(dialog.configuration().name, "n")
+            const remember = findChild(dialog, "rememberPasswordSwitch")
+            remember.toggle(); compare(remember.checked, true)
+            remember.toggle(); compare(remember.checked, false)
+            const advanced = findChild(dialog, "advancedSettingsSwitch")
+            advanced.toggle(); compare(dialog.advanced, true)
+            dialog.advanced = false; compare(advanced.checked, false)
+            const protocol = findChild(dialog, "incomingProtocolChoice")
+            protocol.select(1); compare(dialog.configuration().incomingProtocol, "pop3")
+            compare(dialog.configuration().imapPort, 995)
+            protocol.select(0); compare(dialog.configuration().incomingProtocol, "imap")
+            for (const width of [1180, 460]) {
+                app.width = width
+                wait(100)
+                verify(name.width > 0)
+                const point = name.mapToItem(dialog.contentItem, 0, 0)
+                verify(point.x >= 0 && point.x + name.width <= dialog.contentItem.width + 1)
+            }
+        } finally { dialog.close(); mock.demo = oldDemo }
+    }
+    function test_pop_account_configuration_and_local_action_labels() {
+        const dialog = findChild(app, "accountDialog")
+        dialog.addAccount()
+        const picker = findChild(dialog, "providerChoice")
+        picker.currentIndex = Profiles.ids.indexOf("qq")
+        dialog.nextStep()
+        const protocol = findChild(dialog, "incomingProtocolChoice")
+        protocol.activated(1)
+        compare(dialog.configuration().incomingProtocol, "pop3")
+        compare(dialog.configuration().imapHost, "pop.qq.com")
+        compare(dialog.configuration().imapPort, 995)
+        verify(!dialog.configuration().imapStartTls)
+        if (imagePolicyCapture.capturePath.length > 0) {
+            findChild(dialog, "accountAddress").text = "person@example.invalid"
+            findChild(dialog, "accountName").text = "POP fixture"
+            wait(150)
+            grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".pop.png")
+            protocol.openMenu(); tryCompare(protocol, "popupOpened", true)
+            wait(80)
+            grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".select.png")
+            protocol.closeMenu()
+            AppTheme.appearanceMode = "dark"
+            wait(80)
+            grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".dark.png")
+            AppTheme.appearanceMode = "light"
+        }
+        dialog.editAccount({id: "existing-pop", incomingProtocol: "pop3", imapHost: "pop.example.invalid", imapPort: 995})
+        compare(dialog.configuration().incomingProtocol, "pop3")
+        verify(!protocol.enabled)
+        dialog.addAccount(); picker.currentIndex = Profiles.ids.indexOf("icloud"); dialog.nextStep()
+        compare(protocol.model.length, 1)
+        compare(dialog.configuration().incomingProtocol, "imap")
+        dialog.close()
+    }
+    function test_first_receipt_progress_failure_retry_and_open() {
+        const dialog = findChild(app, "accountDialog")
+        const previousDemo = mock.demo
+        try {
+            mock.demo = false
+            dialog.addAccount()
+            findChild(dialog, "accountAddress").text = "sample@example.invalid"
+            dialog.nextStep()
+            dialog.savedAccountId = "sample@example.invalid"
+            dialog.step = 2
+            mock.initialReceipt = {accountId: dialog.savedAccountId, state: "loading", error: ""}
+            tryCompare(findChild(dialog, "initialReceiptSpinner"), "visible", true)
+            verify(!findChild(dialog, "retryInitialReceiptButton").visible)
+            mock.initialReceipt = {accountId: dialog.savedAccountId, state: "failed", error: "Synthetic connection failure"}
+            tryCompare(findChild(dialog, "retryInitialReceiptButton"), "visible", true)
+            if (imagePolicyCapture.capturePath.length > 0) {
+                wait(100)
+                grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".receipt-failed.png")
+            }
+            findChild(dialog, "retryInitialReceiptButton").clicked()
+            compare(mock.receiptRetryId, dialog.savedAccountId)
+            compare(dialog.receiptState, "loading")
+            mock.initialReceipt = {accountId: dialog.savedAccountId, state: "ready", error: ""}
+            verify(!findChild(dialog, "initialReceiptSpinner").visible)
+            if (imagePolicyCapture.capturePath.length > 0) {
+                wait(100)
+                grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".receipt-ready.png")
+            }
+            findChild(dialog, "openAccountInboxButton").clicked()
+            compare(mock.receiptOpenId, dialog.savedAccountId)
+            verify(!dialog.visible)
+        } finally { dialog.close(); mock.initialReceipt = ({}); mock.demo = previousDemo }
     }
     function test_account_wizard_preserves_config_on_failure() {
         const dialog = findChild(app, "accountDialog")
@@ -1368,6 +1605,25 @@ TestCase {
         compare(findChild(app, "accountPassword").text, "")
         compare(findChild(app, "accountPassword").echoMode, TextInput.Password)
     }
+    function test_check_mail_is_visible_and_respects_busy_state() {
+        const button = findChild(app, "checkMailButton")
+        verify(button !== null)
+        verify(button.visible)
+        verify(button.text.length > 0)
+        mouseClick(button)
+        compare(mock.refreshCount, 1)
+        mock.busy = true
+        compare(button.enabled, false)
+        mock.busy = false
+        app.width = 650
+        wait(30)
+        verify(button.visible)
+        const title = findChild(app, "folderTitle")
+        verify(title.x + title.width <= button.x)
+        if (imagePolicyCapture.capturePath.length > 0)
+            grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".receipt.png")
+    }
+
     function test_narrow_window_keeps_three_panes() {
         app.width = 650
         app.readerVisible = true

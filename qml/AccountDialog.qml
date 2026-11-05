@@ -25,16 +25,27 @@ LiquidDialog {
         font.pixelSize: 17
         font.weight: Font.DemiBold
     }
-    materialOpacity: 0.99
     closePolicy: root.submitting ? Popup.NoAutoClose : Popup.CloseOnEscape
     property var original: ({})
     property bool submitting: false
     property int step: 0
     property bool advanced: false
+    property string incomingProtocol: "imap"
+    function chooseProtocol(protocol) {
+        incomingProtocol = protocol
+        imapTls.checked = false
+        imapPortField.text = protocol === "pop3" ? "995" : "993"
+        imapField.text = protocol === "pop3" ? Profiles.popHost(providerChoice.provider) : Profiles.settings(providerChoice.provider).imapHost
+    }
+    property string savedAccountId: ""
+    readonly property var receipt: mail.initialReceipt || ({})
+    readonly property bool receiptMatches: receipt.accountId === savedAccountId
+    readonly property string receiptState: receiptMatches ? String(receipt.state || "") : ""
     property string setupError: ""
     readonly property var setup: mail.accountSetup || null
     function nextStep() {
         if (!providerChoice.available) return
+        incomingProtocol = "imap"
         usernameField.text = addressField.text.trim()
         const preset = Profiles.settings(providerChoice.provider)
         imapField.text = preset.imapHost; smtpField.text = preset.smtpHost
@@ -59,6 +70,7 @@ LiquidDialog {
         // start a new one). A passed account map pre-fills those fields and keeps
         // its id in `original`, so save() edits that record instead of creating one.
         original = (account && String(account.id || "").length > 0) ? account : (mail.account || ({}))
+        incomingProtocol = original.incomingProtocol || "imap"
         nameField.text = field(original, "name")
         addressField.text = field(original, "address")
         usernameField.text = field(original, "username")
@@ -97,7 +109,7 @@ LiquidDialog {
     function configuration() {
         return {
             id: original.id || "", name: nameField.text.trim(), address: addressField.text.trim(),
-            username: usernameField.text.trim(), imapHost: imapField.text.trim(), smtpHost: smtpField.text.trim(),
+            incomingProtocol: incomingProtocol, username: usernameField.text.trim(), imapHost: imapField.text.trim(), smtpHost: smtpField.text.trim(),
             imapPort: Number(imapPortField.text), smtpPort: Number(smtpPortField.text),
             imapStartTls: imapTls.checked, smtpStartTls: smtpTls.checked, serverSavesSent: serverSavesSent.checked, caFile: caField.text.trim()
         }
@@ -109,7 +121,10 @@ LiquidDialog {
         // configureAccount returns its persistence result synchronously. A busy
         // mailbox can reject it; unrelated sync must never leave this dialog locked.
         submitting = false
-        if (saved) step = 2
+        if (saved) {
+            savedAccountId = configuration().id || addressField.text.trim().toLowerCase()
+            step = 2
+        }
         else setupError = mail.error || qsTr("Account could not be saved. Please retry.")
     }
     onClosed: {
@@ -135,47 +150,46 @@ LiquidDialog {
         ColumnLayout {
             id: accountFields
             width: accountScroll.availableWidth
-            spacing: 10
+            spacing: 12
             Text {
                 visible: root.step < 2
                 text: root.mail.demo ? qsTr("Example account · synthetic data only. Account changes and sending are disabled in demo mode.")
                     : qsTr("Use the password or app password required by your email provider.")
                 color: AppTheme.mutedText; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap
             }
-            Text {
+            SettingsGroup {
                 visible: root.step < 2
-                text: root.step === 0 ? qsTr("Enter your email address") : qsTr("Email")
-                Layout.fillWidth: true
-                color: AppTheme.text
-                font.pixelSize: 13
-                font.weight: Font.DemiBold
-            }
-            KosTextField {
-                id: addressField
-                objectName: "accountAddress"
-                visible: root.step < 2
-                Layout.fillWidth: true
-                implicitHeight: MailStyle.fieldHeight
-                cornerRadius: height / 2
-                specificationForm: true
-                enabled: !root.submitting
-                readOnly: root.submitting
-                Accessible.name: qsTr("Email")
-                placeholderText: qsTr("Enter you@example.com")
-                onTextEdited: providerChoice.currentIndex = Profiles.indexForAddress(text)
+                title: root.step === 0 ? qsTr("Enter your email address") : qsTr("Email")
+                cornerRadius: 8
+                SettingsTextField {
+                    id: addressField
+                    objectName: "accountAddress"
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 0
+                    blockInput: true
+                    enabled: !root.submitting
+                    readOnly: root.submitting
+                    Accessible.name: qsTr("Email")
+                    placeholderText: activeFocus ? "" : qsTr("Enter you@example.com")
+                    onTextEdited: providerChoice.currentIndex = Profiles.indexForAddress(text)
+                }
             }
             SettingsGroup {
                 visible: root.step === 1
                 title: qsTr("Identity")
-                SettingsItem { visible: root.step === 1; title: qsTr("Name"); KosTextField { id: nameField; objectName: "accountName"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Name") } }
-                SettingsItem { visible: root.step === 1; title: qsTr("Username"); KosTextField { id: usernameField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Username") } }
                 SettingsItem {
+                    allowStacking: false; visible: root.step === 1; title: qsTr("Name"); MailSettingsInput { id: nameField; objectName: "accountName"; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Name") } }
+                SettingsItem {
+                    allowStacking: false; visible: root.step === 1; title: qsTr("Username"); MailSettingsInput { id: usernameField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Username") } }
+                SettingsItem {
+                    allowStacking: false;
                     visible: root.step === 1; title: qsTr("Password / app password"); description: qsTr("Stored passwords are never displayed.")
-                    KosTextField { id: passwordField; objectName: "accountPassword"; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; echoMode: TextInput.Password; enabled: !root.mail.demo && !root.submitting; Accessible.name: qsTr("Password or app password"); placeholderText: qsTr("Enter password or app password") }
+                    MailSettingsInput { id: passwordField; objectName: "accountPassword"; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; echoMode: TextInput.Password; enabled: !root.mail.demo && !root.submitting; Accessible.name: qsTr("Password or app password"); placeholderText: qsTr("Enter password or app password") }
                 }
                 SettingsItem {
+                    allowStacking: false;
                     visible: root.step === 1; title: qsTr("Remember password"); description: qsTr("Use the system keychain; no plaintext fallback.")
-                    KosCheckBox { id: rememberPassword; enabled: !root.mail.demo && !root.submitting }
+                    SettingsSwitch { id: rememberPassword; objectName: "rememberPasswordSwitch"; accessibleName: qsTr("Remember password"); onToggled: checked => rememberPassword.checked = checked; enabled: !root.mail.demo && !root.submitting }
                 }
             }
             ProviderPicker {
@@ -196,24 +210,51 @@ LiquidDialog {
                 text: qsTr("To switch this account to an app password, enter a Google app password below and verify. Cached mail is kept.")
                 Layout.fillWidth: true; wrapMode: Text.Wrap; font.pixelSize: 11; color: AppTheme.mutedText
             }
-            LiquidCheckBox {
-                id: serverSavesSent
-                visible: root.step === 1 && root.advanced
-                text: qsTr("Server automatically saves sent mail")
-                enabled: !root.submitting
-            }
-            LiquidCheckBox {
+            SettingsGroup {
                 visible: root.step === 1
-                text: qsTr("Advanced server settings")
-                checked: root.advanced
-                enabled: !root.submitting
-                onToggled: root.advanced = checked
+                title: qsTr("Connection options")
+                SettingsItem {
+                    title: qsTr("Advanced server settings")
+                    SettingsSwitch {
+                        objectName: "advancedSettingsSwitch"
+                        accessibleName: qsTr("Advanced server settings")
+                        checked: root.advanced
+                        enabled: !root.submitting
+                        onToggled: checked => root.advanced = checked
+                    }
+                }
+                SettingsItem {
+                    visible: root.advanced && root.incomingProtocol !== "pop3"
+                    title: qsTr("Server automatically saves sent mail")
+                    SettingsSwitch {
+                        id: serverSavesSent
+                        accessibleName: qsTr("Server automatically saves sent mail")
+                        enabled: !root.submitting
+                        onToggled: checked => serverSavesSent.checked = checked
+                    }
+                }
             }
             Text {
                 visible: root.step === 2
-                text: qsTr("Account verified and saved")
+                text: root.receiptState === "loading" ? qsTr("Receiving your first messages…")
+                    : root.receiptState === "failed" ? qsTr("Account saved · mail check failed")
+                    : root.receiptState === "ready" ? qsTr("Your inbox is ready") : qsTr("Account verified and saved")
                 color: AppTheme.text; font.pixelSize: 18
                 Layout.fillWidth: true; wrapMode: Text.Wrap
+            }
+            Text {
+                visible: root.step === 2
+                text: root.receiptState === "failed" ? String(root.receipt.error || "")
+                    : root.receiptState === "loading" ? qsTr("Connecting securely and downloading the newest message headers. You can close this window while mail is fetched.")
+                    : qsTr("Open your inbox to read mail. Use Check for mail above the message list, or Ctrl+R, to check again.")
+                color: AppTheme.mutedText; font.pixelSize: 12
+                Layout.fillWidth: true; wrapMode: Text.Wrap
+            }
+            MailActivityIndicator {
+                objectName: "initialReceiptSpinner"
+                visible: root.step === 2 && root.receiptState === "loading"
+                running: visible
+                Layout.preferredWidth: 20; Layout.preferredHeight: 20
             }
             RowLayout {
                 visible: root.submitting
@@ -232,34 +273,65 @@ LiquidDialog {
             Text { visible: root.setupError.length > 0; text: root.setupError; color: AppTheme.destructive; Layout.fillWidth: true; wrapMode: Text.Wrap }
             SettingsGroup {
                 visible: root.step === 1
-                title: qsTr("Incoming · IMAP")
-                SettingsItem { title: qsTr("Server"); KosTextField { id: imapField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("IMAP server"); placeholderText: "imap.example.invalid" } }
-                SettingsItem { visible: root.advanced; title: qsTr("Port"); KosTextField { id: imapPortField; implicitWidth: 90; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("IMAP port"); validator: IntValidator { bottom: 1; top: 65535 } } }
+                title: root.incomingProtocol === "pop3" ? qsTr("Incoming · POP") : qsTr("Incoming · IMAP")
                 SettingsItem {
+                    allowStacking: false;
+                    title: qsTr("Protocol")
+                    description: root.incomingProtocol === "pop3" ? qsTr("POP keeps server copies. Read status, flags and deletion apply only on this device. Sent copies are saved locally; server folders are unavailable.") : ""
+                    LiquidSelect {
+                        implicitHeight: 24
+                        materialForm: true
+                        plainTrigger: true
+                        indicatorStyle: "upDown"
+                        indicatorBackground: true
+                        popupMaterialForm: true
+                        neutralOptionHighlight: true
+                        compactPopup: true
+                        popupBorderWidth: 0
+                        popupShadowEnabled: true
+                        popupFontWeight: Font.Normal
+                        appearanceMode: AppTheme.dark ? "dark" : "light"
+                        Accessible.name: qsTr("Protocol")
+                        objectName: "incomingProtocolChoice"
+                        model: providerChoice.provider === "icloud" ? ["IMAP"] : ["IMAP", "POP"]
+                        currentIndex: root.incomingProtocol === "pop3" ? 1 : 0
+                        enabled: !root.submitting && !root.original.id
+                        onActivated: index => root.chooseProtocol(index === 1 ? "pop3" : "imap")
+                    }
+                }
+                SettingsItem {
+                    allowStacking: false; title: qsTr("Server"); MailSettingsInput { id: imapField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Incoming server"); placeholderText: root.incomingProtocol === "pop3" ? "pop.example.invalid" : "imap.example.invalid" } }
+                SettingsItem {
+                    allowStacking: false; visible: root.advanced; title: qsTr("Port"); MailSettingsInput { id: imapPortField; Layout.preferredWidth: 90; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("Incoming port"); validator: IntValidator { bottom: 1; top: 65535 } } }
+                SettingsItem {
+                    allowStacking: false;
                     visible: root.advanced; title: qsTr("STARTTLS"); description: qsTr("Off uses implicit TLS, not plaintext.")
-                    KosCheckBox { id: imapTls; enabled: !root.mail.demo && !root.submitting; onToggled: imapPortField.text = checked ? "143" : "993" }
+                    SettingsSwitch { id: imapTls; accessibleName: qsTr("Incoming STARTTLS"); enabled: !root.mail.demo && !root.submitting; onToggled: checked => { imapTls.checked = checked; imapPortField.text = root.incomingProtocol === "pop3" ? (checked ? "110" : "995") : (checked ? "143" : "993") } }
                 }
             }
             SettingsGroup {
                 visible: root.step === 1
                 title: qsTr("Outgoing · SMTP")
-                SettingsItem { title: qsTr("Server"); KosTextField { id: smtpField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("SMTP server"); placeholderText: "smtp.example.invalid" } }
-                SettingsItem { visible: root.advanced; title: qsTr("Port"); KosTextField { id: smtpPortField; implicitWidth: 90; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("SMTP port"); validator: IntValidator { bottom: 1; top: 65535 } } }
                 SettingsItem {
+                    allowStacking: false; title: qsTr("Server"); MailSettingsInput { id: smtpField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("SMTP server"); placeholderText: "smtp.example.invalid" } }
+                SettingsItem {
+                    allowStacking: false; visible: root.advanced; title: qsTr("Port"); MailSettingsInput { id: smtpPortField; Layout.preferredWidth: 90; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("SMTP port"); validator: IntValidator { bottom: 1; top: 65535 } } }
+                SettingsItem {
+                    allowStacking: false;
                     visible: root.advanced; title: qsTr("STARTTLS"); description: qsTr("Off uses implicit TLS, not plaintext.")
-                    KosCheckBox { id: smtpTls; enabled: !root.mail.demo && !root.submitting; onToggled: smtpPortField.text = checked ? "587" : "465" }
+                    SettingsSwitch { id: smtpTls; accessibleName: qsTr("Outgoing STARTTLS"); enabled: !root.mail.demo && !root.submitting; onToggled: checked => { smtpTls.checked = checked; smtpPortField.text = checked ? "587" : "465" } }
                 }
             }
             SettingsGroup {
                 visible: root.step === 1 && root.advanced
                 title: qsTr("Trust")
                 SettingsItem {
+                    allowStacking: false;
                     title: qsTr("CA file"); description: qsTr("Optional PEM path; blank uses system trust.")
-                    KosTextField { id: caField; Layout.fillWidth: true; implicitWidth: 260; implicitHeight: MailStyle.fieldHeight; cornerRadius: height / 2; specificationForm: true; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("CA file"); placeholderText: qsTr("System certificates") }
+                    MailSettingsInput { id: caField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("CA file"); placeholderText: qsTr("System certificates") }
                 }
             }
-            Text { visible: !!root.mail.error; text: root.mail.error; color: AppTheme.destructive; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap }
-            Text { text: qsTr("Reading does not change server flags. Explicit mail actions can update or delete messages."); color: AppTheme.mutedText; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            Text { visible: root.step < 2 && !!root.mail.error; text: root.mail.error; color: AppTheme.destructive; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap }
         }
     }
     footer: Item {
@@ -268,8 +340,24 @@ LiquidDialog {
             anchors.fill: parent
             anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 8; anchors.bottomMargin: 16
             spacing: 8
-            LiquidDialogButton { text: qsTr("Disconnect"); destructive: true; visible: root.mail.configured && !root.mail.demo; enabled: !root.submitting && !root.mail.sending; onClicked: { root.mail.disconnectAccount(); root.close() } }
+            LiquidDialogButton { text: qsTr("Disconnect"); destructive: true; visible: root.step === 1 && root.original.id === root.mail.currentAccountId && root.mail.configured && !root.mail.demo; enabled: !root.submitting && !root.mail.sending; onClicked: { root.mail.disconnectAccount(); root.close() } }
             Item { Layout.fillWidth: true }
+            LiquidDialogButton {
+                objectName: "retryInitialReceiptButton"
+                visible: root.step === 2 && root.receiptState === "failed"
+                text: qsTr("Retry mail check")
+                primaryAction: true
+                enabled: !root.mail.busy && !root.mail.sending
+                onClicked: root.mail.retryInitialReceipt(root.savedAccountId)
+            }
+            LiquidDialogButton {
+                objectName: "openAccountInboxButton"
+                visible: root.step === 2
+                text: qsTr("Open inbox")
+                primaryAction: root.receiptState !== "failed"
+                enabled: !root.mail.busy && !root.mail.sending
+                onClicked: { root.mail.openAccountInbox(root.savedAccountId); root.close() }
+            }
             LiquidDialogButton { text: root.mail.demo || root.step === 2 ? qsTr("Done") : qsTr("Cancel"); enabled: !root.submitting; onClicked: root.close() }
             LiquidDialogButton {
                 text: qsTr("Back")

@@ -14,6 +14,7 @@ add_executable(nkmail_controller_tests
     ${NKMAIL_SERVICE_SOURCES}
     ../../src/MailController.cpp ../../src/MailController.h
     ../../src/MailTypes.cpp
+    ../../src/mail/HtmlSanitizer.cpp
     ../../src/NotificationService.cpp
     ../../src/MessageListModel.cpp ../../src/MessageListModel.h
     ../../src/storage/MailDatabase.cpp ../../src/storage/MailDatabase.h

@@ -9,6 +9,7 @@ WebEngineView {
     MailRenderLifecycle { id: renderLifecycle; view: root }
     property url documentUrl: ""
     property int documentHeight: 200
+    property int documentWidth: 0
     property bool documentReady: false
     signal linkActivated(string link)
     objectName: "mailHtmlBody"
@@ -34,8 +35,8 @@ WebEngineView {
     settings.hyperlinkAuditingEnabled: false
     settings.errorPageEnabled: false
     // Normal documents use the reader scrollbar; capped surfaces retain native
-    // scrolling so the rest of an exceptionally long document remains reachable.
-    settings.showScrollBars: documentHeight >= 12000
+    // scrolling so exceptionally long or intrinsically wide content remains reachable.
+    settings.showScrollBars: documentHeight >= 12000 || documentWidth > Math.ceil(width)
     settings.defaultTextEncoding: "UTF-8"
     onContextMenuRequested: function(request) { request.accepted = true }
     onNewWindowRequested: function(request) {
@@ -59,9 +60,11 @@ WebEngineView {
             const alt = /\balt="([^"]*)"/i.exec(tag)
             return alt && alt[1].trim() ? '<span>' + alt[1] + '</span>' : ''
         })
+        // break-word wraps long prose without lowering table min-content widths
+        // to individual glyphs (as anywhere does for narrow preferred columns).
         const document = '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="'
             + csp + '"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            + '<style>html{background:white;color:#202124}body{margin:0;font:14px/1.55 sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}a{color:#1769d2}</style>'
+            + '<style>html{background:white;color:#202124}body{margin:0;font:14px/1.55 sans-serif;overflow-wrap:break-word}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}a{color:#1769d2}</style>'
             + '</head><body>' + body + '</body></html>'
         root.documentUrl = documentProfile.setDocument(document)
         root.url = root.documentUrl
@@ -70,15 +73,16 @@ WebEngineView {
     // mail scripts stay disabled and no WebChannel/host object is exposed.
     function measureDocument() {
         const expectedUrl = String(root.documentUrl)
-        runJavaScript("document.body ? Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, document.body.getBoundingClientRect().height)) : 0", 1, function(value) {
-            if (String(root.url) !== expectedUrl || !(Number(value) > 0)) return
-            root.documentHeight = Math.max(200, Math.min(12000, Number(value)))
+        runJavaScript("document.body ? ({height:Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, document.body.getBoundingClientRect().height)),width:Math.max(document.documentElement.scrollWidth,document.body.scrollWidth)}) : null", 1, function(value) {
+            if (String(root.url) !== expectedUrl || !value || !(Number(value.height) > 0)) return
+            root.documentWidth = Math.max(0, Number(value.width))
+            root.documentHeight = Math.max(200, Math.min(12000, Number(value.height)))
             root.documentReady = true
         })
     }
     onLoadProgressChanged: if (loadProgress === 100) measureTimer.restart()
     onWidthChanged: measureTimer.restart()
-    onHtmlChanged: { documentHeight = 200; documentReady = false; updateTimer.restart() }
+    onHtmlChanged: { documentWidth = 0; documentHeight = 200; documentReady = false; updateTimer.restart() }
     Component.onCompleted: updateTimer.restart()
     Timer { id: updateTimer; interval: 0; onTriggered: root.updateDocument() }
     Timer { id: measureTimer; interval: 50; onTriggered: root.measureDocument() }

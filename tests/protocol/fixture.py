@@ -13,6 +13,8 @@ import sys
 import tempfile
 import threading
 import time
+import struct
+import zlib
 
 PROBE = sys.argv[1]
 MESSAGE = (b"From: =?UTF-8?B?5rWL6K+V?= <author@fixture.invalid>\r\n"
@@ -42,6 +44,31 @@ QUOTED_MESSAGE = MESSAGE.replace(
     b'To: "Doe, Jane" <to@fixture.invalid>\r\nCc: ' + encoded_name(QUOTED_CC) +
     b' <cc@fixture.invalid>\r\nReply-To: ' + encoded_name('Reply, "Desk" \\ Team') + b' <reply@fixture.invalid>\r\n')
 
+def png_chunk(kind, data):
+    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+
+
+CID_PNG = (b"\x89PNG\r\n\x1a\n" + png_chunk(b"IHDR", struct.pack(">IIBBBBB", 2, 2, 8, 6, 0, 0, 0))
+           + png_chunk(b"IDAT", zlib.compress((b"\x00" + b"\x20\x80\xc0\xff" * 2) * 2)) + png_chunk(b"IEND", b""))
+
+
+def cid_message(scenario):
+    image = CID_PNG if scenario != "cid-corrupt" else b"not an image"
+    if scenario == "cid-svg": image = b'<svg xmlns="http://www.w3.org/2000/svg"><script>bad()</script></svg>'
+    if scenario == "cid-oversize": image = b'x' * (2 * 1024 * 1024 + 1)
+    part = (b'--related\r\nContent-Type: image/png; name="logo.png"\r\n'
+            b'Content-ID: <logo@fixture.invalid>\r\nContent-Disposition: inline; filename="logo.png"\r\n'
+            b'Content-Transfer-Encoding: base64\r\n\r\n' + base64.b64encode(image) + b'\r\n')
+    return (b'From: author@fixture.invalid\r\nTo: to@fixture.invalid\r\nSubject: CID fixture\r\n'
+            b'MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary=related\r\n\r\n'
+            b'--related\r\nContent-Type: multipart/alternative; boundary=alternative\r\n\r\n'
+            b'--alternative\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nSynthetic CID body\r\n'
+            b'--alternative\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n'
+            b'<p>Synthetic CID body</p><img src="CID:logo%40fixture.invalid" width="24" alt="Logo fallback">'
+            b'<img src="cid:missing@fixture.invalid" alt="Missing fallback"><img src="https://fixture.invalid/tracker">\r\n'
+            b'--alternative--\r\n' + part + (part if scenario == "cid-duplicate" else b'') + b'--related--\r\n')
+
+
 class Server:
     def __init__(self, protocol, context, starttls=False, scenario="normal"):
         self.protocol, self.context, self.starttls, self.scenario = protocol, context, starttls, scenario
@@ -56,18 +83,22 @@ class Server:
 
     def run(self):
         try:
-            conn, _ = self.socket.accept()
-            conn.settimeout(20)
-            if self.scenario == "stall":
-                time.sleep(17)
-                conn.close()
-                return
-            with conn:
-                if not self.starttls:
-                    conn = self.context.wrap_socket(conn, server_side=True)
-                self.conn = conn
-                if self.protocol == "imap": self.imap()
-                else: self.smtp()
+            attempts = 2 if self.scenario in ("pop-renumber", "reuse-reset", "reuse-account", "reuse-password", "reuse-trust", "reuse-drop", "reuse-drop-twice") else 1
+            for connection_index in range(attempts):
+                self.connection_index = connection_index
+                conn, _ = self.socket.accept()
+                conn.settimeout(20)
+                if self.scenario == "stall":
+                    time.sleep(17)
+                    conn.close()
+                    return
+                with conn:
+                    if not self.starttls:
+                        conn = self.context.wrap_socket(conn, server_side=True)
+                    self.conn = conn
+                    if self.protocol == "imap": self.imap()
+                    elif self.protocol == "pop": self.pop()
+                    else: self.smtp()
         except (ssl.SSLError, ConnectionResetError, BrokenPipeError):
             pass  # Expected for TLS-negative tests and closed sessions.
         except Exception as exc:
@@ -87,6 +118,39 @@ class Server:
 
     def upgrade(self): self.conn = self.context.wrap_socket(self.conn, server_side=True)
 
+    def pop(self):
+        self.write(b"+OK POP fixture ready\r\n")
+        secure = not self.starttls
+        while line := self.line():
+            self.commands.append(line.decode(errors="replace"))
+            fields = line.split()
+            command = fields[0].upper()
+            if command == b"STLS":
+                if self.scenario == "refuse-starttls": self.write(b"-ERR unavailable\r\n"); continue
+                self.write(b"+OK upgrade\r\n"); self.upgrade(); secure = True
+            elif command in (b"USER", b"PASS"):
+                assert secure, "Credentials before TLS"
+                self.write(b"+OK authenticated\r\n")
+            elif command == b"UIDL":
+                if self.scenario == "no-uidl": self.write(b"-ERR unavailable\r\n")
+                elif self.scenario == "duplicate-uidl": self.write(b"+OK\r\n1 same\r\n2 same\r\n.\r\n")
+                elif self.scenario == "invalid-uidl": self.write(b"+OK\r\n1 bad id\r\n.\r\n")
+                elif self.scenario == "missing": self.write(b"+OK\r\n1 opaque-A\r\n.\r\n")
+                elif self.scenario == "pop-renumber" and self.connection_index == 1:
+                    self.write(b"+OK\r\n1 opaque-B\r\n.\r\n")
+                else: self.write(b"+OK\r\n1 opaque-A\r\n2 opaque-B\r\n.\r\n")
+            elif command in (b"TOP", b"RETR"):
+                if command == b"TOP" and self.scenario == "no-top": self.write(b"-ERR unavailable\r\n"); continue
+                if self.scenario == "pop-renumber" and self.connection_index == 1: assert fields[1] == b"1"
+                if self.scenario == "gone": self.write(b"-ERR gone\r\n"); continue
+                raw = HEADERS if command == b"TOP" else MESSAGE
+                if self.scenario == "dots": raw = b"From: sender@fixture.invalid\r\nSubject: Dot fixture\r\n\r\n.one\r\n..two\r\n"
+                if self.scenario == "pop-oversize": raw = (b"x" * 1024 + b"\r\n") * (26 * 1024)
+                self.write(b"+OK message follows\r\n")
+                self.write(b"\r\n".join(b"." + line if line.startswith(b".") else line for line in raw.split(b"\r\n")) + b".\r\n")
+            elif command == b"QUIT": self.write(b"+OK bye\r\n"); break
+            else: raise AssertionError("Unexpected POP command: " + repr(line))
+
     def imap(self):
         self.write(b"* OK fixture IMAP ready\r\n")
         identified = False
@@ -97,7 +161,9 @@ class Server:
             if upper == b"STARTTLS":
                 if self.scenario == "refuse-starttls": self.write(tag + b" NO unavailable\r\n"); continue
                 self.write(tag + b" OK begin TLS\r\n"); self.upgrade(); continue
-            if upper.startswith(b"LOGIN "): self.write(tag + b" OK logged in\r\n")
+            if upper.startswith(b"LOGIN "):
+                if self.scenario == "reuse-normal": time.sleep(0.15)
+                self.write(tag + b" OK logged in\r\n")
             elif upper.startswith(b"AUTHENTICATE XOAUTH2"):
                 parts = cmd.split(b" ", 2)
                 if len(parts) == 3: response = parts[2]
@@ -130,17 +196,22 @@ class Server:
                 assert b"102" in upper
                 self.write(b"* 2 EXPUNGE\r\n" + tag + b" OK expunged\r\n")
             elif upper.startswith(b"EXAMINE "):
+                if self.scenario == "reuse-drop-twice" and self.connection_index == 1:
+                    self.conn.shutdown(socket.SHUT_RDWR); self.conn.close(); return
                 if self.scenario == "require-id": assert identified
                 count = b"6" if self.scenario.startswith("page-batch") else b"2"
                 next_uid = b"901" if self.scenario.startswith("page-batch") else b"103"
-                self.write(b"* " + count + b" EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY 42] identity\r\n* OK [UIDNEXT " + next_uid + b"] next\r\n" + tag + b" OK [READ-ONLY] examined\r\n")
+                validity = b"43" if self.scenario == "reuse-stale" and sum(" EXAMINE " in c for c in self.commands) > 1 else b"42"
+                self.write(b"* " + count + b" EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY " + validity + b"] identity\r\n* OK [UIDNEXT " + next_uid + b"] next\r\n" + tag + b" OK [READ-ONLY] examined\r\n")
             elif upper.startswith(b"UID SEARCH "):
                 assert upper == (b"UID SEARCH 4:6" if self.scenario.startswith("page-batch") else b"UID SEARCH 2:2"), upper
                 self.write((b"* SEARCH 109 205 900\r\n" if self.scenario.startswith("page-batch") else b"* SEARCH 102\r\n") + tag + b" OK search done\r\n")
             elif upper.startswith(b"UID FETCH "):
+                if self.scenario == "reuse-no" and sum("UID FETCH" in c for c in self.commands) > 1:
+                    self.write(tag + b" NO unavailable\r\n"); continue
                 assert b"BODY.PEEK[" in upper, upper
                 header = b"BODY.PEEK[HEADER]" in upper
-                source = QUOTED_MESSAGE if self.scenario == "quoted-names" else MESSAGE
+                source = cid_message(self.scenario) if self.scenario.startswith("cid-") else QUOTED_MESSAGE if self.scenario == "quoted-names" else MESSAGE
                 body = source.split(b"\r\n\r\n", 1)[0] + b"\r\n\r\n" if header else source
                 section = b"BODY[HEADER]" if header else b"BODY[]"
                 if self.scenario.startswith("page-batch"):
@@ -153,6 +224,14 @@ class Server:
                 elif self.scenario == "oversize":
                     self.write(b"* 2 FETCH (UID 102 " + section + b" {999999999}\r\n")
                 else:
+                    if self.scenario.startswith("reuse-"):
+                        requested = upper.split()[2].split(b":")[0]
+                        self.write(b"* 2 FETCH (FLAGS () " + section + b" {" + str(len(body)).encode() + b"}\r\n" + body + b" UID " + requested + b")\r\n" + tag + b" OK fetched\r\n")
+                        if self.scenario in ("reuse-drop", "reuse-drop-twice") and self.connection_index == 0:
+                            self.conn.shutdown(socket.SHUT_RDWR)
+                            self.conn.close()
+                            return
+                        continue
                     # UID deliberately follows BODY/FLAGS: legal order exposed an upstream identity bug.
                     self.write(b"* 2 FETCH (FLAGS (\\Flagged) " + section + b" {" + str(len(body)).encode() + b"}\r\n" + body + b" UID 102)\r\n" + tag + b" OK fetched\r\n")
             elif upper == b'LIST "" ""':
@@ -253,6 +332,37 @@ def main():
         seen_sni = []
         good.set_servername_callback(lambda sock, name, ctx: seen_sni.append(name))
         ca = root / "ca.pem"
+        for starttls in (False, True):
+            sent, _ = invoke("smtp", good, ca, "pop-send", starttls)
+            assert sent["ok"] and sent["state"] == 0, sent
+            folders, _ = invoke("pop", good, ca, "pop-folders", starttls)
+            assert folders["ok"] and [f["id"] for f in folders["folders"]] == ["INBOX", "Sent"], folders
+            passed += 2
+            for scenario in ("normal", "no-top"):
+                result, server = invoke("pop", good, ca, "pop-page-batch", starttls, scenario)
+                assert result["ok"] and [m["uid"] for m in result["messages"]] == ["opaque-B", "opaque-A"], result
+                assert not any(c.startswith("DELE") for c in server.commands)
+                assert any(c.startswith("RETR") for c in server.commands) == (scenario == "no-top")
+                passed += 1
+            result, server = invoke("pop", good, ca, "pop-read-pop", starttls, "pop-renumber")
+            assert result["ok"] and result["uid"] == "opaque-B" and "你好" in result["text"] and result["hasMore"], result
+            assert "RETR 1" in server.commands and "RETR 2" not in server.commands
+            passed += 1
+            result, _ = invoke("pop", good, ca, "pop-content", starttls, "dots")
+            assert result["ok"] and ".one" in result["text"] and "..two" in result["text"], result
+            passed += 1
+            for scenario in ("no-uidl", "duplicate-uidl", "invalid-uidl", "missing", "gone", "pop-oversize"):
+                result, server = invoke("pop", good, ca, "pop-content", starttls, scenario)
+                assert not result["ok"], (scenario, result)
+                assert not any(c.startswith("DELE") for c in server.commands)
+                passed += 1
+            for ctx, anchor in ((wrong, ca), (good, ""), (expired, ca)):
+                result, server = invoke("pop", ctx, anchor, "pop-page", starttls)
+                assert not result["ok"] and not any(c.startswith(("USER", "PASS")) for c in server.commands), result
+                passed += 1
+        result, server = invoke("pop", good, ca, "pop-page", True, "refuse-starttls")
+        assert not result["ok"] and not any(c.startswith(("USER", "PASS")) for c in server.commands), result
+        passed += 1
         for operation in ("remove", "move"):
             for scenario in ("normal", "no-uidplus"):
                 result, server = invoke("imap", good, ca, operation, scenario=scenario)
@@ -316,12 +426,38 @@ def main():
             content, server = invoke("imap", good, ca, "content", starttls)
             assert content["ok"] and "你好 HTML" in content["text"], content
             assert "bad-script" not in content["text"] and "bad-style" not in content["text"], content
-            assert content["bodyFormatVersion"] == 1 and "<table " in content["displayHtml"], content
+            assert content["bodyFormatVersion"] == 2 and "<table " in content["displayHtml"], content
             assert "padding:24px" in content["displayHtml"] and "bad-script" not in content["displayHtml"], content
             assert "file:///" not in content["displayHtml"] and "data-nkmail-src=" in content["displayHtml"], content
             assert content["attachments"] == [{"name": "evil.txt", "bytes": base64.b64encode(b"fixture\x00attachment").decode(), "path": ""}], content
             assert any("BODY.PEEK[]" in cmd for cmd in server.commands)
             passed += 1
+
+            for cid_scenario in ("cid-normal", "cid-duplicate", "cid-corrupt", "cid-svg", "cid-oversize"):
+                cid, cid_server = invoke("imap", good, ca, "content", starttls, cid_scenario)
+                assert cid["ok"] and "Synthetic CID body" in cid["text"], cid
+                body = cid["displayHtml"]
+                assert ("data:image/png;base64," in body) == (cid_scenario == "cid-normal"), cid
+                assert "Missing fallback" in body and body.count("data-nkmail-src=") == 1, cid
+                assert "cid:" not in body.lower() and "data:image/svg" not in body, cid
+                if cid_scenario == "cid-normal": assert cid["attachments"] == [], cid
+                assert not any("STORE" in command or "SELECT " in command for command in cid_server.commands), cid_server.commands
+                passed += 1
+            for scenario in ("reuse-normal", "reuse-page", "reuse-reset", "reuse-account", "reuse-password", "reuse-trust", "reuse-drop", "reuse-drop-twice", "reuse-no", "reuse-stale"):
+                reused, server = invoke("imap", good, ca, "content-reuse", starttls, scenario)
+                assert reused["ok"] == (scenario not in ("reuse-stale", "reuse-drop-twice", "reuse-no", "reuse-trust")), reused
+                if reused["ok"]:
+                    assert (reused["first"], reused["second"], reused["folder"]) == ("102", "103", "Archive"), reused
+                logins = [c for c in server.commands if " LOGIN " in c]
+                assert len(logins) == (1 if scenario in ("reuse-normal", "reuse-page", "reuse-stale", "reuse-no", "reuse-trust") else 2), server.commands
+                assert not any(" SELECT " in c or " STORE " in c or " EXPUNGE" in c for c in server.commands)
+                fetches = [c for c in server.commands if "UID FETCH" in c]
+                assert len(fetches) == (1 if scenario in ("reuse-stale", "reuse-drop-twice", "reuse-trust") else 2), server.commands
+                assert all("BODY.PEEK[" in c for c in fetches), server.commands
+                assert sum("BODY.PEEK[HEADER]" in c for c in fetches) == (1 if scenario == "reuse-page" else 0)
+                if scenario == "reuse-normal":
+                    print(f"Reuse timing (synthetic 150ms login delay, STARTTLS={starttls}): first={reused['firstMs']}ms second={reused['secondMs']}ms", flush=True)
+                passed += 1
             quoted, server = invoke("imap", good, ca, "content", starttls, "quoted-names")
             assert quoted["ok"], quoted
             assert quoted["to"] == '"Doe, Jane" <to@fixture.invalid>', quoted
