@@ -302,10 +302,16 @@ Rectangle {
                     width: parent.width
                     symbol: mail.busy ? "" : mail.search ? "⌕" : "✉"
                     objectName: "messageEmptyState"
-                    title: mail.busy ? qsTr("Getting your mail…") : mail.search ? qsTr("No cached matches") : mail.unreadOnly ? qsTr("No unread messages in cached mail") : mail.configured || mail.demo ? qsTr("No messages here") : qsTr("Welcome to your new inbox")
-                    description: mail.busy ? (mail.status || "") : mail.unreadOnly ? qsTr("Only cached unread messages are shown. Clear the filter to browse all messages.") : mail.search ? qsTr("Try a different search term.") : mail.configured || mail.demo ? qsTr("There is nothing to show in this mailbox yet.") : qsTr("Add an account to start reading mail locally.")
-                    actionText: mail.unreadOnly ? qsTr("Show all cached messages") : ""
-                    onActionTriggered: mail.unreadOnly = false
+                    title: mail.busy ? qsTr("Getting your mail…") : mail.error ? qsTr("Mail could not be displayed") : mail.search ? qsTr("No cached matches") : mail.unreadOnly ? qsTr("No unread messages in cached mail") : mail.configured || mail.demo ? qsTr("No messages here") : qsTr("Welcome to your new inbox")
+                    description: mail.busy ? (mail.status || "") : mail.error ? mail.error : mail.unreadOnly ? qsTr("Only cached unread messages are shown. Clear the filter to browse all messages.") : mail.search ? qsTr("Try a different search term.") : mail.configured || mail.demo ? qsTr("There is nothing to show in this mailbox yet.") : qsTr("Add an account to start reading mail locally.")
+                    actionText: !mail.busy && mail.error ? qsTr("Retry mail check") : mail.unreadOnly ? qsTr("Show all cached messages") : ""
+                    onActionTriggered: {
+                        if (mail.error) {
+                            if (mail.initialReceipt && mail.initialReceipt.state === "failed" && mail.initialReceipt.accountId === mail.currentAccountId)
+                                mail.retryInitialReceipt(mail.currentAccountId)
+                            else mail.refresh()
+                        } else mail.unreadOnly = false
+                    }
                 }
                 KosButton {
                     objectName: "inboxAddAccountButton"

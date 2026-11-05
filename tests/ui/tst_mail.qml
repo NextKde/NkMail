@@ -289,7 +289,15 @@ TestCase {
             verifyActivityPixelsMove(findChild(app, "messageListSpinner"), findChild(app, "messagePane"))
             mock.status = "Fetching message headers…"
             tryCompare(empty, "description", mock.status)
+            mock.busy = false
+            mock.error = "Synthetic receipt failure"
+            tryCompare(empty, "description", mock.error)
+            const previousRefresh = mock.refreshCount
+            empty.actionTriggered()
+            compare(mock.refreshCount, previousRefresh + 1)
         } finally {
+            mock.error = ""
+
             messageModel.clear()
             for (const row of original) messageModel.append(row)
             mock.status = previousStatus
@@ -648,6 +656,11 @@ TestCase {
         })
         const original = mock.currentAccountId
         const header = findChild(sidebar, "accountHeader_another")
+        const options = findChild(sidebar, "accountMoreButton_another")
+        verify(options !== null)
+        options.clicked()
+        tryCompare(header.optionsMenu, "opened", true)
+        header.optionsMenu.close()
         verify(header !== null)
         header.clicked()
         compare(mock.currentAccountId, original)
@@ -678,19 +691,19 @@ TestCase {
         const originalAccountData = mock.account
         const originalAccounts = mock.accounts
         const originalFavorites = mock.favorites
-        verify(flagged.text.indexOf(mock.account.address) >= 0)
-        verify(findChild(sidebar, "favoriteShortcut_inbox").text.indexOf(mock.account.address) >= 0)
-        verify(findChild(sidebar, "draftFolderButton").text.indexOf(mock.account.address) >= 0)
+        verify(flagged.scopeHint.indexOf(mock.account.address) >= 0)
+        verify(findChild(sidebar, "favoriteShortcut_inbox").scopeHint.indexOf(mock.account.address) >= 0)
+        verify(findChild(sidebar, "draftFolderButton").scopeHint.indexOf(mock.account.address) >= 0)
         try {
             mock.account = Object.assign({}, originalAccountData, {address: "changed@example.invalid"})
-            verify(flagged.text.indexOf("changed@example.invalid") >= 0)
-            compare(flagged.scopeHint, flagged.text)
+            verify(flagged.scopeHint.indexOf("changed@example.invalid") >= 0)
+            compare(findChild(sidebar, "currentAccountAddress").text, "changed@example.invalid")
             mock.accounts = originalAccounts.concat([{id: "other-scope", address: "other@example.invalid"}])
             mock.favorites = [{accountId: "other-scope", folderId: "INBOX", title: "Other inbox"}]
             const favorites = findChild(sidebar, "favoritesList")
             tryCompare(favorites, "count", 1)
-            verify(favorites.itemAt(0).text.indexOf("other@example.invalid") >= 0)
-            verify(favorites.itemAt(0).text.indexOf("changed@example.invalid") < 0)
+            verify(favorites.itemAt(0).scopeHint.indexOf("other@example.invalid") >= 0)
+            verify(favorites.itemAt(0).scopeHint.indexOf("changed@example.invalid") < 0)
         } finally { mock.account = originalAccountData; mock.accounts = originalAccounts; mock.favorites = originalFavorites }
         const unread = findChild(sidebar, "smartMailbox_unread")
         flagged.clicked()
@@ -954,17 +967,11 @@ TestCase {
         app.width = 1400          // 搜索输入框只在 >=1320 时显示
         wait(30)
         const scene = findChild(app, "mailScene")
-        let refresh = findChild(app, "refreshButton")
-        if (refresh) {
-            const point = refresh.mapToItem(scene, refresh.width / 2, refresh.height / 2)
-            mouseClick(scene, point.x, point.y)
-        } else {
-            const group = findChild(app, "mailboxActionGroup")
-            verify(group !== null)
-            const point = group.mapToItem(scene, group.width / 4, group.height / 2)
-            mouseClick(scene, point.x, point.y)
-        }
+        const refresh = findChild(app, "checkMailButton")
+        mouseClick(refresh)
         compare(mock.refreshCount, 1)
+        verify(findChild(app, "replyActionGroup").visible)
+        compare(findChild(app, "refreshButton"), null)
         const search = findChild(app, "searchField")
         mouseClick(search)
         tryCompare(search, "activeFocus", true)

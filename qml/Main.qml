@@ -320,8 +320,9 @@ ApplicationWindow {
                     anchors.rightMargin: 8
                     y: windowChrome.controlsCenterY - height / 2
                     visible: messagePane.visible && !window.draftsVisible
-                    text: qsTr("Check for mail")
-                    enabled: !mail.busy && !mail.sending
+                    text: mail.busy ? qsTr("Checking mail…") : qsTr("Check for mail")
+                    accessibleText: qsTr("Check mail for %1").arg(mail.account.address || "")
+                    enabled: !mail.busy && !mail.sending && (mail.configured || mail.demo)
                     floatingAction: true; shellBackdrop: chromeBackdrop
                     onClicked: mail.refresh()
                 }

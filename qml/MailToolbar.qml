@@ -97,13 +97,12 @@ Item {
             showLabels: true
             objectName: "mailboxActionGroup"
             visible: !readerHeader.compactActions && !readerHeader.searching && readerHeader.windowWidth >= 1180
-            icons: ["refreshRounded", "editRounded"]
-            labels: [qsTr("收取"), qsTr("撰写")]
-            objectNames: ["refreshButton", "headerComposeButton"]
-            enabledActions: [!mail.busy && !readerHeader.draftsVisible && (mail.configured || mail.demo), mail.configured || mail.demo]
+            icons: ["editRounded"]
+            labels: [qsTr("撰写")]
+            objectNames: ["headerComposeButton"]
+            enabledActions: [mail.configured || mail.demo]
             onTriggered: index => {
-                if (index === 0) mail.refresh()
-                else readerHeader.composeRequested("new")
+                readerHeader.composeRequested("new")
             }
         }
         MailToolbarGroup {
@@ -114,7 +113,7 @@ Item {
             objectName: "messageOpsGroup"
             Layout.rightMargin: 14
             visible: !readerHeader.draftsVisible && !readerHeader.searching && readerHeader.windowWidth >= 1100 && readerHeader.selection.selectionSize === 0
-                && readerHeader.actionWidth >= readerHeader.baseActionsWidth + implicitWidth + 14
+                && readerHeader.actionWidth >= readerHeader.baseActionsWidth + implicitWidth + 14 + (replyActions.visible ? replyActions.implicitWidth + 14 : 0)
             icons: ["trash", "archive", "flag"]
             labels: [mail.account.incomingProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"), qsTr("归档"), qsTr("旗标")]
             enabledActions: [readerHeader.hasMessage && !mail.busy, readerHeader.hasMessage && !mail.busy && mail.account.incomingProtocol !== "pop3", readerHeader.hasMessage && !mail.busy]
@@ -179,11 +178,11 @@ Item {
             materialForm: !readerHeader.liquidControls
             id: replyActions
             Layout.rightMargin: 14
-            showLabels: true
+            showLabels: readerHeader.actionWidth >= 500
             objectName: "replyActionGroup"
-            visible: readerHeader.showReplyGroup && !readerHeader.searching && readerHeader.windowWidth >= 1480
+            visible: readerHeader.showReplyGroup && !readerHeader.searching && readerHeader.selection.selectionSize === 0
                 && readerHeader.actionWidth >= readerHeader.baseActionsWidth
-                    + (messageOpsGroup.visible ? messageOpsGroup.implicitWidth + 14 : 0) + implicitWidth + 14
+                    + implicitWidth + 14
             icons: readerHeader.fullReplyGroup ? ["undo", "arrows", "forward"] : ["undo", "forward"]
             labels: readerHeader.fullReplyGroup ? [qsTr("回复"), qsTr("全部回复"), qsTr("转发")] : [qsTr("回复"), qsTr("转发")]
             objectNames: readerHeader.fullReplyGroup ? ["replyButton", "replyAllButton", "forwardButton"] : ["replyButton", "forwardButton"]

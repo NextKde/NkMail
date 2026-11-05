@@ -1105,6 +1105,30 @@
             <source>Accounts</source>
             <translation>Accounts</translation>
         </message>
+    <message>
+        <source>Folder options</source>
+        <translation>Folder options</translation>
+    </message>
+    <message>
+        <source>Account options</source>
+        <translation>Account options</translation>
+    </message>
+    <message>
+        <source>Current account</source>
+        <translation>Current account</translation>
+    </message>
+    <message>
+        <source>Drafts: %1</source>
+        <translation>Drafts: %1</translation>
+    </message>
+    <message>
+        <source>Unread: %1</source>
+        <translation>Unread: %1</translation>
+    </message>
+    <message>
+        <source>Add folders using their options menu.</source>
+        <translation>Add folders using their options menu.</translation>
+    </message>
     </context>
     <context>
         <name>MailToolbar</name>
@@ -1113,11 +1137,7 @@
             <source>Back to messages</source>
             <translation>Back to messages</translation>
         </message>
-        <message>
-            <location filename="../qml/MailToolbar.qml" line="101" />
-            <source>收取</source>
-            <translation>Get mail</translation>
-        </message>
+
         <message>
             <location filename="../qml/MailToolbar.qml" line="101" />
             <source>撰写</source>
@@ -1437,6 +1457,14 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Retry mail check</source>
             <translation>Retry mail check</translation>
         </message>
+    <message>
+        <source>Checking mail…</source>
+        <translation>Checking mail…</translation>
+    </message>
+    <message>
+        <source>Check mail for %1</source>
+        <translation>Check mail for %1</translation>
+    </message>
     </context>
     <context>
         <name>MessagePane</name>
@@ -1613,6 +1641,14 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Delete locally</source>
             <translation>Delete locally</translation>
         </message>
+    <message>
+        <source>Mail could not be displayed</source>
+        <translation>Mail could not be displayed</translation>
+    </message>
+    <message>
+        <source>Retry mail check</source>
+        <translation>Retry mail check</translation>
+    </message>
     </context>
     <context>
         <name>MessageReader</name>

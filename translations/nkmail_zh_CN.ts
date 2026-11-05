@@ -1105,6 +1105,30 @@
             <source>Accounts</source>
             <translation>账号</translation>
         </message>
+    <message>
+        <source>Folder options</source>
+        <translation>文件夹选项</translation>
+    </message>
+    <message>
+        <source>Account options</source>
+        <translation>账号选项</translation>
+    </message>
+    <message>
+        <source>Current account</source>
+        <translation>当前账号</translation>
+    </message>
+    <message>
+        <source>Drafts: %1</source>
+        <translation>草稿数：%1</translation>
+    </message>
+    <message>
+        <source>Unread: %1</source>
+        <translation>未读数：%1</translation>
+    </message>
+    <message>
+        <source>Add folders using their options menu.</source>
+        <translation>通过文件夹的选项菜单添加收藏。</translation>
+    </message>
     </context>
     <context>
         <name>MailToolbar</name>
@@ -1113,11 +1137,7 @@
             <source>Back to messages</source>
             <translation>返回邮件列表</translation>
         </message>
-        <message>
-            <location filename="../qml/MailToolbar.qml" line="101" />
-            <source>收取</source>
-            <translation>收取</translation>
-        </message>
+
         <message>
             <location filename="../qml/MailToolbar.qml" line="101" />
             <source>撰写</source>
@@ -1437,6 +1457,14 @@ Alex
             <source>Retry mail check</source>
             <translation>重试收信</translation>
         </message>
+    <message>
+        <source>Checking mail…</source>
+        <translation>正在收取…</translation>
+    </message>
+    <message>
+        <source>Check mail for %1</source>
+        <translation>收取 %1 的邮件</translation>
+    </message>
     </context>
     <context>
         <name>MessagePane</name>
@@ -1613,6 +1641,14 @@ Alex
             <source>Delete locally</source>
             <translation>本地删除</translation>
         </message>
+    <message>
+        <source>Mail could not be displayed</source>
+        <translation>无法显示邮件</translation>
+    </message>
+    <message>
+        <source>Retry mail check</source>
+        <translation>重试收信</translation>
+    </message>
     </context>
     <context>
         <name>MessageReader</name>
