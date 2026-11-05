@@ -705,3 +705,8 @@ Old unchecked lists and provider statements above are historical evidence, not a
 
 - Append the owning email address to built-in and custom favorite labels. Current-account shortcuts update with account changes; custom favorites retain their own source scope. Long labels elide and expose the complete label through the canonical tooltip. Keep the section title unscoped because custom favorites can belong to other accounts.
 - VM account/section checks passed (4/4 including lifecycle); final account-switch/custom-favorite scope regression passed (3/3 including lifecycle). Canonical UI pin gate passed. Host preview rebuilt/replaced for manual use.
+
+## Sidebar account hierarchy · 2026-11-05
+
+- Add an Accounts section heading aligned and styled identically to Favorites. Expandable account rows remain children of Accounts, with their folders one level further indented. Replace the muted custom MouseArea add-account row with the shared, filled primary MailAction plus button, including keyboard/accessibility behavior.
+- VM UI/i18n/catalog passed 3/3 in 59.98s; hierarchy/disclosure follow-up 4/4 and final caption/capture 3/3 including lifecycle passed. Initial capture exposed an icon-only shared content layout; final icon-and-text adapter verified visually. Canonical UI pin gate passed. Host preview rebuilt/replaced for manual inspection.

@@ -128,7 +128,7 @@ Item {
             }
             Text {
                 id: title
-                anchors.fill: parent; anchors.leftMargin: 18
+                anchors.fill: parent; anchors.leftMargin: 24
                 text: header.text
                 color: header.current ? AppTheme.text : AppTheme.mutedText
                 font.pixelSize: 13; font.weight: Font.DemiBold
@@ -270,7 +270,12 @@ Item {
                         }
                     }
                 }
-                Item { Layout.preferredHeight: 12 }
+                Text {
+                    objectName: "accountsTitle"
+                    text: qsTr("Accounts"); color: root.muted
+                    font.pixelSize: 11; font.weight: Font.DemiBold
+                    topPadding: 20; bottomPadding: 6
+                }
                 Repeater {
                     model: root.sidebarAccounts
                     delegate: ColumnLayout {
@@ -399,50 +404,32 @@ Item {
                         }
                     }
                 }
-                Item {
-                    id: addAccountRow
+                MailAction {
+                    id: addAccountAction
                     objectName: "addAccountButton"
-                    Accessible.name: qsTr("添加账号")
+                    text: qsTr("添加账号")
+                    iconName: "plus"
+                    contentItem: Item {
+                        implicitWidth: addAccountContent.implicitWidth
+                        implicitHeight: addAccountContent.implicitHeight
+                        Row {
+                            id: addAccountContent
+                            anchors.centerIn: parent
+                            spacing: 6
+                            VectorIcon { name: "plus"; size: 14; color: addAccountAction.textColor; anchors.verticalCenter: parent.verticalCenter }
+                            Text {
+                                objectName: "addAccountCaption"
+                                text: addAccountAction.text; color: addAccountAction.textColor
+                                font: addAccountAction.font
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+                    }
+                    primaryAction: true
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 28
-                    Layout.topMargin: 6
-                    readonly property bool hovered: addAccountMouse.containsMouse
-                    Rectangle {
-                        anchors.fill: parent; radius: 8
-                        color: addAccountRow.hovered
-                            ? (AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd") : "transparent"
-                        Behavior on color {
-                            ColorAnimation { duration: AppTheme.reduceMotion ? 0 : AppTheme.motionFast }
-                        }
-                    }
-                    Item {
-                        anchors.left: parent.left; anchors.leftMargin: 12
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: addIcon.implicitWidth + 5 + addLabel.implicitWidth
-                        height: 16
-                        VectorIcon {
-                            id: addIcon
-                            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                            name: "plus"; size: 13
-                            color: addAccountRow.hovered ? AppTheme.text : AppTheme.mutedText
-                        }
-                        Text {
-                            id: addLabel
-                            anchors.left: addIcon.right; anchors.leftMargin: 5
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: qsTr("添加账号")
-                            color: addAccountRow.hovered ? AppTheme.text : AppTheme.mutedText
-                            font.pixelSize: 12
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-                    MouseArea {
-                        id: addAccountMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.addAccountRequested()
-                    }
+                    Layout.preferredHeight: 30
+                    Layout.topMargin: 12
+                    onClicked: root.addAccountRequested()
                 }
             }
         }

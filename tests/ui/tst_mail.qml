@@ -659,6 +659,19 @@ TestCase {
     function test_sidebar_sections_and_smart_navigation() {
         const sidebar = findChild(app, "sidebarBody")
         verify(findChild(sidebar, "favoritesTitle").visible)
+        const accountsTitle = findChild(sidebar, "accountsTitle")
+        verify(accountsTitle.visible)
+        compare(accountsTitle.x, findChild(sidebar, "favoritesTitle").x)
+        compare(accountsTitle.font.pixelSize, findChild(sidebar, "favoritesTitle").font.pixelSize)
+        const addButton = findChild(sidebar, "addAccountButton")
+        verify(addButton.primaryAction)
+        verify(findChild(addButton, "addAccountCaption").visible)
+        compare(findChild(addButton, "addAccountCaption").text, addButton.text)
+        verify(addButton.width > 100 && addButton.height >= 28)
+        if (imagePolicyCapture.capturePath.length > 0) {
+            wait(100)
+            grabImage(app.contentItem).save(imagePolicyCapture.capturePath + ".sidebar.png")
+        }
         verify(!findChild(sidebar, "smartMailboxesTitle").visible)
         const flagged = findChild(sidebar, "favoriteShortcut_flagged")
         const originalAccountData = mock.account

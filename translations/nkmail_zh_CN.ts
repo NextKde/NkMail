@@ -1101,6 +1101,10 @@
             <source>添加账号</source>
             <translation>添加账号</translation>
         </message>
+        <message>
+            <source>Accounts</source>
+            <translation>账号</translation>
+        </message>
     </context>
     <context>
         <name>MailToolbar</name>
