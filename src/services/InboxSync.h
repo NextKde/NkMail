@@ -16,7 +16,7 @@ public:
     InboxSync(QString root, AccountSession *credentials, std::shared_ptr<MailTransport> transport, QObject *parent = nullptr);
     ~InboxSync() override;
     bool running() const { return m_running; }
-    void start(const QList<Account> &accounts);
+    void start(const QList<Account> &accounts, bool discoverFolders = false);
     void cancel();
 signals:
     void runningChanged();
@@ -32,5 +32,6 @@ private:
     QStringList m_failures;
     quint64 m_generation = 0;
     bool m_running = false;
+    bool m_discoverFolders = false;
 };
 }

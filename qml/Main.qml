@@ -587,6 +587,14 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
                 MailAction {
+                    objectName: "retryInitialReceiptNotice"
+                    visible: !!mail.error && !!mail.initialReceipt && mail.initialReceipt.state === "failed" && mail.error === mail.initialReceipt.error
+                    enabled: !mail.busy && !mail.sending
+                    implicitHeight: 24
+                    text: qsTr("Retry mail check")
+                    onClicked: mail.retryInitialReceipt(mail.initialReceipt.accountId)
+                }
+                MailAction {
                     visible: !!mail.error || !!window.lifecycleNotice
                     implicitHeight: 24
                     text: qsTr("Dismiss")
@@ -781,17 +789,17 @@ ApplicationWindow {
         LiquidPopoverItem { text: qsTr("Message details"); iconName: "reminder"; onTriggered: window.detailsVisible = true }
         LiquidPopoverItem {
             text: mail.account.incomingProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"); iconName: "trash"
-            enabled: mail.smartMailbox !== "allInbox" && window.hasMessage && !readerHeader.messageOpsVisible
+            enabled: !mail.busy && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.deleteMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: qsTr("归档"); iconName: "archive"
-            enabled: mail.account.incomingProtocol !== "pop3" && mail.smartMailbox !== "allInbox" && window.hasMessage && !readerHeader.messageOpsVisible
+            enabled: mail.account.incomingProtocol !== "pop3" && !mail.busy && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.archiveMessage(window.selectedIndex())
         }
         LiquidPopoverItem {
             text: window.message.flagged ? qsTr("取消旗标") : qsTr("标为旗标"); iconName: "flag"
-            enabled: mail.smartMailbox !== "allInbox" && window.hasMessage && !readerHeader.messageOpsVisible
+            enabled: !mail.busy && window.hasMessage && !readerHeader.messageOpsVisible
             onTriggered: mail.toggleFlagged(window.selectedIndex())
         }
     }
@@ -857,27 +865,27 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+R"; enabled: !composer.visible && !accountDialog.visible && !mail.busy; onActivated: mail.refresh() }
     Shortcut {
         sequence: "Delete"
-        enabled: mail.smartMailbox !== "allInbox" && !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: !mail.busy && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.deleteMessage(window.selectedIndex())
     }
     Shortcut {
         sequence: "Ctrl+Backspace"
-        enabled: mail.smartMailbox !== "allInbox" && !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: !mail.busy && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.deleteMessage(window.selectedIndex())
     }
     Shortcut {
         sequence: "Ctrl+Shift+U"
-        enabled: mail.smartMailbox !== "allInbox" && !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: !mail.busy && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.setMessageRead(window.selectedIndex(), !!window.message.unread)
     }
     Shortcut {
         sequence: "Ctrl+Shift+L"
-        enabled: mail.smartMailbox !== "allInbox" && !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: !mail.busy && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.toggleFlagged(window.selectedIndex())
     }
     Shortcut {
         sequence: "Ctrl+Shift+A"
-        enabled: mail.smartMailbox !== "allInbox" && !composer.visible && !accountDialog.visible && window.hasMessage
+        enabled: !mail.busy && !composer.visible && !accountDialog.visible && window.hasMessage
         onActivated: mail.archiveMessage(window.selectedIndex())
     }
 }

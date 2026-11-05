@@ -9,7 +9,7 @@ class MailTransport;
 class MailboxCommands final : public QObject {
     Q_OBJECT
 public:
-    enum class Action { Read, Flag, Remove, Move };
+    enum class Action { Read, Flag, Remove, Move, Archive };
     MailboxCommands(MailDatabase &database, std::shared_ptr<MailTransport> transport, QObject *parent = nullptr);
     ~MailboxCommands() override;
     bool busy() const { return m_busy; }

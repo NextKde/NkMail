@@ -117,7 +117,7 @@ Item {
                 && readerHeader.actionWidth >= readerHeader.baseActionsWidth + implicitWidth + 14
             icons: ["trash", "archive", "flag"]
             labels: [mail.account.incomingProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"), qsTr("归档"), qsTr("旗标")]
-            enabledActions: [readerHeader.hasMessage && mail.smartMailbox !== "allInbox", readerHeader.hasMessage && mail.smartMailbox !== "allInbox" && mail.account.incomingProtocol !== "pop3", readerHeader.hasMessage && mail.smartMailbox !== "allInbox"]
+            enabledActions: [readerHeader.hasMessage && !mail.busy, readerHeader.hasMessage && !mail.busy && mail.account.incomingProtocol !== "pop3", readerHeader.hasMessage && !mail.busy]
             onTriggered: index => {
                 readerHeader.messageCommandRequested(index)
             }
@@ -133,12 +133,12 @@ Item {
             backdrop: readerHeader.backdrop
             materialForm: !readerHeader.liquidControls
             id: selectionOpsGroup
-            enabled: mail.smartMailbox !== "allInbox"
+            enabled: !mail.busy
             showLabels: true
             objectName: "selectionOpsGroup"
             visible: !readerHeader.draftsVisible && !readerHeader.searching && readerHeader.selection.selectionSize > 0
             icons: ["envelope", "flag", "archive", "trash", "folder"]
-            enabledActions: [true, true, mail.account.incomingProtocol !== "pop3", true, mail.account.incomingProtocol !== "pop3"]
+            enabledActions: [true, true, mail.smartMailbox === "allInbox" || mail.account.incomingProtocol !== "pop3", true, selectionMoveMenu.destinations.length > 0]
             labels: [qsTr("已读"), qsTr("旗标"), qsTr("归档"), mail.account.incomingProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"), qsTr("移动")]
             onTriggered: index => {
                 if (index === 0) mail.setMessagesRead(readerHeader.selection.selectedIndexList(), true)
@@ -154,12 +154,15 @@ Item {
         }
         LiquidPopover {
             id: selectionMoveMenu
+            readonly property var destinations: typeof mail.commandFolders === "function"
+                ? mail.commandFolders(readerHeader.selection.selectedIndexList())
+                : mail.folders.filter(f => f.id !== mail.currentFolder)
             objectName: "selectionMoveMenu"
             sourceItem: readerHeader.surface
             anchorItem: selectionOpsGroup
             closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
             Repeater {
-                model: mail.folders.filter(f => f.id !== mail.currentFolder)
+                model: selectionMoveMenu.destinations
                 LiquidPopoverItem {
                     text: modelData.title || modelData.id
                     iconName: "folder"

@@ -10,8 +10,9 @@ namespace nkmail {
 InboxSync::InboxSync(QString root, AccountSession *credentials, std::shared_ptr<MailTransport> transport, QObject *parent)
     : QObject(parent), m_root(std::move(root)), m_credentials(credentials), m_sync(new MailboxSync(std::move(transport), this)) {}
 InboxSync::~InboxSync() { delete m_sync; }
-void InboxSync::start(const QList<Account> &accounts) {
+void InboxSync::start(const QList<Account> &accounts, bool discoverFolders) {
     if (m_running || accounts.isEmpty()) return;
+    m_discoverFolders = discoverFolders;
     m_running = true; m_pending = accounts; m_failures.clear();
     const auto generation = ++m_generation;
     emit runningChanged();
@@ -43,6 +44,8 @@ void InboxSync::next(quint64 generation) {
         }
         // Refresh only the newest bounded header page; older cached mail remains
         // available. Bodies are still downloaded on demand through the reader.
+        auto readPage = [self, requested, account, generation, advance] {
+        if (!self || generation != self->m_generation) return;
         self->m_sync->page(account, QStringLiteral("INBOX"), 0, 50,
             [self, requested, generation, advance](const Page &page, const QString &error) {
                 if (!self || generation != self->m_generation) return;
@@ -62,6 +65,20 @@ void InboxSync::next(quint64 generation) {
                 else emit self->updated(requested.id, page.uidValidity);
                 advance();
             });
+        };
+        if (!self->m_discoverFolders) { readPage(); return; }
+        self->m_sync->folders(account, [self, requested, generation, advance, readPage](const QList<Folder> &folders, const QString &error) {
+            if (!self || generation != self->m_generation) return;
+            if (!error.isEmpty()) { self->failed(requested, error); advance(); return; }
+            MailDatabase db;
+            if (!db.open(self->m_root, requested.id)) { self->failed(requested, db.error()); advance(); return; }
+            bool matches = false;
+            for (const auto &current : db.accounts())
+                if (current.id == requested.id && accountMap(current) == accountMap(requested)) matches = true;
+            if (!matches) { advance(); return; }
+            if (!db.saveFolders(folders)) { self->failed(requested, db.error()); advance(); return; }
+            readPage();
+        });
     });
 }
 }

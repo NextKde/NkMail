@@ -37,6 +37,10 @@ LiquidDialog {
         imapPortField.text = protocol === "pop3" ? "995" : "993"
         imapField.text = protocol === "pop3" ? Profiles.popHost(providerChoice.provider) : Profiles.settings(providerChoice.provider).imapHost
     }
+    property string savedAccountId: ""
+    readonly property var receipt: mail.initialReceipt || ({})
+    readonly property bool receiptMatches: receipt.accountId === savedAccountId
+    readonly property string receiptState: receiptMatches ? String(receipt.state || "") : ""
     property string setupError: ""
     readonly property var setup: mail.accountSetup || null
     function nextStep() {
@@ -117,7 +121,10 @@ LiquidDialog {
         // configureAccount returns its persistence result synchronously. A busy
         // mailbox can reject it; unrelated sync must never leave this dialog locked.
         submitting = false
-        if (saved) step = 2
+        if (saved) {
+            savedAccountId = configuration().id || addressField.text.trim().toLowerCase()
+            step = 2
+        }
         else setupError = mail.error || qsTr("Account could not be saved. Please retry.")
     }
     onClosed: {
@@ -229,15 +236,25 @@ LiquidDialog {
             }
             Text {
                 visible: root.step === 2
-                text: qsTr("Account verified and saved")
+                text: root.receiptState === "loading" ? qsTr("Receiving your first messages…")
+                    : root.receiptState === "failed" ? qsTr("Account saved · mail check failed")
+                    : root.receiptState === "ready" ? qsTr("Your inbox is ready") : qsTr("Account verified and saved")
                 color: AppTheme.text; font.pixelSize: 18
                 Layout.fillWidth: true; wrapMode: Text.Wrap
             }
             Text {
                 visible: root.step === 2
-                text: qsTr("Mail is fetched automatically after adding an account. Use Check for mail above the message list, or Ctrl+R, to check again. Connection errors appear in the main window.")
+                text: root.receiptState === "failed" ? String(root.receipt.error || "")
+                    : root.receiptState === "loading" ? qsTr("Connecting securely and downloading the newest message headers. You can close this window while mail is fetched.")
+                    : qsTr("Open your inbox to read mail. Use Check for mail above the message list, or Ctrl+R, to check again.")
                 color: AppTheme.mutedText; font.pixelSize: 12
                 Layout.fillWidth: true; wrapMode: Text.Wrap
+            }
+            MailActivityIndicator {
+                objectName: "initialReceiptSpinner"
+                visible: root.step === 2 && root.receiptState === "loading"
+                running: visible
+                Layout.preferredWidth: 20; Layout.preferredHeight: 20
             }
             RowLayout {
                 visible: root.submitting
@@ -314,8 +331,7 @@ LiquidDialog {
                     MailSettingsInput { id: caField; Layout.fillWidth: true; Layout.preferredWidth: 260; Layout.minimumWidth: 0; enabled: !root.submitting; readOnly: root.mail.demo || root.submitting; Accessible.name: qsTr("CA file"); placeholderText: qsTr("System certificates") }
                 }
             }
-            Text { visible: !!root.mail.error; text: root.mail.error; color: AppTheme.destructive; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap }
-            Text { visible: root.incomingProtocol !== "pop3"; text: qsTr("Reading does not change server flags. Explicit mail actions can update or delete messages."); color: AppTheme.mutedText; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            Text { visible: root.step < 2 && !!root.mail.error; text: root.mail.error; color: AppTheme.destructive; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.Wrap }
         }
     }
     footer: Item {
@@ -324,8 +340,24 @@ LiquidDialog {
             anchors.fill: parent
             anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.topMargin: 8; anchors.bottomMargin: 16
             spacing: 8
-            LiquidDialogButton { text: qsTr("Disconnect"); destructive: true; visible: root.mail.configured && !root.mail.demo; enabled: !root.submitting && !root.mail.sending; onClicked: { root.mail.disconnectAccount(); root.close() } }
+            LiquidDialogButton { text: qsTr("Disconnect"); destructive: true; visible: root.step === 1 && root.original.id === root.mail.currentAccountId && root.mail.configured && !root.mail.demo; enabled: !root.submitting && !root.mail.sending; onClicked: { root.mail.disconnectAccount(); root.close() } }
             Item { Layout.fillWidth: true }
+            LiquidDialogButton {
+                objectName: "retryInitialReceiptButton"
+                visible: root.step === 2 && root.receiptState === "failed"
+                text: qsTr("Retry mail check")
+                primaryAction: true
+                enabled: !root.mail.busy && !root.mail.sending
+                onClicked: root.mail.retryInitialReceipt(root.savedAccountId)
+            }
+            LiquidDialogButton {
+                objectName: "openAccountInboxButton"
+                visible: root.step === 2
+                text: qsTr("Open inbox")
+                primaryAction: root.receiptState !== "failed"
+                enabled: !root.mail.busy && !root.mail.sending
+                onClicked: { root.mail.openAccountInbox(root.savedAccountId); root.close() }
+            }
             LiquidDialogButton { text: root.mail.demo || root.step === 2 ? qsTr("Done") : qsTr("Cancel"); enabled: !root.submitting; onClicked: root.close() }
             LiquidDialogButton {
                 text: qsTr("Back")

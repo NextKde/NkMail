@@ -175,11 +175,6 @@
             <translation>系统证书</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="205" />
-            <source>Reading does not change server flags. Explicit mail actions can update or delete messages.</source>
-            <translation>阅读不会更改服务器标记。主动执行邮件操作可修改或删除邮件。</translation>
-        </message>
-        <message>
             <location filename="../qml/AccountDialog.qml" line="214" />
             <source>Disconnect</source>
             <translation>断开连接</translation>
@@ -252,8 +247,32 @@
             <translation>发件 STARTTLS</translation>
         </message>
         <message>
-            <source>Mail is fetched automatically after adding an account. Use Check for mail above the message list, or Ctrl+R, to check again. Connection errors appear in the main window.</source>
-            <translation>添加账户后会自动收信。之后可点击邮件列表上方的“收取邮件”，或按 Ctrl+R 再次收取。连接错误会显示在主窗口中。</translation>
+            <source>Receiving your first messages…</source>
+            <translation>正在收取首批邮件…</translation>
+        </message>
+        <message>
+            <source>Account saved · mail check failed</source>
+            <translation>账号已保存 · 收信失败</translation>
+        </message>
+        <message>
+            <source>Your inbox is ready</source>
+            <translation>收件箱已就绪</translation>
+        </message>
+        <message>
+            <source>Connecting securely and downloading the newest message headers. You can close this window while mail is fetched.</source>
+            <translation>正在安全连接并下载最新邮件列表。收取期间可以关闭此窗口。</translation>
+        </message>
+        <message>
+            <source>Open your inbox to read mail. Use Check for mail above the message list, or Ctrl+R, to check again.</source>
+            <translation>打开收件箱即可阅读邮件。再次收信可点击邮件列表上方的“检查新邮件”，或按 Ctrl+R。</translation>
+        </message>
+        <message>
+            <source>Retry mail check</source>
+            <translation>重试收信</translation>
+        </message>
+        <message>
+            <source>Open inbox</source>
+            <translation>打开收件箱</translation>
         </message>
     </context>
     <context>
@@ -1410,6 +1429,10 @@ Alex
             <source>Delete locally</source>
             <translation>本地删除</translation>
         </message>
+        <message>
+            <source>Retry mail check</source>
+            <translation>重试收信</translation>
+        </message>
     </context>
     <context>
         <name>MessagePane</name>
@@ -1887,14 +1910,6 @@ Alex
     <context>
         <name>nkmail::MailController</name>
         <message>
-            <source>All inboxes · cached messages · read-only</source>
-            <translation>所有收件箱 · 缓存邮件 · 只读</translation>
-        </message>
-        <message>
-            <source>Open the account folder to change messages.</source>
-            <translation>请打开对应账号的文件夹后修改邮件。</translation>
-        </message>
-        <message>
             <location filename="../src/MailController.cpp" line="73" />
             <source>Messages updated</source>
             <translation>邮件已更新</translation>
@@ -2199,16 +2214,40 @@ Alex
             <translation>POP 不支持服务器文件夹。</translation>
         </message>
         <message>
-            <source>All inboxes updated · read-only</source>
-            <translation>所有收件箱已更新 · 只读</translation>
-        </message>
-        <message>
             <source>Some inboxes could not be updated</source>
             <translation>部分收件箱未能更新</translation>
         </message>
         <message>
             <source>Refreshing all inboxes…</source>
             <translation>正在刷新所有收件箱…</translation>
+        </message>
+        <message>
+            <source>All inboxes updated</source>
+            <translation>所有收件箱已更新</translation>
+        </message>
+        <message>
+            <source>First mail check completed</source>
+            <translation>首次收信完成</translation>
+        </message>
+        <message>
+            <source>First mail check failed</source>
+            <translation>首次收信失败</translation>
+        </message>
+        <message>
+            <source>Mail check interrupted. You can retry.</source>
+            <translation>收信已中断，可以重试。</translation>
+        </message>
+        <message>
+            <source>Receiving your first messages…</source>
+            <translation>正在收取首批邮件…</translation>
+        </message>
+        <message>
+            <source>All inboxes · cached messages</source>
+            <translation>所有收件箱 · 缓存邮件</translation>
+        </message>
+        <message>
+            <source>Select messages from one account before moving them.</source>
+            <translation>移动邮件时请选择同一个账号的邮件。</translation>
         </message>
     </context>
     <context>
@@ -2246,6 +2285,10 @@ Alex
         <message>
             <source>POP does not support moving messages between server folders.</source>
             <translation>POP 不支持在服务器文件夹之间移动邮件。</translation>
+        </message>
+        <message>
+            <source>Choose a destination folder before archiving.</source>
+            <translation>归档前请选择目标文件夹。</translation>
         </message>
     </context>
     <context>
@@ -2450,6 +2493,25 @@ Alex
         <message>
             <source>Invalid inbox response.</source>
             <translation>收件箱响应无效。</translation>
+        </message>
+    </context>
+    <context>
+        <name>nkmail::AggregateCommands</name>
+        <message>
+            <source>Message source account is unavailable.</source>
+            <translation>邮件来源账号不可用。</translation>
+        </message>
+        <message>
+            <source>Destination unavailable for this account. Open its folder and refresh before retrying.</source>
+            <translation>此账号的目标文件夹不可用。请打开该账号的文件夹并刷新后重试。</translation>
+        </message>
+        <message>
+            <source>Account needs a password. Open account settings to reconnect.</source>
+            <translation>账号需要密码。请打开账号设置重新连接。</translation>
+        </message>
+        <message>
+            <source>Message source account changed.</source>
+            <translation>邮件来源账号已变更。</translation>
         </message>
     </context>
 </TS>

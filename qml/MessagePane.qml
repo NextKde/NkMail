@@ -47,7 +47,11 @@ Rectangle {
                 required property string uid
                 required property var model
                 readonly property string sourceAccountId: String(model.accountId || "")
-                readonly property bool readOnlyMailbox: mail.smartMailbox === "allInbox"
+                readonly property bool readOnlyMailbox: mail.busy
+                readonly property string sourceProtocol: ((mail.accounts || []).find(a => a.id === (sourceAccountId || mail.currentAccountId)) || mail.account).incomingProtocol || "imap"
+                readonly property var moveFolders: typeof mail.commandFolders === "function"
+                    ? mail.commandFolders(bulkMenu ? root.selection.selectedIndexList() : [messageIndex])
+                    : mail.folders.filter(f => f.id !== folder)
                 readonly property string accountCaption: {
                     const account = (mail.accounts || []).find(a => a.id === sourceAccountId)
                     return account ? (account.name || account.address) : sourceAccountId
@@ -171,11 +175,11 @@ Rectangle {
                         objectName: "moveToMenuItem"
                         text: qsTr("移动到…")
                         iconName: "folder"
-                        enabled: mail.account.incomingProtocol !== "pop3" && !messageRow.readOnlyMailbox && mail.folders.filter(f => f.id !== messageRow.folder).length > 0
+                        enabled: messageRow.sourceProtocol !== "pop3" && !messageRow.readOnlyMailbox && messageRow.moveFolders.length > 0
                         onTriggered: { rowMenu.close(); messageRow.openMenuAtContext(messageMoveMenu) }
                     }
-                    LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; enabled: mail.account.incomingProtocol !== "pop3" && !messageRow.readOnlyMailbox; onTriggered: messageRow.contextCommand("archive") }
-                    LiquidPopoverItem { text: mail.account.incomingProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"); iconName: "trash"; enabled: !messageRow.readOnlyMailbox; onTriggered: messageRow.contextCommand("delete") }
+                    LiquidPopoverItem { text: qsTr("归档"); iconName: "archive"; enabled: messageRow.sourceProtocol !== "pop3" && !messageRow.readOnlyMailbox; onTriggered: messageRow.contextCommand("archive") }
+                    LiquidPopoverItem { text: messageRow.sourceProtocol === "pop3" ? qsTr("Delete locally") : qsTr("删除"); iconName: "trash"; enabled: !messageRow.readOnlyMailbox; onTriggered: messageRow.contextCommand("delete") }
                 }
                 LiquidPopover {
                     id: messageMoveMenu
@@ -184,7 +188,7 @@ Rectangle {
                     arrowEnabled: false
                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnReleaseOutside
                     Repeater {
-                        model: mail.folders.filter(f => f.id !== messageRow.folder)
+                        model: messageRow.moveFolders
                         LiquidPopoverItem {
                             text: modelData.title || modelData.id
                             iconName: "folder"

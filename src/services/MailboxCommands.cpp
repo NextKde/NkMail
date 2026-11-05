@@ -9,6 +9,7 @@ MailboxCommands::~MailboxCommands() { m_tasks.finish(); }
 void MailboxCommands::execute(const Account &account, QList<Summary> messages, Action action,
                               bool value, const QString &destination, bool demo) {
     if (m_busy || messages.isEmpty()) return;
+    if (action == Action::Archive) { emit completed({}, false, tr("Choose a destination folder before archiving.")); return; }
     const auto first = messages.first();
     if (account.id != m_database.accountId()) {
         emit completed({}, false, tr("The command belongs to another account.")); return;
@@ -18,7 +19,7 @@ void MailboxCommands::execute(const Account &account, QList<Summary> messages, A
     }
     QStringList uids;
     for (auto &message : messages) {
-        if (message.folder != first.folder || message.uidValidity != first.uidValidity
+        if ((!message.accountId.isEmpty() && message.accountId != account.id) || message.folder != first.folder || message.uidValidity != first.uidValidity
             || message.folder.isEmpty() || message.uidValidity.isEmpty() || message.uid.isEmpty()) {
             emit completed({}, false, tr("Select messages from a single valid mailbox.")); return;
         }

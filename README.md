@@ -313,7 +313,7 @@ Body cache format 2 retains the resolved images in sanitized HTML, making them a
 
 ### Unified inbox
 
-**All inboxes** combines cached inbox headers across saved accounts, retaining each row's account/folder/UIDVALIDITY/UID identity. The list shows the source account and opens content with that account's credentials. Search and unread filtering operate on the local cache; Refresh independently downloads the newest 50 inbox headers from each saved IMAP/POP account with available credentials. Periodic refresh also updates inactive accounts; one account failure does not stop the others. Older messages already cached remain available, and refreshing preserves the loaded aggregate window and current body. This is bounded recent-header synchronization, not a full-history mirror or server-deletion reconciliation. Older uncached mail can be fetched from its source account folder. The aggregate remains read-only: opening mail does not mark it read, and mailbox modifications are disabled. Use the row menu's **Open source folder** action to manage messages in their original account. Replies use the selected message's source account.
+**All inboxes** combines cached inbox headers across saved accounts, retaining each row's account/folder/UIDVALIDITY/UID identity. The list shows the source account and opens content with that account's credentials. Search and unread filtering operate on the local cache; Refresh independently downloads the newest 50 inbox headers from each saved IMAP/POP account with available credentials. Periodic refresh also updates inactive accounts; one account failure does not stop the others. Older messages already cached remain available, and refreshing preserves the loaded aggregate window and current body. This is bounded recent-header synchronization, not a full-history mirror or server-deletion reconciliation. Older uncached mail can be fetched from its source account folder. The aggregate supports read/unread, flags, delete and archive, routed to each message's source account and mailbox epoch. Mixed-account selections are processed per account; partial failures are reported and never automatically retried. Archive uses each account's own cached archive destination. Move is available for a selection from one account and uses that account's folder list; cross-account moves are not offered. POP read/flag/delete remain local, and POP move/archive remain unavailable. Opening an unread row marks it read independently of the PEEK body fetch. Replies use the selected message's source account.
 
 ### POP accounts
 
@@ -322,3 +322,14 @@ Choose **POP** in the incoming-protocol selector when adding an account. Default
 POP keeps all server copies: NkMail never sends DELE. Read/star state and **Delete locally** belong to this device; deletion tombstones prevent a refresh from restoring locally deleted mail. Cached messages remain available when server copies disappear, though an uncached body cannot be recovered after server removal. SMTP-accepted mail receives a local Sent copy; ambiguous sends are never retried. Folder moves/archive and server search are unavailable, and inactive POP accounts do not provide server unread polling or notifications. Switching incoming protocol on an existing account requires re-adding it.
 
 The add-account list shows supported password/app-password providers and a manual IMAP/POP + SMTP option. Microsoft/Exchange is absent because its required authentication is not implemented; hiding it does not mean Microsoft lacks standard mail protocols. iCloud offers IMAP only. Provider presets are not a claim of live-account certification; verification checks both incoming and outgoing servers without sending mail.
+
+### First mail check after account setup
+
+After verification and saving a new account, NkMail automatically discovers its
+folders and downloads the newest inbox headers. The completion page shows live
+progress, success or the actual failure; **Retry mail check** reuses the saved
+account instead of creating another account. **Open inbox** navigates to the new
+account. Closing the dialog leaves receipt running; a failed check also has a
+retry action in the main window notice. Adding a second account does not replace
+the current reader. Bodies remain on demand, and an empty inbox is a successful
+check. Verification and receipt do not submit SMTP mail.

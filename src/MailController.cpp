@@ -8,6 +8,7 @@
 #include "services/SendService.h"
 #include "services/MailboxSync.h"
 #include "services/InboxSync.h"
+#include "services/AggregateCommands.h"
 #include "services/RemoteImageLoader.h"
 #include "mail/MailTransport.h"
 #include <QDir>
@@ -61,13 +62,15 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         if (key == RemoteImageLoader::key(m_account.id, m_content.summary, m_content.bodyFormatVersion)) emit selectionChanged();
     });
     m_commands = new MailboxCommands(*m_database, m_transport, this);
-    connect(m_commands, &MailboxCommands::completed, this, [this](const QList<Summary> &messages, bool removed, const QString &error) {
+    auto commandsCompleted = [this](const QList<Summary> &messages, bool removed, const QString &error) {
         for (const auto &s : messages) {
+            m_accountUnread.remove(s.accountId.isEmpty() ? m_account.id : s.accountId);
+            if (m_smartMailbox != "allInbox" && !s.accountId.isEmpty() && s.accountId != m_account.id) continue;
             if (removed) {
-                const int row = m_messages->indexOf(s.folder, s.uidValidity, s.uid);
+                const int row = m_messages->indexOf(s.folder, s.uidValidity, s.uid, s.accountId);
                 if (row >= 0) m_messages->remove(row);
             } else m_messages->update(s);
-            if (sameMessage(m_content.summary, s)) {
+            if ((s.accountId.isEmpty() || s.accountId == m_account.id) && sameMessage(m_content.summary, s)) {
                 if (removed) { ++m_selectionGeneration; m_content = {}; m_selected.clear(); m_selectedUid.clear(); }
                 else {
                     m_content.summary = s;
@@ -81,13 +84,17 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         }
         m_accountUnread.remove(m_account.id); ++m_accountUnreadRevision;
         emit accountUnreadChanged(); emit folderUnreadChanged();
-        if (!m_smartMailbox.isEmpty()) loadCached();
+        if (m_smartMailbox == "allInbox") reloadUnifiedInbox();
+        else if (!m_smartMailbox.isEmpty()) loadCached();
         setStatus(error.isEmpty() ? tr("Messages updated") : tr("Mailbox operation needs attention"), error);
-    });
+    };
+    connect(m_commands, &MailboxCommands::completed, this, commandsCompleted);
+    m_aggregateCommands = new AggregateCommands(m_root, m_credentials, m_transport, this);
+    connect(m_aggregateCommands, &AggregateCommands::completed, this, commandsCompleted);
     m_sync = new MailboxSync(m_transport, this);
     m_inboxSync = new InboxSync(m_root, m_credentials, m_transport, this);
     connect(m_inboxSync, &InboxSync::runningChanged, this, &MailController::statusChanged);
-    connect(m_inboxSync, &InboxSync::updated, this, [this](const QString &id, const QString &validity) {
+    auto inboxUpdated = [this](const QString &id, const QString &validity) {
         if (id == m_account.id && m_content.summary.folder == QLatin1String("INBOX")
             && !m_content.summary.uidValidity.isEmpty() && m_content.summary.uidValidity != validity) {
             ++m_selectionGeneration; m_content = {}; m_selected.clear(); m_selectedUid.clear();
@@ -96,14 +103,34 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         m_accountUnread.remove(id); ++m_accountUnreadRevision;
         emit accountUnreadChanged(); emit folderUnreadChanged();
         if (m_smartMailbox == QLatin1String("allInbox")) reloadUnifiedInbox();
-    });
+    };
+    connect(m_inboxSync, &InboxSync::updated, this, inboxUpdated);
     connect(m_inboxSync, &InboxSync::finished, this, [this](const QStringList &failures) {
         if (!failures.isEmpty() || m_smartMailbox == QLatin1String("allInbox"))
-            setStatus(failures.isEmpty() ? tr("All inboxes updated · read-only") : tr("Some inboxes could not be updated"), failures.join(u'\n'));
+            setStatus(failures.isEmpty() ? tr("All inboxes updated") : tr("Some inboxes could not be updated"), failures.join(u'\n'));
+    });
+    m_initialSync = new InboxSync(m_root, m_credentials, m_transport, this);
+    connect(m_initialSync, &InboxSync::updated, this, inboxUpdated);
+    connect(m_initialSync, &InboxSync::runningChanged, this, &MailController::statusChanged);
+    connect(m_initialSync, &InboxSync::finished, this, [this](const QStringList &failures) {
+        m_initialReceipt["state"] = failures.isEmpty() ? "ready" : "failed";
+        m_initialReceipt["error"] = failures.join(u'\n');
+        emit initialReceiptChanged();
+        const auto id = m_initialReceipt.value("accountId").toString();
+        if (failures.isEmpty() && id == m_account.id) {
+            m_folders.clear();
+            for (const auto &f : m_database->folders()) m_folders.append(QVariantMap{{"id", f.id}, {"title", f.title}, {"role", f.role}, {"total", f.total}});
+            emit foldersChanged();
+            if (!m_busy && m_smartMailbox.isEmpty() && m_folder == "INBOX") loadCached();
+        }
+        if (m_smartMailbox == "allInbox") reloadUnifiedInbox();
+        m_accountUnread.remove(id); ++m_accountUnreadRevision;
+        emit accountUnreadChanged(); emit folderUnreadChanged();
+        setStatus(failures.isEmpty() ? tr("First mail check completed") : tr("First mail check failed"), failures.join(u'\n'));
     });
     m_refreshTimer.setTimerType(Qt::VeryCoarseTimer);
     connect(&m_refreshTimer, &QTimer::timeout, this, [this] {
-        if (m_busy || m_commands->busy() || sending() || m_demo || !configured()) return;
+        if (m_busy || commandsBusy() || sending() || m_demo || !configured()) return;
         if (m_smartMailbox != QLatin1String("allInbox")) fetchPage(false, true);
         refreshInboxes(m_smartMailbox == QLatin1String("allInbox"));
 
@@ -140,7 +167,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         m_restorePending = false;
         m_switchCredentialPending = false;
         m_account.password = password;
-        setStatus(tr("Saved credentials restored. Refresh to connect."));
+        setStatus(m_initialSync && m_initialSync->running() ? tr("Receiving your first messages…") : tr("Saved credentials restored. Refresh to connect."));
         if (m_smartMailbox == QLatin1String("allInbox") && m_selected.value("bodyPending").toBool()) {
             const auto selected = m_content.summary;
             openMessage(selected.uid, selected.uidValidity, selected.folder, m_account.id);
@@ -168,10 +195,14 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     });
     QTimer::singleShot(0, this, &MailController::initialize);
 }
-MailController::~MailController() { delete m_inboxSync; delete m_sync; delete m_commands; delete m_send; delete m_images; }
+MailController::~MailController() { delete m_aggregateCommands; delete m_initialSync; delete m_inboxSync; delete m_sync; delete m_commands; delete m_send; delete m_images; }
 QObject *MailController::messages() const { return m_messages; }
+bool MailController::commandsBusy() const {
+    return (m_commands && m_commands->busy()) || (m_aggregateCommands && m_aggregateCommands->busy());
+}
 bool MailController::busy() const {
-    return m_busy || (m_commands && m_commands->busy())
+    return m_busy || commandsBusy()
+        || (m_initialSync && m_initialSync->running() && m_initialReceipt.value("accountId").toString() == m_account.id)
         || (m_smartMailbox == QLatin1String("allInbox") && m_inboxSync && m_inboxSync->running());
 }
 bool MailController::configured() const { return !m_account.address.isEmpty() && !m_account.imapHost.isEmpty(); }
@@ -318,7 +349,7 @@ void MailController::seedDemo() {
     if (!page.messages.isEmpty()) openMessage(page.messages.first().uid, page.uidValidity);
 }
 bool MailController::configureGoogleAccount(const QString &existingId) {
-    if (m_demo || m_busy || sending() || m_commands->busy()) return false;
+    if (m_demo || m_busy || sending() || commandsBusy()) return false;
     auto *setup = static_cast<AccountSetup *>(m_accountSetup);
     auto next = setup->authorizedGoogleAccount();
     if (next.authMethod != "google_oauth" || next.password.isEmpty()) return false;
@@ -341,23 +372,12 @@ bool MailController::configureAccount(const QVariantMap &configuration, const QS
     bool existing = false;
     for (const auto &known : m_database->accounts()) if (known.id == id) existing = true;
     if (!configureAccountImpl(ordinary, password, remember)) return false;
-    // Start first receipt without requiring discovery of a menu action. Background
-    // additions keep the current reader and bind results to their own account.
-    if (!existing) {
-        if (id == m_account.id) {
-            // switchAccount restores the session password on the next event turn.
-            const auto generation = m_generation;
-            QTimer::singleShot(0, this, [this, id, generation] {
-                if (m_account.id == id && m_generation == generation) refresh();
-            });
-        } else for (const auto &saved : m_database->accounts())
-            if (saved.id == id) { m_inboxSync->start({saved}); break; }
-    }
+    if (!existing) retryInitialReceipt(id);
     return true;
 }
 bool MailController::configureAccountImpl(const QVariantMap &configuration, const QString &password, bool remember) {
     if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return false; }
-    if (m_busy || sending() || m_commands->busy()) return false;
+    if (m_busy || sending() || commandsBusy()) return false;
     Account next = accountFromMap(configuration);
     const auto validHost = [](const QString &host) { return !host.trimmed().isEmpty() && !host.contains('/') && !host.contains('\n') && !host.contains('\r'); };
     if (!next.address.contains('@') || next.username.trimmed().isEmpty() || !validHost(next.imapHost) || !validHost(next.smtpHost)
@@ -385,6 +405,7 @@ bool MailController::configureAccountImpl(const QVariantMap &configuration, cons
     // Only the live account may reuse the session-only password held in memory.
     next.password = password.isEmpty() ? (editingCurrent && next.authMethod == m_account.authMethod ? m_account.password : QString{}) : password;
     if (!m_database->saveAccount(next)) { setStatus(tr("Could not save account"), m_database->error()); return false; }
+    cancelInitialReceipt();
     m_inboxSync->cancel();
     m_sync->resetReadConnection();
     if (editingCurrent && next.authMethod != m_account.authMethod) m_credentials->forget(m_account);
@@ -422,7 +443,7 @@ bool MailController::configureAccountImpl(const QVariantMap &configuration, cons
 void MailController::switchAccount(const QString &id, bool keepUnifiedInbox) {
     keepUnifiedInbox = keepUnifiedInbox && m_smartMailbox == QLatin1String("allInbox");
     const QString accountId = id.trimmed();
-    if (m_busy || sending() || m_commands->busy()) { setStatus(tr("Finish the current operation before switching accounts")); return; }
+    if (m_busy || sending() || commandsBusy()) { setStatus(tr("Finish the current operation before switching accounts")); return; }
     if (accountId.isEmpty() || accountId == m_account.id) return;
     bool exists = false;
     for (const auto &account : m_database->accounts())
@@ -503,13 +524,14 @@ int MailController::accountUnread(const QString &accountId) const {
 }
 void MailController::removeAccount(const QString &id) {
     if (m_demo) { setStatus(tr("Preview mode"), tr("Account changes are disabled in this synthetic preview.")); return; }
-    if (m_busy || sending() || m_commands->busy()) { setStatus(tr("Finish the current operation before switching accounts")); return; }
+    if (m_busy || sending() || commandsBusy()) { setStatus(tr("Finish the current operation before switching accounts")); return; }
     const QString accountId = id.trimmed().isEmpty() ? QStringLiteral("default") : id.trimmed();
     Account target;
     bool found = false;
     for (const auto &account : m_database->accounts())
         if (account.id == accountId) { target = account; found = true; break; }
     if (!found) return;
+    cancelInitialReceipt();
     m_inboxSync->cancel();
     if (!m_database->removeAccount(accountId)) { setStatus(tr("Could not remove account"), m_database->error()); return; }
     QStringList retainedFavorites;
@@ -535,13 +557,43 @@ void MailController::removeAccount(const QString &id) {
     emit accountChanged(); emit foldersChanged(); emit selectionChanged(); emit draftsChanged();
     setStatus(tr("No accounts left"));
 }
+void MailController::cancelInitialReceipt() {
+    if (!m_initialSync || !m_initialSync->running()) return;
+    m_initialSync->cancel(); m_initialReceipt["state"] = "failed";
+    m_initialReceipt["error"] = tr("Mail check interrupted. You can retry.");
+    emit initialReceiptChanged();
+}
+void MailController::retryInitialReceipt(const QString &id) {
+    if (m_demo || m_initialSync->running() || commandsBusy() || sending()) return;
+    for (auto account : m_database->accounts()) if (account.id == id) {
+        if (id == m_account.id) account.password = m_account.password;
+        m_initialReceipt = {{"accountId", id}, {"state", "loading"}, {"error", ""}};
+        emit initialReceiptChanged();
+        setStatus(tr("Receiving your first messages…"));
+        m_initialSync->start({account}, true);
+        return;
+    }
+}
+void MailController::openAccountInbox(const QString &id) {
+    if (commandsBusy() || m_busy || sending()) return;
+    bool exists = false;
+    for (const auto &a : m_database->accounts()) if (a.id == id) exists = true;
+    if (!exists) return;
+    if (id != m_account.id) switchAccount(id);
+    if (id != m_account.id) return;
+    ++m_generation; ++m_selectionGeneration;
+    m_folder = "INBOX"; m_smartMailbox.clear(); m_search.clear(); m_unreadOnly = false;
+    m_selected.clear(); m_selectedUid.clear(); m_content = {}; m_cachedOnly = true;
+    emit folderChanged(); emit searchChanged(); emit unreadOnlyChanged(); emit selectionChanged();
+    loadCached();
+}
 void MailController::reloadUnifiedInbox() {
     const auto page = m_database->smartPage("allInbox", 0, qMax(pageSize, m_offset), m_search, m_unreadOnly);
     m_messages->replace(page.messages); m_offset = page.nextOffset; m_hasMore = page.hasMore;
     emit statusChanged();
 }
 void MailController::refreshInboxes(bool includeCurrent) {
-    if (m_demo || m_inboxSync->running() || m_commands->busy() || sending()) return;
+    if (m_demo || m_inboxSync->running() || commandsBusy() || sending()) return;
     QList<Account> accounts;
     for (auto account : m_database->accounts()) {
         if (account.id == m_account.id) {
@@ -557,15 +609,16 @@ void MailController::refreshInboxes(bool includeCurrent) {
 void MailController::refresh() {
     if (m_smartMailbox == QLatin1String("allInbox") && !m_demo) { refreshInboxes(true); return; }
     if (m_account.incomingProtocol == "pop3" && m_folder == "Sent" && m_smartMailbox.isEmpty()) { m_cachedOnly = true; loadCached(); return; }
-    if (!m_smartMailbox.isEmpty()) { loadCached(); setStatus(m_smartMailbox == QLatin1String("allInbox") ? tr("All inboxes · cached messages · read-only") : tr("Smart mailbox · current account cached messages")); return; }
+    if (!m_smartMailbox.isEmpty()) { loadCached(); setStatus(m_smartMailbox == QLatin1String("allInbox") ? tr("All inboxes · cached messages") : tr("Smart mailbox · current account cached messages")); return; }
     if (m_demo) { setStatus(tr("Preview · synthetic mail · not connected")); return; }
-    if (m_busy || sending() || m_commands->busy()) return;
+    if (m_busy || sending() || commandsBusy()) return;
     if (!configured() || m_account.password.isEmpty()) {
         if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
         else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Enter a Google app password in account settings to reconnect this account."));
         else setStatus(tr("Account needs attention"), tr("Add an account and enter an application password before connecting."));
         return;
     }
+    cancelInitialReceipt();
     m_inboxSync->cancel();
     const auto generation = ++m_generation; const auto account = m_account;
     m_busy = true; setStatus(tr("Connecting securely…"));
@@ -592,13 +645,13 @@ void MailController::loadCached(bool append) {
 }
 void MailController::selectSmartMailbox(const QString &kind) {
     if (kind != "flagged" && kind != "unread" && kind != "attachments" && kind != "allInbox") return;
-    if (m_commands->busy()) return;
+    if (commandsBusy()) return;
     ++m_generation; ++m_selectionGeneration; m_busy = false; m_offset = 0;
     m_smartMailbox = kind; m_cachedOnly = true; m_search.clear(); m_unreadOnly = false;
     m_selected.clear(); m_selectedUid.clear(); m_content = {};
     emit folderChanged(); emit selectionChanged(); emit searchChanged(); emit unreadOnlyChanged();
     loadCached();
-    setStatus(m_smartMailbox == QLatin1String("allInbox") ? tr("All inboxes · cached messages · read-only") : tr("Smart mailbox · current account cached messages"));
+    setStatus(m_smartMailbox == QLatin1String("allInbox") ? tr("All inboxes · cached messages") : tr("Smart mailbox · current account cached messages"));
 }
 void MailController::selectFolder(const QString &folder) {
     if (folder == m_folder && m_smartMailbox.isEmpty()) return;
@@ -714,8 +767,9 @@ void MailController::loadMore() {
 }
 void MailController::fetchPage(bool append, bool quiet) {
     if (m_account.incomingProtocol == "pop3" && m_folder == "Sent" && m_smartMailbox.isEmpty()) { m_cachedOnly = true; loadCached(append); return; }
-    if (m_busy || m_commands->busy() || m_demo || m_account.password.isEmpty()) return;
+    if (m_busy || commandsBusy() || m_demo || m_account.password.isEmpty()) return;
     if (!m_smartMailbox.isEmpty() || !m_search.isEmpty()) { loadCached(append); return; }
+    cancelInitialReceipt();
     m_inboxSync->cancel();
     const auto generation = m_generation; const auto account = m_account; const auto folder = m_folder;
     const auto offset = append ? m_offset : 0;
@@ -828,7 +882,12 @@ void MailController::openMessage(const QString &uid, const QString &validity, co
     }
     const auto folder = sourceFolder.isEmpty() ? m_folder : sourceFolder;
     if (!m_smartMailbox.isEmpty() && m_messages->indexOf(folder, validity, uid, m_account.id) < 0) return;
-    if (m_commands->busy()) return;
+    // Credential restoration must be able to resume this selected body while
+    // its automatic read flag is queued. Removal still invalidates the body token.
+    const bool resumingSelectedBody = m_selectedUid == uid && m_content.summary.folder == folder
+        && m_content.summary.uidValidity == validity && m_selected.value("bodyPending").toBool()
+        && !m_selected.value("bodyLoading").toBool();
+    if (commandsBusy() && !resumingSelectedBody) return;
     const auto selectionGeneration = ++m_selectionGeneration;
     bool upgrading = false;
     if (auto cached = m_database->content(folder, validity, uid)) {
@@ -881,7 +940,7 @@ void MailController::discardDraft(const QString &id) { if (!sending() && !sendPe
 QVariantMap MailController::addAttachment(const QString &url) { return m_drafts->addAttachment(url); }
 void MailController::saveAttachment(int index, const QString &url) { m_drafts->saveAttachment(m_content, index, url); }
 void MailController::sendDraft(const QVariantMap &draft) {
-    if (m_busy || m_commands->busy()) return;
+    if (m_busy || commandsBusy()) return;
     m_send->sendDraft(m_account, draft);
 }
 void MailController::cancelSend() { m_send->cancelSend(); }
@@ -891,7 +950,8 @@ bool MailController::sendPending() const { return m_send->pending(); }
 int MailController::sendDelay() const { return m_send->delay(); }
 void MailController::clearError() { m_error.clear(); emit statusChanged(); }
 void MailController::disconnectAccount() {
-    if (sending()) return;
+    if (sending() || commandsBusy()) return;
+    cancelInitialReceipt();
     m_inboxSync->cancel();
     m_sync->resetReadConnection();
     clearPendingSend();
@@ -911,6 +971,7 @@ void MailController::setMessagesRead(const QVariantList &indices, bool read) { e
 void MailController::setMessagesFlagged(const QVariantList &indices, bool flagged) { executeCommand(indices, MailboxCommands::Action::Flag, flagged); }
 void MailController::deleteMessages(const QVariantList &indices) { executeCommand(indices, MailboxCommands::Action::Remove); }
 void MailController::archiveMessages(const QVariantList &indices) {
+    if (m_smartMailbox == "allInbox") { executeCommand(indices, MailboxCommands::Action::Archive); return; }
     if (m_account.incomingProtocol == "pop3") { setStatus(tr("POP does not support server folders.")); return; }
     for (const auto &value : m_folders) {
         const auto folder = value.toMap();
@@ -920,6 +981,22 @@ void MailController::archiveMessages(const QVariantList &indices) {
     }
     setStatus(tr("Archive folder unavailable"), tr("This account has no Archive, Archives or All Mail folder."));
 }
+QVariantList MailController::commandFolders(const QVariantList &indices) const {
+    QString id, folder;
+    for (const auto &value : indices) {
+        const auto row = m_messages->get(value.toInt());
+        if (row.isEmpty()) return {};
+        const auto source = row.value("accountId", m_account.id).toString();
+        const auto accountId = source.isEmpty() ? m_account.id : source;
+        if (!id.isEmpty() && id != accountId) return {};
+        id = accountId; folder = row.value("folder").toString();
+    }
+    if (id.isEmpty()) return {};
+    for (const auto &a : m_database->accounts()) if (a.id == id && a.incomingProtocol == "pop3") return {};
+    QVariantList result;
+    for (const auto &f : m_database->folders(id)) if (f.id != folder) result.append(QVariantMap{{"id", f.id}, {"title", f.title}});
+    return result;
+}
 void MailController::moveMessages(const QVariantList &indices, const QString &destination) {
     if (destination.trimmed().isEmpty() || (m_smartMailbox.isEmpty() && destination == m_folder)) {
         setStatus(tr("Choose a different destination folder")); return;
@@ -928,11 +1005,8 @@ void MailController::moveMessages(const QVariantList &indices, const QString &de
 }
 void MailController::executeCommand(const QVariantList &indices, MailboxCommands::Action action,
                                      bool value, const QString &destination) {
-    if (m_smartMailbox == QLatin1String("allInbox")) {
-        setStatus(tr("Open the account folder to change messages.")); return;
-    }
-    if (m_commands->busy() || m_busy || sending() || sendPending()) { setStatus(tr("Another mail operation is in progress")); return; }
-    if (!m_demo && m_account.incomingProtocol != "pop3" && (!configured() || m_account.password.isEmpty())) {
+    if (commandsBusy() || m_busy || sending() || sendPending()) { setStatus(tr("Another mail operation is in progress")); return; }
+    if (m_smartMailbox != "allInbox" && !m_demo && m_account.incomingProtocol != "pop3" && (!configured() || m_account.password.isEmpty())) {
         if (m_account.imapHost == "imap.qq.com") setStatus(tr("Account needs attention"), tr("Reconnect with your QQ Mail authorization code. Enable Remember password to restore it after restarting."));
         else if (m_account.authMethod == "google_oauth") setStatus(tr("Account needs attention"), tr("Enter a Google app password in account settings to reconnect this account."));
         else setStatus(tr("Account needs attention"), tr("Enter an application password before changing messages."));
@@ -950,10 +1024,19 @@ void MailController::executeCommand(const QVariantList &indices, MailboxCommands
         seen.insert(identity); selected.append(summary);
     }
     if (selected.isEmpty()) return;
+    cancelInitialReceipt();
     m_inboxSync->cancel();
     ++m_generation; m_serverSearching = false;
     setStatus(tr("Updating messages…"));
-    m_commands->execute(m_account, selected, action, value, destination, m_demo);
+    if (m_smartMailbox == "allInbox") {
+        if (m_demo) { setStatus(tr("Preview mode")); return; }
+        if (action == MailboxCommands::Action::Move) {
+            for (const auto &s : selected) if (s.accountId != selected.first().accountId) {
+                setStatus(tr("Select messages from one account before moving them.")); return;
+            }
+        }
+        m_aggregateCommands->execute(selected, action, value, destination);
+    } else m_commands->execute(m_account, selected, action, value, destination, m_demo);
     emit statusChanged();
 }
 }

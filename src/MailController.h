@@ -17,10 +17,12 @@ class DraftService;
 class SendService;
 class MailboxSync;
 class InboxSync;
+class AggregateCommands;
 class RemoteImageLoader;
 class MailTransport;
 class MailController : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QVariantMap initialReceipt READ initialReceipt NOTIFY initialReceiptChanged)
     Q_PROPERTY(QObject* accountSetup READ accountSetup CONSTANT)
     Q_PROPERTY(QObject* messages READ messages CONSTANT)
     Q_PROPERTY(QVariantList folders READ folders NOTIFY foldersChanged)
@@ -55,6 +57,9 @@ class MailController : public QObject {
 public:
     explicit MailController(bool demo, const QString &dataRoot, QObject *parent = nullptr, std::shared_ptr<MailTransport> transport = {});
     ~MailController() override;
+    QVariantMap initialReceipt() const { return m_initialReceipt; }
+    Q_INVOKABLE void retryInitialReceipt(const QString &id);
+    Q_INVOKABLE void openAccountInbox(const QString &id);
     QObject *messages() const;
     QObject *accountSetup() const { return m_accountSetup; }
     QVariantList folders() const { return m_folders; }
@@ -116,6 +121,7 @@ public:
     Q_INVOKABLE QVariantMap folderUnread() const;
     Q_INVOKABLE QVariantMap folderUnreadFor(const QString &accountId) const;
     Q_INVOKABLE int accountUnread(const QString &accountId) const;
+    Q_INVOKABLE QVariantList commandFolders(const QVariantList &indices) const;
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void searchServer();
     Q_INVOKABLE void selectFolder(const QString &folder);
@@ -142,7 +148,7 @@ public:
     Q_INVOKABLE void archiveMessages(const QVariantList &indices);
     Q_INVOKABLE void moveMessages(const QVariantList &indices, const QString &destination);
 signals:
-    void imagePolicyChanged();
+    void initialReceiptChanged();    void imagePolicyChanged();
     void foldersChanged();
     void folderUnreadChanged();
     void draftsChanged();
@@ -161,6 +167,8 @@ signals:
     void accountUnreadChanged();
     void draftAccepted(const QString &id);
 private:
+    bool commandsBusy() const;
+    void cancelInitialReceipt();
     void loadAllowedImages();
     bool configureAccountImpl(const QVariantMap &configuration, const QString &credential, bool remember);
     void initialize();
@@ -212,5 +220,8 @@ private:
     QObject *m_accountSetup = nullptr;
     MailboxSync *m_sync = nullptr;
     InboxSync *m_inboxSync = nullptr;
+    AggregateCommands *m_aggregateCommands = nullptr;
+    InboxSync *m_initialSync = nullptr;
+    QVariantMap m_initialReceipt;
 };
 }

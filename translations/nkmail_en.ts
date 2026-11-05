@@ -175,11 +175,6 @@
             <translation>System certificates</translation>
         </message>
         <message>
-            <location filename="../qml/AccountDialog.qml" line="205" />
-            <source>Reading does not change server flags. Explicit mail actions can update or delete messages.</source>
-            <translation>Reading does not change server flags. Explicit mail actions can update or delete messages.</translation>
-        </message>
-        <message>
             <location filename="../qml/AccountDialog.qml" line="214" />
             <source>Disconnect</source>
             <translation>Disconnect</translation>
@@ -252,8 +247,32 @@
             <translation>Outgoing STARTTLS</translation>
         </message>
         <message>
-            <source>Mail is fetched automatically after adding an account. Use Check for mail above the message list, or Ctrl+R, to check again. Connection errors appear in the main window.</source>
-            <translation>Mail is fetched automatically after adding an account. Use Check for mail above the message list, or Ctrl+R, to check again. Connection errors appear in the main window.</translation>
+            <source>Receiving your first messages…</source>
+            <translation>Receiving your first messages…</translation>
+        </message>
+        <message>
+            <source>Account saved · mail check failed</source>
+            <translation>Account saved · mail check failed</translation>
+        </message>
+        <message>
+            <source>Your inbox is ready</source>
+            <translation>Your inbox is ready</translation>
+        </message>
+        <message>
+            <source>Connecting securely and downloading the newest message headers. You can close this window while mail is fetched.</source>
+            <translation>Connecting securely and downloading the newest message headers. You can close this window while mail is fetched.</translation>
+        </message>
+        <message>
+            <source>Open your inbox to read mail. Use Check for mail above the message list, or Ctrl+R, to check again.</source>
+            <translation>Open your inbox to read mail. Use Check for mail above the message list, or Ctrl+R, to check again.</translation>
+        </message>
+        <message>
+            <source>Retry mail check</source>
+            <translation>Retry mail check</translation>
+        </message>
+        <message>
+            <source>Open inbox</source>
+            <translation>Open inbox</translation>
         </message>
     </context>
     <context>
@@ -1410,6 +1429,10 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Delete locally</source>
             <translation>Delete locally</translation>
         </message>
+        <message>
+            <source>Retry mail check</source>
+            <translation>Retry mail check</translation>
+        </message>
     </context>
     <context>
         <name>MessagePane</name>
@@ -1887,14 +1910,6 @@ Synthetic demo draft. Sending is disabled.</translation>
     <context>
         <name>nkmail::MailController</name>
         <message>
-            <source>All inboxes · cached messages · read-only</source>
-            <translation>All inboxes · cached messages · read-only</translation>
-        </message>
-        <message>
-            <source>Open the account folder to change messages.</source>
-            <translation>Open the account folder to change messages.</translation>
-        </message>
-        <message>
             <location filename="../src/MailController.cpp" line="73" />
             <source>Messages updated</source>
             <translation>Messages updated</translation>
@@ -2199,16 +2214,40 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation>POP does not support server folders.</translation>
         </message>
         <message>
-            <source>All inboxes updated · read-only</source>
-            <translation>All inboxes updated · read-only</translation>
-        </message>
-        <message>
             <source>Some inboxes could not be updated</source>
             <translation>Some inboxes could not be updated</translation>
         </message>
         <message>
             <source>Refreshing all inboxes…</source>
             <translation>Refreshing all inboxes…</translation>
+        </message>
+        <message>
+            <source>All inboxes updated</source>
+            <translation>All inboxes updated</translation>
+        </message>
+        <message>
+            <source>First mail check completed</source>
+            <translation>First mail check completed</translation>
+        </message>
+        <message>
+            <source>First mail check failed</source>
+            <translation>First mail check failed</translation>
+        </message>
+        <message>
+            <source>Mail check interrupted. You can retry.</source>
+            <translation>Mail check interrupted. You can retry.</translation>
+        </message>
+        <message>
+            <source>Receiving your first messages…</source>
+            <translation>Receiving your first messages…</translation>
+        </message>
+        <message>
+            <source>All inboxes · cached messages</source>
+            <translation>All inboxes · cached messages</translation>
+        </message>
+        <message>
+            <source>Select messages from one account before moving them.</source>
+            <translation>Select messages from one account before moving them.</translation>
         </message>
     </context>
     <context>
@@ -2246,6 +2285,10 @@ Synthetic demo draft. Sending is disabled.</translation>
         <message>
             <source>POP does not support moving messages between server folders.</source>
             <translation>POP does not support moving messages between server folders.</translation>
+        </message>
+        <message>
+            <source>Choose a destination folder before archiving.</source>
+            <translation>Choose a destination folder before archiving.</translation>
         </message>
     </context>
     <context>
@@ -2450,6 +2493,25 @@ Synthetic demo draft. Sending is disabled.</translation>
         <message>
             <source>Invalid inbox response.</source>
             <translation>Invalid inbox response.</translation>
+        </message>
+    </context>
+    <context>
+        <name>nkmail::AggregateCommands</name>
+        <message>
+            <source>Message source account is unavailable.</source>
+            <translation>Message source account is unavailable.</translation>
+        </message>
+        <message>
+            <source>Destination unavailable for this account. Open its folder and refresh before retrying.</source>
+            <translation>Destination unavailable for this account. Open its folder and refresh before retrying.</translation>
+        </message>
+        <message>
+            <source>Account needs a password. Open account settings to reconnect.</source>
+            <translation>Account needs a password. Open account settings to reconnect.</translation>
+        </message>
+        <message>
+            <source>Message source account changed.</source>
+            <translation>Message source account changed.</translation>
         </message>
     </context>
 </TS>
