@@ -20,7 +20,8 @@ refresh, never replaying a failed write operation.
 Validation runs only in the VM with synthetic mail. Focused menu, header pointer
 and sidebar checks passed 5/5 including lifecycle. The first full run found a
 popup lookup error in the new test; exposing the account menu through its row
-fixed the test lookup. Canonical dependency gate passed. Host compilation and
+fixed the test lookup. Final VM UI/i18n/catalog suites passed 3/3 in 62.43s.
+Canonical dependency gate passed. Host compilation and
 preview replacement are for the user's manual inspection only.
 
 ![Synthetic mailbox with clarified account scope and reply actions](sidebar.png)

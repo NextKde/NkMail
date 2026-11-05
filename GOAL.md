@@ -712,3 +712,10 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - VM UI/i18n/catalog passed 3/3 in 59.98s; hierarchy/disclosure follow-up 4/4 and final caption/capture 3/3 including lifecycle passed. Initial capture exposed an icon-only shared content layout; final icon-and-text adapter verified visually. Canonical UI pin gate passed. Host preview rebuilt/replaced for manual inspection.
 
 - Plain blue Add account follow-up: VM sidebar and empty-profile account-entry checks passed (4/4 including lifecycle), synthetic capture refreshed, host preview rebuilt/replaced for manual use.
+
+## Mail usability review follow-up · 2026-11-05
+
+- Separate current-account shortcuts from fixed favorites, with a shared current address and secondary address lines for custom favorites. Preserve hidden aggregate navigation. Add full-account tooltips, explicit count meanings and muted draft totals.
+- Expose existing account/folder/favorite menus with direct options actions; preserve account disclosure behavior. Prioritize replies at ordinary widths and compact to icons when needed. Consolidate direct refresh in the list header with account scope and checking state.
+- Empty lists show errors and safe mail-check retry; do not replay failed mailbox writes. Add menu, scope, reply/refresh and empty-error regression coverage.
+- VM final UI/i18n/catalog checks passed 3/3 in 62.43s; focused checks passed 5/5. Initial new test failed to locate a reparented popup; fixed test access and verified menu opening. Canonical UI gate passed. Synthetic capture reviewed. Host binary rebuilt and owned preview replaced for manual use only; no host tests or GUI verification.
