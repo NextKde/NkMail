@@ -708,5 +708,7 @@ Old unchecked lists and provider statements above are historical evidence, not a
 
 ## Sidebar account hierarchy · 2026-11-05
 
-- Add an Accounts section heading aligned and styled identically to Favorites. Expandable account rows remain children of Accounts, with their folders one level further indented. Replace the muted custom MouseArea add-account row with the shared, filled primary MailAction plus button, including keyboard/accessibility behavior.
+- Add an Accounts section heading aligned and styled identically to Favorites. Expandable account rows remain children of Accounts, with their folders one level further indented. Replace the muted custom MouseArea add-account row with a shared MailAction, retaining keyboard/accessibility behavior. Following user feedback, present it as left-aligned blue plus-and-text without a filled background.
 - VM UI/i18n/catalog passed 3/3 in 59.98s; hierarchy/disclosure follow-up 4/4 and final caption/capture 3/3 including lifecycle passed. Initial capture exposed an icon-only shared content layout; final icon-and-text adapter verified visually. Canonical UI pin gate passed. Host preview rebuilt/replaced for manual inspection.
+
+- Plain blue Add account follow-up: VM sidebar and empty-profile account-entry checks passed (4/4 including lifecycle), synthetic capture refreshed, host preview rebuilt/replaced for manual use.

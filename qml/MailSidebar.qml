@@ -414,9 +414,10 @@ Item {
                         implicitHeight: addAccountContent.implicitHeight
                         Row {
                             id: addAccountContent
-                            anchors.centerIn: parent
-                            spacing: 6
-                            VectorIcon { name: "plus"; size: 14; color: addAccountAction.textColor; anchors.verticalCenter: parent.verticalCenter }
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 5
+                            VectorIcon { name: "plus"; size: 13; color: addAccountAction.textColor; anchors.verticalCenter: parent.verticalCenter }
                             Text {
                                 objectName: "addAccountCaption"
                                 text: addAccountAction.text; color: addAccountAction.textColor
@@ -425,10 +426,15 @@ Item {
                             }
                         }
                     }
-                    primaryAction: true
+                    // Sidebar text action: retain shared interaction without a filled button.
+                    flat: true
+                    surfaceColor: "transparent"
+                    textColor: AppTheme.defaultAccentSeed
+                    leftPadding: 12
+                    font.weight: Font.Normal
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 30
-                    Layout.topMargin: 12
+                    Layout.preferredHeight: 28
+                    Layout.topMargin: 6
                     onClicked: root.addAccountRequested()
                 }
             }
