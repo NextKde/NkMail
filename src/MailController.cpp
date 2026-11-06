@@ -1,7 +1,7 @@
 #include "MailController.h"
 #include "services/AccountSetup.h"
 #include "MessageListModel.h"
-#include "NotificationService.h"
+#include "services/MailAlerts.h"
 #include "storage/MailDatabase.h"
 #include "services/AccountSession.h"
 #include "services/DraftService.h"
@@ -41,6 +41,23 @@ bool isArchiveFolder(const QVariantList &folders, const QString &destination) {
 MailController::MailController(bool demo, const QString &dataRoot, QObject *parent, std::shared_ptr<MailTransport> transport)
     : QObject(parent), m_transport(transport ? std::move(transport) : std::make_shared<MailTransport>()), m_demo(demo), m_root(dataRoot), m_database(std::make_unique<MailDatabase>()),
       m_messages(new MessageListModel(this)), m_credentials(new AccountSession(dataRoot, this)) {
+    m_alerts = new MailAlerts(m_root, this);
+    m_notifyEnabled = m_alerts->enabled();
+    connect(m_alerts, &MailAlerts::newMail, this, &MailController::newMailNotification);
+    auto updateUnread = [this] {
+        int total = 0;
+        for (const auto &account : m_database->accounts())
+            total += m_database->unreadCounts(account.id).value("INBOX", 0);
+        if (total != m_totalUnread) { m_totalUnread = total; emit totalUnreadChanged(); }
+    };
+    connect(this, &MailController::folderUnreadChanged, this, updateUnread);
+    connect(this, &MailController::accountsChanged, this, updateUnread);
+    connect(this, &MailController::accountChanged, this, updateUnread);
+    connect(this, &MailController::statusChanged, this, [this] {
+        if (!m_notificationReadTarget.isEmpty()) QTimer::singleShot(0, this, &MailController::markNotificationRead);
+    });
+    m_notificationTimer.setInterval(200);
+    connect(&m_notificationTimer, &QTimer::timeout, this, &MailController::tryOpenNotification);
     m_accountSetup = new AccountSetup(m_transport, !demo, this);
     m_drafts = new DraftService(*m_database, dataRoot, this);
     connect(m_drafts, &DraftService::draftsChanged, this, &MailController::draftsChanged);
@@ -64,7 +81,6 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     m_commands = new MailboxCommands(*m_database, m_transport, this);
     auto commandsCompleted = [this](const QList<Summary> &messages, bool removed, const QString &error) {
         for (const auto &s : messages) {
-            m_accountUnread.remove(s.accountId.isEmpty() ? m_account.id : s.accountId);
             if (m_smartMailbox != "allInbox" && !s.accountId.isEmpty() && s.accountId != m_account.id) continue;
             if (removed) {
                 const int row = m_messages->indexOf(s.folder, s.uidValidity, s.uid, s.accountId);
@@ -82,7 +98,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
                 emit selectionChanged();
             }
         }
-        m_accountUnread.remove(m_account.id); ++m_accountUnreadRevision;
+        ++m_accountUnreadRevision;
         emit accountUnreadChanged(); emit folderUnreadChanged();
         if (m_smartMailbox == "allInbox") reloadUnifiedInbox();
         else if (!m_smartMailbox.isEmpty()) loadCached();
@@ -93,6 +109,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
     connect(m_aggregateCommands, &AggregateCommands::completed, this, commandsCompleted);
     m_sync = new MailboxSync(m_transport, this);
     m_inboxSync = new InboxSync(m_root, m_credentials, m_transport, this);
+    connect(m_inboxSync, &InboxSync::received, m_alerts, &MailAlerts::observe);
     connect(m_inboxSync, &InboxSync::runningChanged, this, &MailController::statusChanged);
     auto inboxUpdated = [this](const QString &id, const QString &validity) {
         if (id == m_account.id && m_content.summary.folder == QLatin1String("INBOX")
@@ -100,9 +117,10 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
             ++m_selectionGeneration; m_content = {}; m_selected.clear(); m_selectedUid.clear();
             emit selectionChanged();
         }
-        m_accountUnread.remove(id); ++m_accountUnreadRevision;
+        ++m_accountUnreadRevision;
         emit accountUnreadChanged(); emit folderUnreadChanged();
         if (m_smartMailbox == QLatin1String("allInbox")) reloadUnifiedInbox();
+        else if (id == m_account.id && m_folder == QLatin1String("INBOX") && m_smartMailbox.isEmpty() && !m_busy) loadCached();
     };
     connect(m_inboxSync, &InboxSync::updated, this, inboxUpdated);
     connect(m_inboxSync, &InboxSync::finished, this, [this](const QStringList &failures) {
@@ -110,6 +128,7 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
             setStatus(failures.isEmpty() ? tr("All inboxes updated") : tr("Some inboxes could not be updated"), failures.join(u'\n'));
     });
     m_initialSync = new InboxSync(m_root, m_credentials, m_transport, this);
+    connect(m_initialSync, &InboxSync::received, m_alerts, &MailAlerts::observe);
     connect(m_initialSync, &InboxSync::updated, this, inboxUpdated);
     connect(m_initialSync, &InboxSync::runningChanged, this, &MailController::statusChanged);
     connect(m_initialSync, &InboxSync::finished, this, [this](const QStringList &failures) {
@@ -124,39 +143,17 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
             if (!m_busy && m_smartMailbox.isEmpty() && m_folder == "INBOX") loadCached();
         }
         if (m_smartMailbox == "allInbox") reloadUnifiedInbox();
-        m_accountUnread.remove(id); ++m_accountUnreadRevision;
+        ++m_accountUnreadRevision;
         emit accountUnreadChanged(); emit folderUnreadChanged();
         setStatus(failures.isEmpty() ? tr("First mail check completed") : tr("First mail check failed"), failures.join(u'\n'));
     });
+    m_refreshTimer.setParent(this);
+    m_refreshTimer.setObjectName("mailRefreshTimer");
     m_refreshTimer.setTimerType(Qt::VeryCoarseTimer);
     connect(&m_refreshTimer, &QTimer::timeout, this, [this] {
         if (m_busy || commandsBusy() || sending() || m_demo || !configured()) return;
-        if (m_smartMailbox != QLatin1String("allInbox")) fetchPage(false, true);
-        refreshInboxes(m_smartMailbox == QLatin1String("allInbox"));
-
-        for (const auto &account : m_database->accounts()) {
-            if (account.id == m_account.id || account.incomingProtocol == "pop3") continue;
-            const auto generation = m_generation;
-            QPointer<MailController> self(this);
-            m_credentials->resolve(account, [self, generation](const Account &authenticated) {
-                if (!self || generation != self->m_generation || authenticated.password.isEmpty()) return;
-                self->m_sync->stats(authenticated, [self, authenticated, generation](const InboxStats &stats, const QString &error) {
-                    if (!self || generation != self->m_generation || !error.isEmpty() || authenticated.incomingProtocol == "pop3") return;
-                    self->m_accountUnread.insert(authenticated.id, stats.unseen);
-                    ++self->m_accountUnreadRevision;
-                    emit self->accountUnreadChanged();
-                    QSettings settings(QDir(self->m_root).filePath("polling.ini"), QSettings::IniFormat);
-                    const QString key = self->credentialKey(authenticated);
-                    const QString validity = settings.value(key + "/validity").toString();
-                    const quint64 previous = settings.value(key + "/maxUid").toULongLong();
-                    const quint64 current = stats.maxUid.toULongLong();
-                    settings.setValue(key + "/validity", stats.uidValidity);
-                    settings.setValue(key + "/maxUid", current);
-                    if (self->m_notifyEnabled && validity == stats.uidValidity && current > previous)
-                        NotificationService::notify(authenticated.name, tr("New mail available"));
-                });
-            });
-        }
+        // Inbox receipt and alerts do not depend on the folder being viewed.
+        refreshInboxes(true);
     });
     connect(m_credentials, &AccountSession::passwordReady, this, [this](const QString &id, const QString &password) {
         if (id != credentialKey() || m_demo) return;
@@ -168,10 +165,11 @@ MailController::MailController(bool demo, const QString &dataRoot, QObject *pare
         m_switchCredentialPending = false;
         m_account.password = password;
         setStatus(m_initialSync && m_initialSync->running() ? tr("Receiving your first messages…") : tr("Saved credentials restored. Refresh to connect."));
-        if (m_smartMailbox == QLatin1String("allInbox") && m_selected.value("bodyPending").toBool()) {
+        if (m_selected.value("bodyPending").toBool()) {
             const auto selected = m_content.summary;
             openMessage(selected.uid, selected.uidValidity, selected.folder, m_account.id);
         }
+        markNotificationRead();
     });
     connect(m_credentials, &AccountSession::passwordSaved, this, [this](const QString &) {
         QSettings settings(QDir(m_root).filePath("credentials.ini"), QSettings::IniFormat);
@@ -340,7 +338,7 @@ void MailController::seedDemo() {
         c.text = i == 0 ? QStringLiteral("Hi there,\n\nYour inbox should feel like a place to think, not a place to catch up.\n\nWe've been exploring a quieter way to read and write email — one that puts your conversations first and lets everything else settle into the background.\n\nA few details we think you'll appreciate:\n\n  •  A clear, comfortable reading space\n  •  Familiar controls, right where you expect them\n  •  Drafts that stay with you\n  •  Your mail, kept on your device\n\nI've attached a short note with the direction. Take a look whenever you have a moment.\n\nTalk soon,\nMaya\n\n—\nThis is synthetic demonstration content. No real mailbox is connected.")
                       : previews[i] + QStringLiteral("\n\nThis message is part of NkMail's synthetic preview.\nNo external messages are sent from demonstration mode.\n\nBest,\n") + senders[i];
         if (i == 0) { Attachment a; a.name = "Design direction.txt"; a.mimeType = "text/plain"; a.bytes = "A calmer inbox. Clear hierarchy. Familiar interactions.\n"; a.size = a.bytes.size(); c.attachments.append(a); }
-        m_database->savePage(Page{s.folder, s.uidValidity, {s}, false, 0}); m_database->saveContent(c);
+        m_database->savePage(Page{s.folder, s.uidValidity, {s}, false, 0, {}}); m_database->saveContent(c);
     }
     m_database->savePage(page);
     emit accountChanged(); emit foldersChanged(); emit draftsChanged();
@@ -516,9 +514,6 @@ QVariantMap MailController::folderUnreadFor(const QString &accountId) const {
     return out;
 }
 int MailController::accountUnread(const QString &accountId) const {
-    // Prefer the count most recently reported by the server; fall back to the
-    // local cache when this account has not been polled yet.
-    if (m_accountUnread.contains(accountId)) return m_accountUnread.value(accountId);
     // A scoped SELECT, without opening a connection or changing the active binding.
     return m_database->unreadCounts(accountId).value(QStringLiteral("INBOX"), 0);
 }
@@ -541,6 +536,7 @@ void MailController::removeAccount(const QString &id) {
     emit favoritesChanged();
     m_sync->resetReadConnection();
     m_credentials->forget(target);
+    m_alerts->forget(accountId);
     m_images->forgetAccount(accountId);
     emit accountsChanged();
     if (accountId != m_account.id) {
@@ -708,6 +704,7 @@ void MailController::setUnreadOnly(bool unreadOnly) {
 void MailController::setNotifyEnabled(bool enabled) {
     if (m_notifyEnabled == enabled) return;
     m_notifyEnabled = enabled;
+    m_alerts->setEnabled(enabled);
     emit notifyEnabledChanged();
 }
 void MailController::setRefreshInterval(int seconds) {
@@ -725,34 +722,55 @@ void MailController::startRefreshTimer() {
     if (m_demo || !configured()) { m_refreshTimer.stop(); return; }
     m_refreshTimer.start(qMax(60, m_refreshInterval) * 1000);
 }
-void MailController::checkNewMail(const Page &page) {
-    if (m_account.incomingProtocol == "pop3") return; // UIDL is opaque, never an increasing IMAP UID.
-    quint64 maxUid = 0;
-    for (const auto &summary : page.messages) {
-        bool ok = false;
-        const quint64 uid = summary.uid.toULongLong(&ok);
-        if (ok && uid > maxUid) maxUid = uid;
+void MailController::activateNotification(const QVariantMap &target) {
+    if (m_demo) return;
+    m_pendingNotification = target;
+    m_notificationTimer.start();
+    tryOpenNotification();
+}
+void MailController::tryOpenNotification() {
+    if (m_pendingNotification.isEmpty()) { m_notificationTimer.stop(); return; }
+    if (busy() || sending() || sendPending()) return;
+    const auto target = m_pendingNotification;
+    m_pendingNotification.clear(); m_notificationTimer.stop();
+    const auto id = target.value("accountId").toString();
+    Account account; bool exists = false;
+    for (const auto &entry : m_database->accounts())
+        if (entry.id == id) { account = entry; exists = true; break; }
+    MailDatabase source;
+    const auto folder = target.value("folder").toString(), epoch = target.value("uidValidity").toString(), uid = target.value("uid").toString();
+    if (!exists || target.value("identity").toString() != MailAlerts::identity(account)
+        || folder != QLatin1String("INBOX") || !source.open(m_root, id)) {
+        setStatus(tr("Notification unavailable"), tr("The account or message is no longer available.")); return;
     }
-    QSettings settings;
-    const QString key = QStringLiteral("accounts/%1/lastMaxUid").arg(m_account.id);
-    if (!settings.contains(key)) { settings.setValue(key, QVariant::fromValue<qulonglong>(maxUid)); return; }
-    const quint64 lastUid = settings.value(key).toULongLong();
-    // A lower maximum means the mailbox or every UID was regenerated; re-baseline quietly.
-    if (maxUid < lastUid) { settings.setValue(key, QVariant::fromValue<qulonglong>(maxUid)); return; }
-    if (maxUid == lastUid) return;
-    int count = 0;
-    const Summary *first = nullptr;
-    for (const auto &summary : page.messages) {
-        bool ok = false;
-        const quint64 uid = summary.uid.toULongLong(&ok);
-        if (!ok || uid <= lastUid) continue;
-        if (!first) first = &summary;
-        ++count;
+    const auto summary = source.summary(folder, epoch, uid);
+    if (!summary) { setStatus(tr("Notification unavailable"), tr("The account or message is no longer available.")); return; }
+    if (id != m_account.id) switchAccount(id);
+    if (id != m_account.id) return;
+    // Navigate using the cached identity, without a list refresh replacing it.
+    ++m_generation; ++m_selectionGeneration;
+    m_smartMailbox.clear(); m_search.clear(); m_unreadOnly = false;
+    m_folder = folder; m_offset = 0; m_cachedOnly = true;
+    emit searchChanged(); emit unreadOnlyChanged(); emit folderChanged();
+    loadCached();
+    if (m_messages->indexOf(folder, epoch, uid, id) < 0) m_messages->append({*summary});
+    m_notificationReadTarget = summary->unread ? target : QVariantMap{};
+    openMessage(uid, epoch, folder, id);
+    emit notificationMessageOpened();
+    markNotificationRead();
+}
+void MailController::markNotificationRead() {
+    if (m_notificationReadTarget.isEmpty()) return;
+    const auto target = m_notificationReadTarget;
+    const auto uid = target.value("uid").toString(), epoch = target.value("uidValidity").toString(), folder = target.value("folder").toString();
+    if (m_account.id != target.value("accountId").toString() || m_selectedUid != uid
+        || m_content.summary.uidValidity != epoch || m_content.summary.folder != folder) {
+        m_notificationReadTarget.clear(); return;
     }
-    settings.setValue(key, QVariant::fromValue<qulonglong>(maxUid));
-    if (!first || !m_notifyEnabled) return;
-    const QString title = count == 1 ? first->sender : tr("%1 封新邮件").arg(count);
-    NotificationService::notify(title, first->subject);
+    if (busy() || sending() || sendPending() || (m_account.incomingProtocol != "pop3" && m_account.password.isEmpty())) return;
+    m_notificationReadTarget.clear();
+    const int row = m_messages->indexOf(folder, epoch, uid, m_account.id);
+    if (row >= 0 && m_messages->get(row).value("unread").toBool()) setMessageRead(row, true);
 }
 void MailController::loadMore() {
     if (m_busy || !m_hasMore) return;
@@ -822,7 +840,7 @@ void MailController::fetchPage(bool append, bool quiet) {
         m_cachedOnly = m_unreadOnly || !m_search.isEmpty();
         // Saved headers changed the cached unread totals.
         emit folderUnreadChanged();
-        if (quiet && !append && page.folder == QLatin1String("INBOX")) checkNewMail(page);
+        if (!append) m_alerts->observe(m_account, page);
         if (!quiet) setStatus(MailController::tr("Up to date · headers cached"));
     });
 }

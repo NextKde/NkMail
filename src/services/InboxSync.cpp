@@ -62,7 +62,10 @@ void InboxSync::next(quint64 generation) {
                 }
                 const auto reconciled = db.reconcilePopPage(page);
                 if (!db.savePage(reconciled)) self->failed(requested, db.error());
-                else emit self->updated(requested.id, page.uidValidity);
+                else {
+                    emit self->received(requested, reconciled, self->m_discoverFolders);
+                    emit self->updated(requested.id, page.uidValidity);
+                }
                 advance();
             });
         };

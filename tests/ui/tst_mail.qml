@@ -57,6 +57,7 @@ TestCase {
         property int refreshCount: 0
         property int saveCount: 0
         property var lastSaved: ({})
+        signal notificationMessageOpened()
         signal selectionChanged()
         signal folderChanged()
         signal folderUnreadChanged()
@@ -668,6 +669,12 @@ TestCase {
         header.clicked()
         compare(mock.currentAccountId, original)
         verify(!sidebar.collapsedAccounts.another)
+    }
+    function test_notification_reveals_reader_from_drafts() {
+        app.width = 800; app.sidebarExpanded = true
+        app.draftsVisible = true; app.readerVisible = false;
+        mock.notificationMessageOpened();
+        compare(app.draftsVisible, false); compare(app.readerVisible, true); compare(app.sidebarExpanded, false);
     }
     function test_sidebar_sections_and_smart_navigation() {
         const sidebar = findChild(app, "sidebarBody")

@@ -22,6 +22,7 @@ signals:
     void runningChanged();
     void updated(const QString &accountId, const QString &validity);
     void finished(const QStringList &failures);
+    void received(const nkmail::Account &account, const nkmail::Page &page, bool baselineOnly);
 private:
     void next(quint64 generation);
     void failed(const Account &account, const QString &error);

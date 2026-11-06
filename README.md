@@ -328,7 +328,7 @@ The smart-mailbox sidebar section is currently hidden at the maintainer's reques
 
 Choose **POP** in the incoming-protocol selector when adding an account. Default security is implicit TLS (995); STARTTLS uses port 110 and never falls back to plaintext. The server must provide stable UIDL identifiers. Header pages use TOP, with a bounded RETR fallback when TOP is unavailable. Bodies and attachments use the same sanitized MIME reader as IMAP.
 
-POP keeps all server copies: NkMail never sends DELE. Read/star state and **Delete locally** belong to this device; deletion tombstones prevent a refresh from restoring locally deleted mail. Cached messages remain available when server copies disappear, though an uncached body cannot be recovered after server removal. SMTP-accepted mail receives a local Sent copy; ambiguous sends are never retried. Folder moves/archive and server search are unavailable, and inactive POP accounts do not provide server unread polling or notifications. Switching incoming protocol on an existing account requires re-adding it.
+POP keeps all server copies: NkMail never sends DELE. Read/star state and **Delete locally** belong to this device; deletion tombstones prevent a refresh from restoring locally deleted mail. Cached messages remain available when server copies disappear, though an uncached body cannot be recovered after server removal. SMTP-accepted mail receives a local Sent copy; ambiguous sends are never retried. Folder moves/archive and server search are unavailable, and unread state belongs to this device. Background inbox receipt and new-mail notifications support both active and inactive POP accounts. Switching incoming protocol on an existing account requires re-adding it.
 
 The add-account list shows supported password/app-password providers and a manual IMAP/POP + SMTP option. Microsoft/Exchange is absent because its required authentication is not implemented; hiding it does not mean Microsoft lacks standard mail protocols. iCloud offers IMAP only. Provider presets are not a claim of live-account certification; verification checks both incoming and outgoing servers without sending mail.
 
@@ -342,3 +342,30 @@ account. Closing the dialog leaves receipt running; a failed check also has a
 retry action in the main window notice. Adding a second account does not replace
 the current reader. Bodies remain on demand, and an empty inbox is a successful
 check. Verification and receipt do not submit SMTP mail.
+
+### New-mail notifications and unread tray count
+
+While NkMail is running (including hidden in the tray), the refresh timer checks
+all saved accounts' inboxes independently of the folder being viewed. The default
+interval remains five minutes; this is polling, not IMAP IDLE. Both IMAP and POP
+use the same post-cache notification path. The first successful observation and
+account/UIDVALIDITY changes establish a quiet baseline; historical mail is not
+announced as new. IMAP cursors and opaque POP UIDL identities persist per profile
+and account. Turning notifications off still advances these cursors, so turning
+them back on does not replay old arrivals. Receipt retains the bounded newest
+50-header synchronization; notification summaries concern newly fetched unread
+headers, not a full-history reconciliation.
+
+**Display → New mail notifications** is saved in the profile's `notifications.ini`.
+Desktop notifications carry an Open message action bound to account, endpoint,
+folder, UIDVALIDITY and UID. Clicking restores the window and opens that exact
+cached header, fetching its body if necessary. Active writes/sends finish before
+navigation; stale/deleted-account targets fail safely. The desktop must support
+notification actions, and the application must still be running. Notification
+transport is asynchronous and tolerates a missing/restarted notification daemon.
+
+The tray badge shows the unread total across **locally synced inboxes**, not an
+estimate of all unseen server mail. It updates on receipt, read/unread changes,
+local deletion and account removal. Counts above 99 display `99+`; the tooltip
+contains the full count. Zero clears the badge. Popup notification settings do
+not hide the unread badge. No background daemon or automatic startup is added.

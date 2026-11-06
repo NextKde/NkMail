@@ -388,6 +388,7 @@ Page popPage(const Account &a, const QString &folder, int offset, int limit) {
     Pop3Session session(a);
     const auto ids = session.identities();
     Page page; page.folder = folder; page.uidValidity = QLatin1String(PopValidity); page.nextOffset = offset;
+    for (const auto &entry : ids) page.inboxIdentities.append(entry.second);
     int skipped = 0; qsizetype bytes = 0;
     for (auto it = ids.rbegin(); it != ids.rend(); ++it) {
         if (skipped++ < offset) continue;

@@ -1,5 +1,6 @@
 # Shared source list for the application and isolated controller/service suite.
 set(NKMAIL_SERVICE_SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/../src/services/MailAlerts.cpp ${CMAKE_CURRENT_LIST_DIR}/../src/services/MailAlerts.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/services/AggregateCommands.cpp ${CMAKE_CURRENT_LIST_DIR}/../src/services/AggregateCommands.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/services/InboxSync.cpp ${CMAKE_CURRENT_LIST_DIR}/../src/services/InboxSync.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/services/AccountSetup.h

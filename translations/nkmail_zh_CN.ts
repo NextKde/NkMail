@@ -1832,7 +1832,15 @@ Alex
             <source>Quit NkMail</source>
             <translation>退出 NkMail</translation>
         </message>
-    </context>
+    <message>
+        <source>NkMail · %1 unread in synced inboxes</source>
+        <translation>NkMail · 已同步收件箱中有 %1 封未读邮件</translation>
+    </message>
+    <message>
+        <source>NkMail · No unread messages in synced inboxes</source>
+        <translation>NkMail · 已同步收件箱中没有未读邮件</translation>
+    </message>
+</context>
     <context>
         <name>nkmail::AccountSession</name>
         <message>
@@ -1959,11 +1967,7 @@ Alex
             <source>Mailbox operation needs attention</source>
             <translation>邮箱操作需要处理</translation>
         </message>
-        <message>
-            <location filename="../src/MailController.cpp" line="100" />
-            <source>New mail available</source>
-            <translation>收到新邮件</translation>
-        </message>
+
         <message>
             <location filename="../src/MailController.cpp" line="110" />
             <source>Saved credentials restored. Refresh to connect.</source>
@@ -2149,11 +2153,7 @@ Alex
             <source>Cached messages only</source>
             <translation>仅缓存邮件</translation>
         </message>
-        <message>
-            <location filename="../src/MailController.cpp" line="568" />
-            <source>%1 封新邮件</source>
-            <translation>%1 封新邮件</translation>
-        </message>
+
         <message>
             <location filename="../src/MailController.cpp" line="581" />
             <source>Fetching message headers…</source>
@@ -2289,6 +2289,14 @@ Alex
             <source>Select messages from one account before moving them.</source>
             <translation>移动邮件时请选择同一个账号的邮件。</translation>
         </message>
+    <message>
+        <source>Notification unavailable</source>
+        <translation>通知已失效</translation>
+    </message>
+    <message>
+        <source>The account or message is no longer available.</source>
+        <translation>该账号或邮件已不存在。</translation>
+    </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
@@ -2554,4 +2562,22 @@ Alex
             <translation>邮件来源账号已变更。</translation>
         </message>
     </context>
+<context>
+    <name>nkmail::MailAlerts</name>
+    <message>
+        <source>New mail · %1</source>
+        <translation>新邮件 · %1</translation>
+    </message>
+    <message>
+        <source>%1 new messages · %2</source>
+        <translation>%1 封新邮件 · %2</translation>
+    </message>
+</context>
+<context>
+    <name>nkmail::NotificationService</name>
+    <message>
+        <source>Open message</source>
+        <translation>打开邮件</translation>
+    </message>
+</context>
 </TS>

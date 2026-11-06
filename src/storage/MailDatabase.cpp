@@ -521,6 +521,15 @@ bool MailDatabase::savePage(const Page &input)
             return false;
     return tx.commit() || fail(m_db.lastError().text());
 }
+std::optional<Summary> MailDatabase::summary(const QString &folder, const QString &epoch, const QString &uid) const
+{
+    if (!check() || validity(folder) != epoch) return {};
+    QSqlQuery query(m_db);
+    query.prepare("SELECT payload FROM summaries WHERE account=? AND folder=? AND uid_validity=? AND uid=?");
+    for (const auto &value : {m_accountId, folder, epoch, uid}) query.addBindValue(value);
+    if (!query.exec() || !query.next()) return {};
+    return summaryFromMap(mapFromJson(query.value(0)));
+}
 Page MailDatabase::cachedPage(const QString &folder, int offset, int limit, const QString &search, bool unreadOnly) const
 {
     Page page;

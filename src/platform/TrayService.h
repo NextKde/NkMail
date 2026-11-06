@@ -14,6 +14,7 @@ class TrayBackend : public QObject {
 public:
     using QObject::QObject;
     virtual bool available() const = 0;
+    virtual void setUnreadCount(int) {}
 signals:
     void showRequested();
     void quitRequested();
@@ -32,6 +33,7 @@ public:
     Q_INVOKABLE void showWindow();
     Q_INVOKABLE void requestQuit();
     void refreshAvailability();
+    void setUnreadCount(int count);
 signals:
     void availableChanged();
     void exitRequested();

@@ -15,6 +15,7 @@ void TrayService::attach(QWindow *window, std::function<bool()> prepareQuit) {
     m_window = window;
     m_prepareQuit = std::move(prepareQuit);
 }
+void TrayService::setUnreadCount(int count) { m_backend->setUnreadCount(qMax(0, count)); }
 void TrayService::refreshAvailability() {
     const bool available = m_backend->available();
     if (available == m_available) return;

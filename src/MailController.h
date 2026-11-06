@@ -10,6 +10,7 @@
 #include <memory>
 
 namespace nkmail {
+class MailAlerts;
 class MailDatabase;
 class MessageListModel;
 class AccountSession;
@@ -49,6 +50,7 @@ class MailController : public QObject {
     Q_PROPERTY(QString search READ search WRITE setSearch NOTIFY searchChanged)
     Q_PROPERTY(QString smartMailbox READ smartMailbox NOTIFY folderChanged)
     Q_PROPERTY(bool unreadOnly READ unreadOnly WRITE setUnreadOnly NOTIFY unreadOnlyChanged)
+    Q_PROPERTY(int totalUnread READ totalUnread NOTIFY totalUnreadChanged)
     Q_PROPERTY(bool notifyEnabled READ notifyEnabled WRITE setNotifyEnabled NOTIFY notifyEnabledChanged)
     Q_PROPERTY(int refreshInterval READ refreshInterval WRITE setRefreshInterval NOTIFY refreshIntervalChanged)
     Q_PROPERTY(int sendDelay READ sendDelay WRITE setSendDelay NOTIFY sendDelayChanged)
@@ -99,6 +101,8 @@ public:
     void setSearch(const QString &query);
     bool unreadOnly() const { return m_unreadOnly; }
     void setUnreadOnly(bool unreadOnly);
+    int totalUnread() const { return m_totalUnread; }
+    Q_INVOKABLE void activateNotification(const QVariantMap &target);
     bool notifyEnabled() const { return m_notifyEnabled; }
     void setNotifyEnabled(bool enabled);
     int refreshInterval() const { return m_refreshInterval; }
@@ -109,7 +113,7 @@ public:
     int accountUnreadRevision() const { return m_accountUnreadRevision; }
     Q_INVOKABLE bool configureGoogleAccount(const QString &existingId = {});
     Q_INVOKABLE bool configureAccount(const QVariantMap &configuration, const QString &password, bool remember);
-    // Foreground account owns browsing/search. Background accounts refresh recent inbox headers and poll IMAP inbox stats.
+    // Foreground account owns browsing/search. All accounts refresh inbox headers independently for reminders.
     Q_INVOKABLE void switchAccount(const QString &id, bool keepUnifiedInbox = false);
     // Read-only cache probe: lists another account's folders without touching the
     // active account or opening a connection.
@@ -161,6 +165,9 @@ signals:
     void searchChanged();
     void unreadOnlyChanged();
     void notifyEnabledChanged();
+    void totalUnreadChanged();
+    void newMailNotification(const QString &title, const QString &body, const QVariantMap &target);
+    void notificationMessageOpened();
     void refreshIntervalChanged();
     void sendDelayChanged();
     void sendPendingChanged();
@@ -178,7 +185,8 @@ private:
     void startRefreshTimer();
     void refreshInboxes(bool includeCurrent);
     void reloadUnifiedInbox();
-    void checkNewMail(const Page &page);
+    void tryOpenNotification();
+    void markNotificationRead();
     void setStatus(const QString &status, const QString &error = {});
     void present(const Content &content);
     void executeCommand(const QVariantList &indices, MailboxCommands::Action action, bool value = false, const QString &destination = {});
@@ -196,11 +204,15 @@ private:
     bool m_cachedOnly = true; // Query offsets stay local until a successful unfiltered header fetch.
     QString m_smartMailbox;
     bool m_unreadOnly = false;
+    MailAlerts *m_alerts = nullptr;
+    int m_totalUnread = 0;
+    QVariantMap m_pendingNotification;
+    QVariantMap m_notificationReadTarget;
+    QTimer m_notificationTimer;
     bool m_notifyEnabled = true;
     int m_refreshInterval = 300; // Seconds, clamped to at least 60.
     SendService *m_send = nullptr;
     QTimer m_refreshTimer;
-    QHash<QString, int> m_accountUnread; // Network-reported INBOX unread per account.
     int m_accountUnreadRevision = 0;
     QString m_root, m_folder = QStringLiteral("INBOX"), m_status, m_error, m_search, m_selectedUid;
     QString m_uidValidity; // Selected folder generation, for validating server search.
