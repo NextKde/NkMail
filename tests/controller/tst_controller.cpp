@@ -4,6 +4,7 @@
 #include "mail/MailTransport.h"
 #include "services/AccountSession.h"
 #include "services/InboxSync.h"
+#include "services/MailAlerts.h"
 #include "services/AccountSetup.h"
 #include "auth/GoogleOAuth.h"
 #include "services/RemoteImageLoader.h"
@@ -208,6 +209,81 @@ struct ReleaseOnExit {
 class ControllerTests : public QObject {
     Q_OBJECT
 private slots:
+    void backgroundInboxAlertsIgnoreVisibleFolder_data() {
+        QTest::addColumn<QString>("protocol");
+        QTest::newRow("imap") << QString("imap");
+        QTest::newRow("pop") << QString("pop3");
+    }
+    void backgroundInboxAlertsIgnoreVisibleFolder() {
+        QFETCH(QString, protocol);
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 0));
+        MailDatabase db; QVERIFY(db.open(root.path())); auto configured = account(); configured.incomingProtocol = protocol;
+        QVERIFY(db.saveAccount(configured));
+        std::atomic_int generation{0};
+        synthetic::page = [&generation, protocol](const Account &, const QString &folder, int, int) {
+            Page p; p.folder = folder; p.uidValidity = "epoch";
+            Summary row; row.folder = folder; row.uidValidity = p.uidValidity;
+            row.uid = protocol == "imap" ? QString::number(10 + generation.load()) : generation ? "A-new" : "Z-old";
+            row.unread = true; row.subject = "Synthetic new mail"; p.messages = {row};
+            if (protocol == "pop3") p.inboxIdentities = generation ? QStringList{"Z-old", "A-new"} : QStringList{"Z-old"};
+            return p;
+        };
+        MailController controller(false, root.path());
+        QTRY_VERIFY(controller.status().contains("restored"));
+        controller.selectFolder("Archive"); QTRY_VERIFY(!controller.busy());
+        QSignalSpy notices(&controller, &MailController::newMailNotification);
+        auto *timer = controller.findChild<QTimer *>("mailRefreshTimer"); QVERIFY(timer);
+        QVERIFY(QMetaObject::invokeMethod(timer, "timeout"));
+        QTRY_COMPARE(controller.totalUnread(), 1); QCOMPARE(notices.count(), 0);
+        QTest::qWait(30);
+        generation = 1; QVERIFY(QMetaObject::invokeMethod(timer, "timeout"));
+        QTRY_COMPARE(notices.count(), 1); QTRY_COMPARE(controller.totalUnread(), 2);
+        QCOMPARE(controller.currentFolder(), "Archive");
+        QCOMPARE(notices[0][2].toMap().value("accountId").toString(), "default");
+        QTest::qWait(30); QVERIFY(QMetaObject::invokeMethod(timer, "timeout"));
+        QTest::qWait(50); QCOMPARE(notices.count(), 1);
+    }
+    void notificationOpensExactCachedSourceAndRejectsRemovedAccount() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 1));
+        auto other = account(); other.id = "other"; other.address = other.username = "other@example.invalid";
+        MailDatabase db; QVERIFY(db.open(root.path())); QVERIFY(db.saveAccount(other)); QVERIFY(db.open(root.path(), other.id));
+        auto p = synthetic::page(other, "INBOX", 0, 120); QVERIFY(db.savePage(p));
+        Content content; content.summary = p.messages.last(); content.summary.subject = "Other account oldest message";
+        content.text = "Exact cached body"; content.bodyFormatVersion = CurrentBodyFormatVersion; QVERIFY(db.saveContent(content));
+        MailController controller(false, root.path()); QTRY_VERIFY(controller.status().contains("restored"));
+        QVariantMap target{{"accountId", other.id}, {"folder", "INBOX"}, {"uidValidity", "100"},
+            {"uid", content.summary.uid}, {"identity", MailAlerts::identity(other)}};
+        QSignalSpy opened(&controller, &MailController::notificationMessageOpened);
+        controller.activateNotification(target);
+        QTRY_COMPARE(opened.count(), 1); QCOMPARE(controller.currentAccountId(), other.id);
+        QCOMPARE(controller.selectedUid(), content.summary.uid);
+        QCOMPARE(controller.selectedMessage().value("text").toString(), content.text);
+        QTRY_VERIFY(!controller.busy()); controller.removeAccount(other.id);
+        const auto current = controller.currentAccountId(); controller.activateNotification(target);
+        QCOMPARE(controller.currentAccountId(), current); QCOMPARE(opened.count(), 1);
+        QVERIFY(controller.error().contains("no longer available"));
+    }
+    void trayUnreadTracksPopReadDeleteAndAccountRemoval() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 0, false));
+        auto pop = account(); pop.incomingProtocol = "pop3";
+        MailDatabase db; QVERIFY(db.open(root.path())); QVERIFY(db.saveAccount(pop));
+        Page p; p.folder = "INBOX"; p.uidValidity = "pop3-uidl-v1";
+        Summary row; row.folder = p.folder; row.uidValidity = p.uidValidity; row.uid = "opaque-one"; row.unread = true;
+        p.messages = {row}; row.uid = "opaque-two"; p.messages.append(row); QVERIFY(db.savePage(p));
+        auto other = pop; other.id = "another"; QVERIFY(db.saveAccount(other)); QVERIFY(db.open(root.path(), other.id));
+        p.messages = {row}; QVERIFY(db.savePage(p));
+        MailController controller(false, root.path()); QTRY_COMPARE(controller.totalUnread(), 3);
+        controller.setMessageRead(0, true); QCOMPARE(controller.totalUnread(), 2);
+        controller.setMessageRead(0, false); QCOMPARE(controller.totalUnread(), 3);
+        controller.deleteMessage(0); QCOMPARE(controller.totalUnread(), 2);
+        controller.removeAccount(other.id); QCOMPARE(controller.totalUnread(), 1);
+    }
+    void controllerNotificationPreferencePersists() {
+        QTemporaryDir root(temporaryTemplate()); QVERIFY(seed(root.path(), 0, false));
+        { MailController controller(false, root.path()); controller.setNotifyEnabled(false); }
+        { MailController controller(false, root.path()); QVERIFY(!controller.notifyEnabled()); controller.setNotifyEnabled(true); }
+        MailController controller(false, root.path()); QVERIFY(controller.notifyEnabled());
+    }
     void addingAccountFetchesMailAutomatically() {
         synthetic::reset();
         QTemporaryDir root(temporaryTemplate());

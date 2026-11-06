@@ -1832,7 +1832,15 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Quit NkMail</source>
             <translation>Quit NkMail</translation>
         </message>
-    </context>
+    <message>
+        <source>NkMail · %1 unread in synced inboxes</source>
+        <translation>NkMail · %1 unread in synced inboxes</translation>
+    </message>
+    <message>
+        <source>NkMail · No unread messages in synced inboxes</source>
+        <translation>NkMail · No unread messages in synced inboxes</translation>
+    </message>
+</context>
     <context>
         <name>nkmail::AccountSession</name>
         <message>
@@ -1959,11 +1967,7 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Mailbox operation needs attention</source>
             <translation>Mailbox operation needs attention</translation>
         </message>
-        <message>
-            <location filename="../src/MailController.cpp" line="100" />
-            <source>New mail available</source>
-            <translation>New mail available</translation>
-        </message>
+
         <message>
             <location filename="../src/MailController.cpp" line="110" />
             <source>Saved credentials restored. Refresh to connect.</source>
@@ -2149,11 +2153,7 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Cached messages only</source>
             <translation>Cached messages only</translation>
         </message>
-        <message>
-            <location filename="../src/MailController.cpp" line="568" />
-            <source>%1 封新邮件</source>
-            <translation>%1 new messages</translation>
-        </message>
+
         <message>
             <location filename="../src/MailController.cpp" line="581" />
             <source>Fetching message headers…</source>
@@ -2289,6 +2289,14 @@ Synthetic demo draft. Sending is disabled.</translation>
             <source>Select messages from one account before moving them.</source>
             <translation>Select messages from one account before moving them.</translation>
         </message>
+    <message>
+        <source>Notification unavailable</source>
+        <translation>Notification unavailable</translation>
+    </message>
+    <message>
+        <source>The account or message is no longer available.</source>
+        <translation>The account or message is no longer available.</translation>
+    </message>
     </context>
     <context>
         <name>nkmail::MailboxCommands</name>
@@ -2554,4 +2562,22 @@ Synthetic demo draft. Sending is disabled.</translation>
             <translation>Message source account changed.</translation>
         </message>
     </context>
+<context>
+    <name>nkmail::MailAlerts</name>
+    <message>
+        <source>New mail · %1</source>
+        <translation>New mail · %1</translation>
+    </message>
+    <message>
+        <source>%1 new messages · %2</source>
+        <translation>%1 new messages · %2</translation>
+    </message>
+</context>
+<context>
+    <name>nkmail::NotificationService</name>
+    <message>
+        <source>Open message</source>
+        <translation>Open message</translation>
+    </message>
+</context>
 </TS>

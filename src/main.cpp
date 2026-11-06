@@ -1,3 +1,4 @@
+#include "NotificationService.h"
 #include "MailController.h"
 #include "platform/TrayService.h"
 #include "platform/SingleInstance.h"
@@ -86,6 +87,18 @@ int main(int argc, char **argv) {
     nkmail::MailController mail(demo, root);
     std::unique_ptr<nkmail::TrayService> desktop;
     if (!parser.isSet("screenshot")) desktop = std::make_unique<nkmail::TrayService>(nkmail::createSystemTray());
+    std::unique_ptr<nkmail::NotificationService> notifications;
+    if (desktop) {
+        QObject::connect(&mail, &nkmail::MailController::totalUnreadChanged, desktop.get(), [&] { desktop->setUnreadCount(mail.totalUnread()); });
+        desktop->setUnreadCount(mail.totalUnread());
+        if (!demo) {
+            notifications = std::make_unique<nkmail::NotificationService>();
+            QObject::connect(&mail, &nkmail::MailController::newMailNotification, notifications.get(), &nkmail::NotificationService::notify);
+            QObject::connect(notifications.get(), &nkmail::NotificationService::activated, &mail, [&](const QVariantMap &target) {
+                desktop->showWindow(); mail.activateNotification(target);
+            });
+        }
+    }
     QQmlApplicationEngine engine;
     QObject::connect(&language, &nkmail::LanguageService::languageChanged, &engine, &QQmlApplicationEngine::retranslate);
     engine.rootContext()->setContextProperty(QStringLiteral("reviewAppearance"), demo ? parser.value("appearance") : QStringLiteral("system"));

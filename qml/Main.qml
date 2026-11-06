@@ -187,6 +187,11 @@ ApplicationWindow {
         target: mail
         function onStatusChanged() { if (!mail.sending && !mail.sendPending) window.lifecycleNotice = "" }
         function onSendPendingChanged() { if (!mail.sending && !mail.sendPending) window.lifecycleNotice = "" }
+        function onNotificationMessageOpened() {
+            window.draftsVisible = false; window.readerVisible = true
+            if (window.width < 1080) window.sidebarExpanded = false
+            mailSelection.clearSelection()
+        }
         function onSelectionChanged() { if (window.narrow && window.hasMessage) window.readerVisible = true }
         function onFolderChanged() { window.clearSelection() }
         function onAccountChanged() {

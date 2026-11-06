@@ -725,3 +725,10 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - Integrated stacked PRs #19–#30 through PR #30 into main at 833e5b3c4aa401fac86a195781b9dabbbffa794b, preserving feature commits and the required release gate.
 - Arch x86_64 0.1.0rc1 packaging and complete source export include pinned UI sources, licenses, checksums, dependency manifest and installation instructions. Packaging builds without OAuth fixture credentials and smoke-tests the installed binary in CI. Wayland runtime is declared explicitly.
 - Clean PR acceptance: release-gate 10/10 passed in 106.74s, package built from the exported source, installed and passed CLI smoke tests (Actions run 42042100544). Main release build and artifacts are tracked by Actions run 42056400794. Publication uses that exact main commit and the v0.1.0-rc1 prerelease; see GitHub Releases for downloadable assets. No host execution/verification for this release work.
+
+## Complete mail reminders · 2026-11-06
+
+- IMAP/POP receipt feeds durable MailAlerts cursors independently of the viewed folder. Persist notification preference per profile; baseline quietly on first receipt/identity changes and deduplicate across refresh/restart/disabled periods.
+- Asynchronous desktop notification actions retain exact account/endpoint/folder/epoch/UID targets, reject stale targets, restore the reader and wait for pending writes/sends. Account credential restoration resumes body loading and read updates.
+- Tray badge totals locally synced inbox unread counts, updates on read/delete/account removal, caps drawing at 99+ with exact tooltip, and clears at zero. Retain five-minute polling and bounded 50-header receipt.
+- VM full suite passed 11/11 in 134.11s; synthetic tray captures reviewed. Added policy, desktop D-Bus, cross-account navigation and unread-count regressions. Final focused checks passed 4/4 in 11.68s and narrow reader checks passed 3/3 including lifecycle; canonical UI pin gate passed. User explicitly authorized a companion Shell bridge fix; its isolated VM QML regression passes. Existing Release/tag remains unchanged; no host validation or real-mail writes.

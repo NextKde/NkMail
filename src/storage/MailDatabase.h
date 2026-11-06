@@ -39,6 +39,7 @@ public:
     Page smartPage(const QString &kind, int offset, int limit, const QString &search = {}, bool unreadOnly = false) const;
     QMap<QString, int> unreadCounts(const QString &accountId = {}) const;
 
+    std::optional<Summary> summary(const QString &folder, const QString &validity, const QString &uid) const;
     bool saveContent(const Content &content);
     std::optional<Content> content(const QString &folder, const QString &uidValidity,
                                    const QString &uid) const;

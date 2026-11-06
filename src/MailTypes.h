@@ -39,6 +39,7 @@ struct Page {
     QList<Summary> messages;
     bool hasMore = false;
     int nextOffset = 0;
+    QStringList inboxIdentities; // Complete POP UIDL listing for new-mail baselines.
 };
 struct Draft {
     QString id, to, cc, bcc, subject, body, html, inReplyTo, references;
