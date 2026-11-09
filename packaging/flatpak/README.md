@@ -31,7 +31,8 @@ manifest and dependency commits. BaseApp sources and notices are maintained
 at https://github.com/flathub/io.qt.qtwebengine.BaseApp (branch/6.11).
 
 The `Flatpak package` workflow builds in a GitHub VM and checks exact-commit
-installation, offline synthetic inbox/composer/account rendering, reinstall,
+installation, offline synthetic inbox/composer/account rendering, normal-launch
+single-instance activation, reinstall,
 and uninstall retaining private data. It does not use real mail or credentials.
 Inspect the synthetic screenshots before release. This first release has no
 older Flatpak version to test a cross-version upgrade against. Portal file

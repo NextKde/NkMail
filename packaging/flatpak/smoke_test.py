@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 artifacts = Path(sys.argv[1]).resolve()
 plan = json.loads((artifacts / 'flatpak-release.json').read_text())
@@ -29,11 +30,27 @@ try:
         capture = Path.home() / '.var/app' / app / 'data' / f'{scenario}.png'
         assert capture.stat().st_size > 1000
         (artifacts / f'{scenario}.png').write_bytes(capture.read_bytes())
+    # Screenshot mode intentionally bypasses instance ownership. Exercise the
+    # normal sandbox launch separately to catch D-Bus permission mistakes.
+    command = ['flatpak', 'run', '--unshare=network', '--env=QT_QPA_PLATFORM=xcb',
+               '--env=LIBGL_ALWAYS_SOFTWARE=1', app, '--demo']
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as primary:
+        try:
+            time.sleep(2)
+            assert primary.poll() is None, 'Primary demo exited unexpectedly'
+            activated = subprocess.run(command, check=True, capture_output=True, text=True, timeout=30)
+            assert 'Activated existing NkMail window.' in activated.stdout
+            assert primary.poll() is None, 'Activation must preserve the primary instance'
+        finally:
+            run('flatpak', 'kill', app)
+            primary.communicate(timeout=15)
     marker = Path.home() / '.var/app' / app / 'data/packaging-fixture.txt'
     marker.write_text('Synthetic packaging fixture; no mailbox data.\n')
-    run('flatpak', '--user', 'install', '--noninteractive', '--reinstall', '--bundle', str(bundle))
+    run('flatpak', '--user', 'uninstall', '--noninteractive', app)
+    assert marker.is_file()
+    run('flatpak', '--user', 'install', '--noninteractive', '--bundle', str(bundle))
     assert marker.is_file()
 finally:
     run('flatpak', '--user', 'uninstall', '--noninteractive', app)
 assert marker.is_file(), 'Uninstall must preserve private application data'
-print('PASS: exact bundle installed, three offline previews, reinstall, data-preserving uninstall')
+print('PASS: exact bundle installed, three offline previews, single-instance activation, reinstall, data-preserving uninstall')
