@@ -5,7 +5,8 @@
 - User requested a Flatpak following kos-apps and publication/submission to appCatalog. Shared runtime: org.kde.Platform//6.11; WebEngine supplied by matching BaseApp, without host Qt bundling. Canonical UI pin unchanged.
 - Added reproducible packaging, schema-2 release metadata, source exports, sandbox identity/permissions, and disposable-CI synthetic lifecycle checks. Build and runtime acceptance are pending; no claim of a successful package yet.
 - User will handle the final catalog signature. Scope here is the NkMail stable Release and appCatalog PR, after required release-gate and package validation. No live mail operation authorized or performed.
-- Next: run clean CI build, resolve package issues, inspect synthetic previews, publish exact artifacts and submit catalog entry.
+- NkMail PR #33 opened. First package run 42631129624 built Boost/QtKeychain but mailio rejected the default in-source CMake build; set `builddir: true` before retrying. Catalog entry validated in the designated VM: 6 entries, 3/3 tests passed.
+- Next: pass clean CI build and existing release-gate, inspect synthetic previews, publish exact artifacts and submit catalog entry.
 
 ## Consolidated integration of PRs #7–#16 · 2026-11-03
 

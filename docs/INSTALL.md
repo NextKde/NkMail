@@ -1,8 +1,36 @@
 # Install NkMail
 
-NkMail is an early preview for Linux. The first binary distribution targets
-**Arch Linux x86_64**, with dependencies supplied by Arch repositories. It is not
-an AppImage and is not a package for Ubuntu, Debian, Fedora, Windows or macOS.
+NkMail is an early Linux mail client. The Flatpak package targets **x86_64 Linux**
+and uses the shared KDE 6.11 runtime. The older native preview package targets
+Arch Linux only. Windows and macOS packages are not provided.
+
+## Flatpak
+
+Download `org.nextkde.NkMail-0.1.0-x86_64.flatpak` and `flatpak-release.json`
+from the [stable release](https://github.com/NextKde/NkMail/releases/tag/v0.1.0).
+Use the bundle SHA-256 recorded in that manifest to check your download. Install
+the shared runtime from an approved Flathub source, then install the local bundle:
+
+```sh
+flatpak --user install flathub org.kde.Platform//6.11
+flatpak --user install --bundle ./org.nextkde.NkMail-0.1.0-x86_64.flatpak
+flatpak run org.nextkde.NkMail
+```
+
+If your installation already has this runtime from kos-apps, Flatpak reuses it.
+The bundle includes WebEngine; it does not use your distribution's Qt libraries.
+A desktop portal and an unlocked Secret Service/KWallet are needed for file
+selection and remembered passwords. Files are selected through the portal;
+NkMail has no general access to your home directory. Private app data is under
+`~/.var/app/org.nextkde.NkMail/`, separate from the native application's profile.
+There is no automatic profile migration. Quit a native NkMail instance before
+starting the Flatpak, because both respect the same session-wide instance owner.
+
+Install a later release bundle with `flatpak --user install --bundle <bundle>`.
+Uninstall with `flatpak --user uninstall org.nextkde.NkMail`; omit `--delete-data`
+to retain your local mail and drafts. The appCatalog client can manage releases
+after the maintainer publishes a signed catalog containing this application.
+See [packaging and validation details](../packaging/flatpak/README.md).
 
 ## Arch Linux package
 
@@ -53,7 +81,7 @@ both commits. `BUILD-DEPENDENCIES.txt` records its build environment. The suppli
 PKGBUILD and source tarball can also be rebuilt together with `makepkg` on Arch.
 
 Ordinary desktops do not need NextKde's compositor extensions: application-drawn
-window controls remain available. System Qt/WebEngine libraries are required;
+window controls remain available. Native builds require system Qt/WebEngine libraries;
 copying the `nkmail` executable alone to a different distribution is unsupported.
 
 ## First use and current limitations

@@ -26,7 +26,7 @@ jobs:
       - name: Install build tools in the disposable CI VM
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y flatpak flatpak-builder ostree python3 elfutils desktop-file-utils optipng librsvg2-common xvfb xauth dbus-x11
+          sudo apt-get install --no-install-recommends -y flatpak flatpak-builder ostree python3 elfutils desktop-file-utils optipng librsvg2-common xvfb xauth dbus-x11 fonts-noto-cjk
           flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak --user install --noninteractive flathub org.kde.Sdk//6.11 org.kde.Platform//6.11 io.qt.qtwebengine.BaseApp//6.11
       - name: Build pinned package and exact release metadata
