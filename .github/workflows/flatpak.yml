@@ -1,0 +1,44 @@
+name: Flatpak package
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packaging/flatpak/**'
+      - '.github/workflows/flatpak.yml'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'qml/**'
+      - 'third_party/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  flatpak:
+    name: flatpak-package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Install build tools in the disposable CI VM
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y flatpak flatpak-builder ostree python3 elfutils desktop-file-utils optipng librsvg2-common xvfb xauth dbus-x11
+          flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak --user install --noninteractive flathub org.kde.Sdk//6.11 org.kde.Platform//6.11 io.qt.qtwebengine.BaseApp//6.11
+      - name: Build pinned package and exact release metadata
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 packaging/flatpak/build_bundle.py
+      - name: Install, launch offline, reinstall and preserve data on uninstall
+        run: |
+          dbus-run-session -- xvfb-run -a python3 packaging/flatpak/smoke_test.py build/flatpak/artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nkmail-flatpak-x86_64
+          path: build/flatpak/artifacts/
+          if-no-files-found: error
+          retention-days: 14

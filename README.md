@@ -6,7 +6,9 @@ A native Qt Quick mail client for NextKde. The interface takes cues from macOS M
 
 ## Install or try the preview
 
-See [installation and first-use instructions](docs/INSTALL.md). Preview releases
+See [installation and first-use instructions](docs/INSTALL.md).
+Flatpak packaging shares the KDE 6.11 runtime with kos-apps; see
+[build, permissions and release procedure](packaging/flatpak/README.md). Preview releases
 provide an Arch Linux x86_64 package, complete source bundle (including Kos.Ui),
 checksums and a rebuild recipe. Other Linux distributions require a source build
 with Qt 6.8+; no universal Linux binary or Windows/macOS package is provided.

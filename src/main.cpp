@@ -35,7 +35,11 @@ int main(int argc, char **argv) {
     app.setApplicationDisplayName(QStringLiteral("NkMail"));
     app.setOrganizationName(QStringLiteral("NextKde"));
     app.setApplicationVersion(QStringLiteral(NKMAIL_VERSION));
+#ifdef NKMAIL_FLATPAK_BUILD
+    app.setDesktopFileName(QStringLiteral("org.nextkde.NkMail"));
+#else
     app.setDesktopFileName(QStringLiteral("nkmail"));
+#endif
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QQuickWindow::setDefaultAlphaBuffer(true);
     QCommandLineParser parser;
