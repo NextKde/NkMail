@@ -28,6 +28,8 @@ def make_plan(bundle, repo, revision, version, arch):
     config.read_string(metadata.decode())
     if config['Application']['name'] != APP_ID:
         raise ValueError('Unexpected bundle identity')
+    if config.get('Session Bus Policy', 'org.NextKde.NkMail', fallback='') != 'own':
+        raise ValueError('Single-instance bus ownership is required; talk must not override own')
     runtime = config['Application']['runtime']
     if runtime != f'org.kde.Platform/{arch}/6.11':
         raise ValueError('Unexpected runtime')

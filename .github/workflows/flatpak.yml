@@ -38,7 +38,7 @@ jobs:
         env:
           XDG_CURRENT_DESKTOP: GNOME
         run: |
-          dbus-run-session -- xvfb-run -a sh -c 'dbus-update-activation-environment DISPLAY XDG_CURRENT_DESKTOP; python3 packaging/flatpak/smoke_test.py build/flatpak/artifacts'
+          dbus-run-session -- xvfb-run -a sh -c 'dbus-update-activation-environment DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP; python3 packaging/flatpak/smoke_test.py build/flatpak/artifacts'
       - uses: actions/upload-artifact@v4
         if: always() && steps.bundle.outcome == 'success'
         with:

@@ -8,7 +8,8 @@
 - NkMail PR #33 opened. First package run 42631129624 built Boost/QtKeychain but mailio rejected the default in-source CMake build; set `builddir: true` before retrying. Catalog entry validated in the designated VM: 6 entries, 3/3 tests passed.
 - Run 42631957886 successfully built/exported/installed the Flatpak and produced three offline synthetic screenshots. Its same-commit `--reinstall --bundle` check failed with “already installed”; replace with explicit uninstall/reinstall and verify data survives both removals. Add normal-launch single-instance acceptance and desktop portal services to the disposable runner. Preserve successfully built candidates as CI artifacts even if smoke acceptance fails; never publish a failed candidate.
 - Both initial release-gate jobs passed. Preserve the older Arch preview artifact filename by passing its explicit `--version 0.1.0rc1` to the generalized exporter.
-- Next: pass final clean CI and lifecycle checks, inspect downloaded synthetic previews, publish exact artifacts and submit catalog entry.
+- Candidate 8526746: full release-gate and Arch package succeeded; app bundle built and three offline screenshots inspected successfully. Normal-launch test correctly caught a packaging bug: the later `--talk-name=org.NextKde.NkMail` overrode `--own-name`, confirmed in the actual bundle metadata. Remove duplicate talk and require `own` in the producer's metadata check. Also pass XAUTHORITY to the CI portal activation environment and retain primary-process diagnostics.
+- Next: pass the corrected package's full lifecycle acceptance, publish exact artifacts and submit catalog entry. Candidate 8526746 is rejected for publication despite its successful rendering checks.
 
 ## Consolidated integration of PRs #7–#16 · 2026-11-03
 

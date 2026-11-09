@@ -37,12 +37,15 @@ try:
     with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as primary:
         try:
             time.sleep(2)
-            assert primary.poll() is None, 'Primary demo exited unexpectedly'
+            if primary.poll() is not None:
+                output, errors = primary.communicate()
+                raise RuntimeError(f'Primary demo exited {primary.returncode}: {output.decode()}\n{errors.decode()}')
             activated = subprocess.run(command, check=True, capture_output=True, text=True, timeout=30)
             assert 'Activated existing NkMail window.' in activated.stdout
             assert primary.poll() is None, 'Activation must preserve the primary instance'
         finally:
-            run('flatpak', 'kill', app)
+            if primary.poll() is None:
+                run('flatpak', 'kill', app)
             primary.communicate(timeout=15)
     marker = Path.home() / '.var/app' / app / 'data/packaging-fixture.txt'
     marker.write_text('Synthetic packaging fixture; no mailbox data.\n')

@@ -48,6 +48,8 @@ selection, a desktop keyring and tray interaction require desktop acceptance.
 - Secret Service and KWallet: QtKeychain secure storage, with insecure fallback
   disabled. An unavailable/unlocked keyring produces an error, never plaintext.
 - File dialogs use the desktop portal; no blanket home or host filesystem access.
+  The KDE base also grants read-only `xdg-config/kdeglobals` and its standard
+  desktop-settings D-Bus names.
 - WebEngine retains its Flatpak subprocess sandbox. No `--no-sandbox` override.
 
 The release uses application-password authentication. Google browser OAuth is
