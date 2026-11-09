@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>org.nextkde.NkMail</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-3.0-only</project_license>
+  <project_license>GPL-3.0-or-later</project_license>
   <name>NkMail</name>
   <summary>A native email client for multiple accounts</summary>
   <summary xml:lang="zh-CN">支持多个账号的原生邮件客户端</summary>
