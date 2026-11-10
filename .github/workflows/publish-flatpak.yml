@@ -27,7 +27,8 @@ jobs:
       - name: Install bundle inspection libraries
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y flatpak
+          sudo apt-get install --no-install-recommends -y flatpak libflatpak0
+          python3 -c 'import ctypes, ctypes.util; [ctypes.CDLL(ctypes.util.find_library(name) or "missing-library-" + name) for name in ("flatpak", "gio-2.0", "gobject-2.0", "glib-2.0")]'
       - name: Verify accepted artifacts and publish
         env:
           GH_TOKEN: ${{ github.token }}
