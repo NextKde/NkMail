@@ -1,5 +1,14 @@
 # NkMail local delivery goal
 
+## Flatpak KWin controls and sidebar follow-up · 2026-11-10
+
+- User reported an application-drawn region over KWin-owned traffic lights, folder icon/title alignment, and insufficient hover spacing. Preserve the window contract: publish button geometry to KWin; hide client fallback when the compositor acknowledges ownership.
+- Confirmed released v0.1.0 omits the `Kos.SurfaceShape` module required by NativeWindowControls.qml; its dynamic-load failure leaves client buttons visible. Existing X11 lifecycle checks and mocked takeover tests did not cover this real integration.
+- Prepare 0.1.1 with the canonical module pinned to NextKde/NextKde d7b34a8e8b37a9fb7605333f10d02f7b16e70743, built against the existing shared KDE 6.11 runtime. No upstream source edits or host plugin binaries. Screenshot acceptance must load the real module, plus a dedicated Wayland/KWin takeover check.
+- Work is isolated in codex/flatpak-kwin-controls. Existing uncommitted icon changes in the primary checkout are unrelated and preserved. All builds and execution for this follow-up are VM/CI-only.
+- The existing VM desktop bridge lacks the controls protocol. Built the pinned canonical bridge in the VM and launched it in an isolated nested KWin; no running desktop replacement. Real module loading and compositor takeover now pass for inbox and composer. Missing-module and absent-compositor review checks fail closed. Native full suite passed 11/11 (132.70 s); sidebar capture check passed 3/3. A review-only false negative caused by selecting the hidden composer from the inbox QObject tree was fixed by filtering by QQuickWindow.
+- PR #38 carries the fix. First candidate 7175a54 passed release-gate and Flatpak lifecycle; final candidate 34fb749 includes the corrected per-window review gate. Final 34fb749 passed release-gate/Arch run 42846541027 and Flatpak lifecycle run 42846541152. The exact downloaded bundle passed real KWin v2 takeover checks and stable compositor captures for inbox and composer in the isolated VM; it was then uninstalled with data retained. Bundle SHA-256 dbd3094e0baf91b99220bb679bc086002d9f11bf5c579bbd6c8c2c5527b32739. Publication of v0.1.1 follows protected PR #38 integration; consult its live state and Release before resuming. See docs/progress/2026-11-10-kwin-controls for acceptance evidence.
+
 ## Application artwork · 2026-11-10
 
 - Replaced `data/nkmail.svg` with the shared original NextKde icon family: soft

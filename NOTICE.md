@@ -31,3 +31,8 @@ Flatpak builds bundle Boost 1.88.0 (Boost Software License 1.0), QtKeychain
 (Qt/Chromium and bundled third-party notices). Dependency license files are
 retained in the package and corresponding source bundles accompany releases.
 KDE Platform 6.11 is a separately installed shared runtime.
+
+The Flatpak also builds the canonical `Kos.SurfaceShape` Wayland protocol module
+from NextKde/NextKde at `d7b34a8e8b37a9fb7605333f10d02f7b16e70743`
+(`shell/native/surface-shape`), GPL-3.0. Its license and corresponding source
+are included in the package and Sources bundle. No host plugin binary is copied.

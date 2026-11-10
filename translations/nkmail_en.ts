@@ -2580,4 +2580,15 @@ Synthetic demo draft. Sending is disabled.</translation>
         <translation>Open message</translation>
     </message>
 </context>
+    <context>
+        <name>MailDiagnostics</name>
+        <message>
+            <source>Window-control protocol module did not load.</source>
+            <translation>Window-control protocol module did not load.</translation>
+        </message>
+        <message>
+            <source>Compositor window-control takeover was not confirmed.</source>
+            <translation>Compositor window-control takeover was not confirmed.</translation>
+        </message>
+    </context>
 </TS>

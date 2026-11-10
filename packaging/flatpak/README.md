@@ -67,3 +67,19 @@ Do not overwrite a published version. Add `apps/org.nextkde.NkMail.json` to
 publisher mode (GitHub ownership + HTTPS + SHA-256); the catalog itself must
 still be signed by its maintainer. Package publication and signed catalog
 publication are separate operations.
+
+## Compositor controls acceptance
+
+The package builds canonical `Kos.SurfaceShape` from NextKde/NextKde commit
+`d7b34a8e8b37a9fb7605333f10d02f7b16e70743` using this SDK. The app publishes
+its button rectangles through the Wayland window-controls protocol; KWin owns
+their drawing and input once it acknowledges takeover. No host plugin or host
+Qt library is exposed to the sandbox. The shared runtime stays KDE 6.11.
+
+Every Flatpak synthetic screenshot now requires successful loading of the real
+protocol module, including on X11. That check alone does not prove compositor
+ownership. In a disposable VM with a protocol-v2 KWin bridge, run both inbox
+and compose captures with `NKMAIL_REVIEW_REQUIRE_COMPOSITOR_CONTROLS=1`, Wayland
+and network disabled. Capture must fail unless KWin acknowledged ownership and
+the application's fallback controls have zero opacity and are disabled. Inspect
+a compositor screenshot too: application-only screenshots omit compositor pixels.

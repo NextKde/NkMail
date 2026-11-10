@@ -61,7 +61,12 @@ Item {
         Layout.preferredHeight: secondaryText.length ? 42 : 28
         specificationForm: true
         specificationFontSize: 12
-        specificationSelectedVerticalInset: 2
+        // Keep the full hit target while leaving air around every row state.
+        topInset: 2
+        bottomInset: 2
+        leftInset: 2
+        rightInset: 2
+        specificationSelectedVerticalInset: 0
         specificationSelectedFillColor: AppTheme.dark ? Qt.rgba(0.31, 0.56, 0.96, 0.28) : "#DCE9FB"
         specificationSelectedTextColor: AppTheme.dark ? "#EAF1FF" : AppTheme.accent
         specificationHoverFillColor: AppTheme.dark ? Qt.rgba(1, 1, 1, .08) : "#dbdbdd"
@@ -75,12 +80,14 @@ Item {
                 + (unread.visible ? unread.implicitWidth + 6 : 0)
             implicitHeight: Math.max(caption.implicitHeight, 16)
             VectorIcon {
-                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                objectName: "mailboxIcon"
+                anchors.left: parent.left; anchors.verticalCenter: caption.verticalCenter
                 visible: action.iconName.length > 0
                 name: action.iconName; size: 14; color: action.iconColor
             }
             Text {
                 id: caption
+                objectName: "mailboxCaption"
                 anchors.left: parent.left; anchors.right: unread.visible ? unread.left : parent.right
                 anchors.leftMargin: action.iconName.length ? 24 : 0
                 anchors.rightMargin: unread.visible ? 6 : 0
@@ -106,7 +113,7 @@ Item {
                 id: unread
                 KosToolTip { target: unread; text: action.countHint }
                 objectName: "mailboxUnread"
-                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                anchors.right: parent.right; anchors.verticalCenter: caption.verticalCenter
                 visible: text.length > 0
                 text: action.unreadText
                 font: action.font

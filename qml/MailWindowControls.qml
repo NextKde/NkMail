@@ -13,6 +13,7 @@ Item {
     property alias spacing: controls.spacing
     property Component platformComponent: Qt.createComponent("qrc:/nkmail/platform/NativeWindowControls.qml")
     property var platformSlot: null
+    readonly property bool platformReady: platformSlot !== null
     readonly property bool compositorActive: platformSlot !== null && platformSlot.active
     property int layoutRevision: 0
     readonly property var buttonLayout: {
