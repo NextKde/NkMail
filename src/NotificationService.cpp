@@ -30,9 +30,14 @@ void NotificationService::notify(const QString &summary, const QString &body, co
         const bool markup = !supported.isError() && supported.value().contains("body-markup");
         auto message = QDBusMessage::createMethodCall("org.freedesktop.Notifications", "/org/freedesktop/Notifications",
             "org.freedesktop.Notifications", "Notify");
-        message << QString("NkMail") << uint(0) << QString("nkmail") << summary << (markup ? body.toHtmlEscaped() : body)
+#ifdef NKMAIL_FLATPAK_BUILD
+        const QString desktopId = QStringLiteral("org.nextkde.NkMail");
+#else
+        const QString desktopId = QStringLiteral("nkmail");
+#endif
+        message << QString("NkMail") << uint(0) << desktopId << summary << (markup ? body.toHtmlEscaped() : body)
             << QStringList{"default", tr("Open message")}
-            << QVariantMap{{"desktop-entry", "nkmail"}} << -1;
+            << QVariantMap{{"desktop-entry", desktopId}} << -1;
         auto *reply = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message, 5000), this);
         connect(reply, &QDBusPendingCallWatcher::finished, this, [this, reply, target, generation] {
             QDBusPendingReply<uint> result = *reply;

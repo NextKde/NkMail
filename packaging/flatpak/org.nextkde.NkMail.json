@@ -1,0 +1,98 @@
+{
+  "app-id": "org.nextkde.NkMail",
+  "runtime": "org.kde.Platform",
+  "runtime-version": "6.11",
+  "sdk": "org.kde.Sdk",
+  "base": "io.qt.qtwebengine.BaseApp",
+  "base-version": "6.11",
+  "command": "nkmail",
+  "separate-locales": false,
+  "finish-args": [
+    "--share=ipc",
+    "--share=network",
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--device=dri",
+    "--own-name=org.NextKde.NkMail",
+    "--talk-name=org.freedesktop.Notifications",
+    "--talk-name=org.kde.StatusNotifierWatcher",
+    "--talk-name=org.freedesktop.secrets",
+    "--talk-name=org.kde.kwalletd6",
+    "--talk-name=org.kde.kwalletd5",
+    "--env=QT_QPA_PLATFORMTHEME=xdgdesktopportal",
+    "--env=QTWEBENGINEPROCESS_PATH=/app/bin/QtWebEngineProcess",
+    "--env=QTWEBENGINE_DICTIONARIES_PATH=/app/qtwebengine_dictionaries"
+  ],
+  "cleanup": [
+    "/include",
+    "/lib/cmake",
+    "/lib/pkgconfig",
+    "/lib/*.a",
+    "/lib/*.la"
+  ],
+  "cleanup-commands": [
+    "/app/cleanup-BaseApp.sh"
+  ],
+  "modules": [
+    {
+      "name": "boost",
+      "buildsystem": "simple",
+      "build-commands": [
+        "./bootstrap.sh --prefix=/app --with-libraries=date_time,regex",
+        "./b2 -j2 variant=release link=static threading=multi cxxflags=-fPIC install",
+        "install -Dm644 LICENSE_1_0.txt /app/share/licenses/boost/LICENSE_1_0.txt"
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2",
+          "sha256": "46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b"
+        }
+      ]
+    },
+    {
+      "name": "qtkeychain",
+      "buildsystem": "cmake-ninja",
+      "config-opts": [
+        "-DBUILD_WITH_QT6=ON",
+        "-DBUILD_TEST_APPLICATION=OFF",
+        "-DBUILD_TRANSLATIONS=ON",
+        "-DBUILD_TRANSLATIONS_AS_RESOURCES=ON",
+        "-DCMAKE_INSTALL_LIBDIR=lib"
+      ],
+      "post-install": [
+        "install -Dm644 COPYING /app/share/licenses/qtkeychain/COPYING"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/frankosterfeld/qtkeychain.git",
+          "commit": "ad7344c45a86a4f66cbafc4b081b5f7b876cb0b7"
+        }
+      ]
+    },
+    {
+      "name": "nkmail",
+      "buildsystem": "cmake-ninja",
+      "config-opts": [
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DNKMAIL_BUILD_TESTS=OFF",
+        "-DNKMAIL_FLATPAK_BUILD=ON",
+        "-DBoost_USE_STATIC_LIBS=ON"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "../..",
+          "skip": [
+            ".git",
+            "tmp",
+            "build",
+            ".flatpak-builder"
+          ]
+        }
+      ],
+      "builddir": true
+    }
+  ]
+}

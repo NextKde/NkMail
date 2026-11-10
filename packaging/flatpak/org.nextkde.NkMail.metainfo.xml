@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.nextkde.NkMail</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>NkMail</name>
+  <summary>A native email client for multiple accounts</summary>
+  <summary xml:lang="zh-CN">支持多个账号的原生邮件客户端</summary>
+  <description>
+    <p>Read and search email, manage attachments, and compose messages with durable local drafts. Supports IMAP, POP3 and SMTP with application passwords and secure credential storage.</p>
+    <p xml:lang="zh-CN">阅读与搜索邮件、管理附件，并使用持久化本地草稿撰写邮件。支持 IMAP、POP3、SMTP、应用专用密码和安全凭据存储。</p>
+  </description>
+  <launchable type="desktop-id">org.nextkde.NkMail.desktop</launchable>
+  <url type="homepage">https://github.com/NextKde/NkMail</url>
+  <url type="bugtracker">https://github.com/NextKde/NkMail/issues</url>
+  <developer id="org.nextkde"><name>NextKde</name></developer>
+  <provides><binary>nkmail</binary></provides>
+  <content_rating type="oars-1.1"/>
+  <releases><release version="0.1.0" date="2026-11-09"/></releases>
+</component>

@@ -121,7 +121,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --global --add safe.directory "$GITHUB_WORKSPACE/third_party/nextkdeAppDemo"
-          python scripts/export_release_source.py dist
+          python scripts/export_release_source.py dist --version 0.1.0rc1
           cp packaging/arch/PKGBUILD dist/PKGBUILD
           source_sha=$(sha256sum dist/nkmail-0.1.0rc1.tar.gz | cut -d ' ' -f1)
           sed -i "s/@SOURCE_SHA256@/$source_sha/" dist/PKGBUILD

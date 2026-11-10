@@ -3,15 +3,19 @@
 import argparse
 import gzip
 import io
+import re
 from pathlib import Path
 import subprocess
 import tarfile
 
 parser = argparse.ArgumentParser()
 parser.add_argument('output', type=Path)
+parser.add_argument('--version')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
-version = '0.1.0rc1'
+version = args.version or re.search(r'project\(NkMail VERSION ([0-9.]+)', (root / 'CMakeLists.txt').read_text()).group(1)
+if not re.fullmatch(r'[0-9][0-9A-Za-z.-]*', version):
+    parser.error('Invalid source archive version')
 prefix = f'nkmail-{version}'
 sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
 epoch = int(subprocess.check_output(['git', 'show', '-s', '--format=%ct', 'HEAD'], cwd=root))

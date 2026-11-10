@@ -21,3 +21,13 @@ Apple Mail user-guide screenshots were consulted for design research only. Apple
 ## Provider marks
 
 Account setup bundles provider identity images for offline display. Brand rights remain with their owners; no endorsement is implied. Sources are recorded in data/providers/README.md.
+
+## Flatpak packaging
+
+`packaging/flatpak/bundle_metadata.py` adapts the exact-byte libflatpak reader
+from NextKde/kos-apps (`e5bab138f8cbfab697b5d67c1f4a1cc653fb29b4`), GPL-3.0.
+Flatpak builds bundle Boost 1.88.0 (Boost Software License 1.0), QtKeychain
+0.15.0 (modified BSD license), and the QtWebEngine BaseApp 6.11
+(Qt/Chromium and bundled third-party notices). Dependency license files are
+retained in the package and corresponding source bundles accompany releases.
+KDE Platform 6.11 is a separately installed shared runtime.
