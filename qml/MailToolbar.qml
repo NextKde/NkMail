@@ -183,7 +183,7 @@ Item {
             visible: readerHeader.showReplyGroup && !readerHeader.searching && readerHeader.selection.selectionSize === 0
                 && readerHeader.actionWidth >= readerHeader.baseActionsWidth
                     + implicitWidth + 14
-            icons: readerHeader.fullReplyGroup ? ["undo", "arrows", "forward"] : ["undo", "forward"]
+            icons: readerHeader.fullReplyGroup ? ["reply", "replyAll", "forwardMail"] : ["reply", "forwardMail"]
             labels: readerHeader.fullReplyGroup ? [qsTr("回复"), qsTr("全部回复"), qsTr("转发")] : [qsTr("回复"), qsTr("转发")]
             objectNames: readerHeader.fullReplyGroup ? ["replyButton", "replyAllButton", "forwardButton"] : ["replyButton", "forwardButton"]
             enabledActions: [readerHeader.hasMessage && !mail.sending, readerHeader.hasMessage && !mail.sending, readerHeader.hasMessage && !mail.sending]

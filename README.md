@@ -157,7 +157,7 @@ one shared mutable controller across multiple implementation files.
 
 Mailio 0.26.1 source commit: `f358b1f85f9a021f0bd814e285eb8ae102fc8f79`.
 Kos.Ui is pinned by the existing gitlink and `third_party/kos-ui.lock.json` to
-`e2592b2742c58c1bd797a8bcfa2a3ae7da4affd8`. The current lock is commit-only; it does not
+`998c145f92783f622a61c0ea858e34bce4881981`. The current lock is commit-only; it does not
 claim a release tag. This revision was inherited from main, not upgraded by the modularity refactor.
 System dependencies above must still be installed.
 
