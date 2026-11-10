@@ -40,3 +40,9 @@ Release. The user will perform the catalog signing/publication.
 ![Synthetic inbox](inbox.png)
 ![Synthetic composer](compose.png)
 ![Synthetic account dialog](account.png)
+
+## Publication · 2026-11-10
+
+[Publisher run 42732344261](https://github.com/NextKde/NkMail/actions/runs/42732344261) published [v0.1.0](https://github.com/NextKde/NkMail/releases/tag/v0.1.0). All 10 uploaded asset hashes and sizes match the accepted artifacts; the tag resolves to the accepted source above. The first publisher attempt stopped before upload on a missing Ubuntu libflatpak dependency; PR #35 fixed it through the normal release gate.
+
+[appCatalog PR #3](https://github.com/NextKde/appCatalog/pull/3) is ready for review with passing catalog checks. Catalog signing and publication remain separate and are handled by the maintainer.
