@@ -66,6 +66,27 @@ def check_bundle_identity(path, expected):
             objects.g_object_unref(file)
 
 
+def check_tag(tag, revision):
+    matches = [item for item in api(f'git/matching-refs/tags/{tag}')
+               if item['ref'] == 'refs/tags/' + tag]
+    if not matches:
+        return
+    if len(matches) != 1:
+        raise ValueError('Ambiguous existing tag')
+    obj = matches[0]['object']
+    for _ in range(8):
+        if not re.fullmatch('[0-9a-f]{40}', obj['sha']):
+            raise ValueError('Invalid tag object')
+        if obj['type'] == 'commit':
+            if obj['sha'] != revision:
+                raise ValueError('Existing tag points to different source; never move it')
+            return
+        if obj['type'] != 'tag':
+            raise ValueError('Tag does not resolve to a commit')
+        obj = api(f"git/tags/{obj['sha']}")['object']
+    raise ValueError('Tag nesting exceeds verification limit')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-id', required=True, type=int)
@@ -121,6 +142,7 @@ def main():
     (work / 'SHA256SUMS').write_text(''.join(f'{digest(work / name)}  {name}\n' for name in sorted(files)))
     files.add('SHA256SUMS')
     tag = f'v{version}'
+    check_tag(tag, revision)
     releases = json.loads(run('gh', 'api', '--paginate', '--slurp', f'repos/{REPO}/releases?per_page=100'))
     matches = [release for page in releases for release in page if release['tag_name'] == tag]
     if len(matches) > 1:
@@ -160,6 +182,7 @@ def main():
         path = work / item['name']
         if item['state'] != 'uploaded' or item['size'] != path.stat().st_size or item.get('digest') != 'sha256:' + digest(path):
             raise ValueError('Uploaded release asset verification failed')
+    check_tag(tag, revision)
     run('gh', 'release', 'edit', tag, '--repo', REPO, '--draft=false', '--latest')
     print(f'Published https://github.com/{REPO}/releases/tag/{tag}')
 
