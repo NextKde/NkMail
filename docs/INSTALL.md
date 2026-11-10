@@ -12,6 +12,7 @@ Use the bundle SHA-256 recorded in that manifest to check your download. Install
 the shared runtime from an approved Flathub source, then install the local bundle:
 
 ```sh
+flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak --user install flathub org.kde.Platform//6.11
 flatpak --user install --bundle ./org.nextkde.NkMail-0.1.0-x86_64.flatpak
 flatpak run org.nextkde.NkMail
