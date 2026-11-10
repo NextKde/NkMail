@@ -1,5 +1,14 @@
 # NkMail local delivery goal
 
+## Application artwork · 2026-11-10
+
+- Replaced `data/nkmail.svg` with the shared original NextKde icon family: soft
+  blue tile, ivory envelope, fine seam and restrained depth. Qt SVG export and
+  transparent-corner checks passed in the dedicated VM. No host app was launched.
+- This is source artwork only; published v0.1.0 bundles remain unchanged. Catalog
+  PNG synchronization is delivered separately in NextKde/appCatalog. Normal PR
+  release-gate checks still govern main integration.
+
 ## Flatpak and appCatalog integration · 2026-11-09
 
 - Delivery complete on 2026-11-10: stable [NkMail v0.1.0](https://github.com/NextKde/NkMail/releases/tag/v0.1.0) published by [run 42732344261](https://github.com/NextKde/NkMail/actions/runs/42732344261). All 10 GitHub assets match the accepted local artifact hashes/sizes; the tag resolves to accepted source 4ff223d6453af784f310426783f1df6577f7dcc1. The Release is latest, non-draft and non-prerelease.
