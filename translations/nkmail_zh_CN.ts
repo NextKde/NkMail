@@ -2580,4 +2580,15 @@ Alex
         <translation>打开邮件</translation>
     </message>
 </context>
+    <context>
+        <name>MailDiagnostics</name>
+        <message>
+            <source>Window-control protocol module did not load.</source>
+            <translation>窗口控制协议模块未能加载。</translation>
+        </message>
+        <message>
+            <source>Compositor window-control takeover was not confirmed.</source>
+            <translation>未确认合成器已接管窗口控制。</translation>
+        </message>
+    </context>
 </TS>

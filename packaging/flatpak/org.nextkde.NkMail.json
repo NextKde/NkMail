@@ -21,7 +21,8 @@
     "--talk-name=org.kde.kwalletd5",
     "--env=QT_QPA_PLATFORMTHEME=xdgdesktopportal",
     "--env=QTWEBENGINEPROCESS_PATH=/app/bin/QtWebEngineProcess",
-    "--env=QTWEBENGINE_DICTIONARIES_PATH=/app/qtwebengine_dictionaries"
+    "--env=QTWEBENGINE_DICTIONARIES_PATH=/app/qtwebengine_dictionaries",
+    "--env=QML_IMPORT_PATH=/app/lib/qt6/qml:/app/lib/qml"
   ],
   "cleanup": [
     "/include",
@@ -68,6 +69,27 @@
           "type": "git",
           "url": "https://github.com/frankosterfeld/qtkeychain.git",
           "commit": "ad7344c45a86a4f66cbafc4b081b5f7b876cb0b7"
+        }
+      ]
+    },
+    {
+      "name": "kos-surface-shape",
+      "buildsystem": "cmake-ninja",
+      "builddir": true,
+      "subdir": "shell/native/surface-shape",
+      "config-opts": [
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_INSTALL_LIBDIR=lib"
+      ],
+      "post-install": [
+        "install -Dm644 /run/build/kos-surface-shape/LICENSE /app/share/licenses/kos-surface-shape/LICENSE"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/NextKde/NextKde.git",
+          "commit": "d7b34a8e8b37a9fb7605333f10d02f7b16e70743",
+          "disable-submodules": true
         }
       ]
     },

@@ -676,6 +676,34 @@ TestCase {
         mock.notificationMessageOpened();
         compare(app.draftsVisible, false); compare(app.readerVisible, true); compare(app.sidebarExpanded, false);
     }
+    function test_mailbox_icon_title_alignment_and_hover_spacing() {
+        const sidebar = findChild(app, "sidebarBody")
+        const originalFavorites = mock.favorites
+        try {
+        mock.favorites = [{accountId: mock.currentAccountId, folderId: "INBOX", title: "Pinned inbox"}]
+        const favorites = findChild(sidebar, "favoritesList")
+        tryCompare(favorites, "count", 1)
+        const rows = [findChild(sidebar, "mailboxFolder_INBOX"), favorites.itemAt(0)]
+        for (const row of rows) {
+            verify(row !== null)
+            const icon = findChild(row, "mailboxIcon")
+            const title = findChild(row, "mailboxCaption")
+            const iconCenter = icon.mapToItem(row, icon.width / 2, icon.height / 2)
+            const titleCenter = title.mapToItem(row, 0, title.height / 2)
+            verify(Math.abs(iconCenter.y - titleCenter.y) <= 0.5)
+            row.checked = false
+            mouseMove(row, row.width / 2, row.height / 2)
+            tryCompare(row, "hovered", true)
+            verify(row.background.y >= 2)
+            verify(row.background.y + row.background.height <= row.height - 2)
+            verify(row.background.x >= 2)
+            verify(row.background.x + row.background.width <= row.width - 2)
+        }
+        } finally {
+            mock.favorites = originalFavorites
+        }
+    }
+
     function test_sidebar_sections_and_smart_navigation() {
         const sidebar = findChild(app, "sidebarBody")
         verify(findChild(sidebar, "favoritesTitle").visible)

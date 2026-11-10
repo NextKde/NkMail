@@ -16,5 +16,6 @@
   <developer id="org.nextkde"><name>NextKde</name></developer>
   <provides><binary>nkmail</binary></provides>
   <content_rating type="oars-1.1"/>
-  <releases><release version="0.1.0" date="2026-11-09"/></releases>
+  <releases>
+    <release version="0.1.1" date="2026-11-10"/><release version="0.1.0" date="2026-11-09"/></releases>
 </component>

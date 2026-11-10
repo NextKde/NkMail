@@ -1,5 +1,13 @@
 # NkMail local delivery goal
 
+## Flatpak KWin controls and sidebar follow-up · 2026-11-10
+
+- User reported an application-drawn region over KWin-owned traffic lights, folder icon/title alignment, and insufficient hover spacing. Preserve the window contract: publish button geometry to KWin; hide client fallback when the compositor acknowledges ownership.
+- Confirmed released v0.1.0 omits the `Kos.SurfaceShape` module required by NativeWindowControls.qml; its dynamic-load failure leaves client buttons visible. Existing X11 lifecycle checks and mocked takeover tests did not cover this real integration.
+- Prepare 0.1.1 with the canonical module pinned to NextKde/NextKde d7b34a8e8b37a9fb7605333f10d02f7b16e70743, built against the existing shared KDE 6.11 runtime. No upstream source edits or host plugin binaries. Screenshot acceptance must load the real module, plus a dedicated Wayland/KWin takeover check.
+- Work is isolated in codex/flatpak-kwin-controls. Existing uncommitted icon changes in the primary checkout are unrelated and preserved. All builds and execution for this follow-up are VM/CI-only.
+- VM's current KWin bridge does not advertise the window-controls protocol; use an isolated nested compositor with the pinned canonical bridge for acceptance rather than changing the running desktop. Release and real compositor acceptance remain pending.
+
 ## Flatpak and appCatalog integration · 2026-11-09
 
 - Delivery complete on 2026-11-10: stable [NkMail v0.1.0](https://github.com/NextKde/NkMail/releases/tag/v0.1.0) published by [run 42732344261](https://github.com/NextKde/NkMail/actions/runs/42732344261). All 10 GitHub assets match the accepted local artifact hashes/sizes; the tag resolves to accepted source 4ff223d6453af784f310426783f1df6577f7dcc1. The Release is latest, non-draft and non-prerelease.

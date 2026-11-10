@@ -214,6 +214,26 @@ int main(int argc, char **argv) {
             auto *capture = scenario.startsWith(QStringLiteral("compose")) && window
                 ? window->findChild<QQuickWindow *>(QStringLiteral("composerDialog")) : window;
             if (!capture || !capture->isExposed()) { std::fprintf(stderr, "Preview window is not exposed.\n"); app.exit(3); return; }
+            // The Flatpak must carry its native protocol module; a successful
+            // X11 screenshot alone cannot prove compositor takeover on Wayland.
+            const bool requireCompositor = qEnvironmentVariableIntValue("NKMAIL_REVIEW_REQUIRE_COMPOSITOR_CONTROLS") == 1;
+#ifdef NKMAIL_FLATPAK_BUILD
+            const bool requirePlatform = true;
+#else
+            const bool requirePlatform = requireCompositor;
+#endif
+            auto *controls = capture->findChild<QObject *>(QStringLiteral("windowControls"));
+            if (requirePlatform && (!controls || !controls->property("platformReady").toBool())) {
+                const auto error = QCoreApplication::translate("MailDiagnostics", "Window-control protocol module did not load.").toUtf8();
+                std::fprintf(stderr, "%s\n", error.constData()); app.exit(3); return;
+            }
+            auto *clientControls = controls ? controls->findChild<QObject *>(QStringLiteral("clientWindowControls")) : nullptr;
+            if (requireCompositor && (!controls->property("compositorActive").toBool()
+                    || !clientControls || clientControls->property("opacity").toDouble() != 0.0
+                    || clientControls->property("enabled").toBool())) {
+                const auto error = QCoreApplication::translate("MailDiagnostics", "Compositor window-control takeover was not confirmed.").toUtf8();
+                std::fprintf(stderr, "%s\n", error.constData()); app.exit(3); return;
+            }
             const QImage image = capture->grabWindow();
             if (image.isNull()) { std::fprintf(stderr, "Application screenshot capture failed.\n"); app.exit(3); return; }
             QDir().mkpath(QFileInfo(path).absolutePath());
