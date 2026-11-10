@@ -17,6 +17,7 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QQuickItem>
 #include <QQmlProperty>
 #include <QScreen>
 #include <QSettings>
@@ -222,7 +223,15 @@ int main(int argc, char **argv) {
 #else
             const bool requirePlatform = requireCompositor;
 #endif
-            auto *controls = capture->findChild<QObject *>(QStringLiteral("windowControls"));
+            QQuickItem *controls = nullptr;
+            // QObject ownership can include a hidden composer window. Select
+            // controls belonging to the window actually being captured.
+            for (auto *candidate : capture->findChildren<QQuickItem *>(QStringLiteral("windowControls"))) {
+                if (candidate->window() == capture) {
+                    controls = candidate;
+                    break;
+                }
+            }
             if (requirePlatform && (!controls || !controls->property("platformReady").toBool())) {
                 const auto error = QCoreApplication::translate("MailDiagnostics", "Window-control protocol module did not load.").toUtf8();
                 std::fprintf(stderr, "%s\n", error.constData()); app.exit(3); return;

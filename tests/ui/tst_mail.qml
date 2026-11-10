@@ -680,25 +680,29 @@ TestCase {
         const sidebar = findChild(app, "sidebarBody")
         const originalFavorites = mock.favorites
         try {
-        mock.favorites = [{accountId: mock.currentAccountId, folderId: "INBOX", title: "Pinned inbox"}]
-        const favorites = findChild(sidebar, "favoritesList")
-        tryCompare(favorites, "count", 1)
-        const rows = [findChild(sidebar, "mailboxFolder_INBOX"), favorites.itemAt(0)]
-        for (const row of rows) {
-            verify(row !== null)
-            const icon = findChild(row, "mailboxIcon")
-            const title = findChild(row, "mailboxCaption")
-            const iconCenter = icon.mapToItem(row, icon.width / 2, icon.height / 2)
-            const titleCenter = title.mapToItem(row, 0, title.height / 2)
-            verify(Math.abs(iconCenter.y - titleCenter.y) <= 0.5)
-            row.checked = false
-            mouseMove(row, row.width / 2, row.height / 2)
-            tryCompare(row, "hovered", true)
-            verify(row.background.y >= 2)
-            verify(row.background.y + row.background.height <= row.height - 2)
-            verify(row.background.x >= 2)
-            verify(row.background.x + row.background.width <= row.width - 2)
-        }
+            mock.favorites = [{accountId: mock.currentAccountId, folderId: "INBOX", title: "Pinned inbox"}]
+            const favorites = findChild(sidebar, "favoritesList")
+            tryCompare(favorites, "count", 1)
+            const rows = [findChild(sidebar, "mailboxFolder_INBOX"), favorites.itemAt(0)]
+            for (const row of rows) {
+                verify(row !== null)
+                const icon = findChild(row, "mailboxIcon")
+                const title = findChild(row, "mailboxCaption")
+                const iconCenter = icon.mapToItem(row, icon.width / 2, icon.height / 2)
+                const titleCenter = title.mapToItem(row, 0, title.height / 2)
+                verify(Math.abs(iconCenter.y - titleCenter.y) <= 0.5)
+                row.checked = false
+                mouseMove(row, row.width / 2, row.height / 2)
+                tryCompare(row, "hovered", true)
+                verify(row.background.y >= 2)
+                verify(row.background.y + row.background.height <= row.height - 2)
+                verify(row.background.x >= 2)
+                verify(row.background.x + row.background.width <= row.width - 2)
+                if (imagePolicyCapture.capturePath.length > 0) {
+                    waitForRendering(app.contentItem)
+                    grabImage(app.contentItem).save(imagePolicyCapture.capturePath + (row === rows[0] ? ".folder-hover.png" : ".favorite-hover.png"))
+                }
+            }
         } finally {
             mock.favorites = originalFavorites
         }
