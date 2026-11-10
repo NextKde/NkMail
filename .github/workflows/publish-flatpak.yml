@@ -1,0 +1,35 @@
+name: Publish accepted Flatpak
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Flatpak package workflow run ID (source must be merged)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: flatpak-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install bundle inspection libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y flatpak
+      - name: Verify accepted artifacts and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: python3 scripts/publish_flatpak.py --run-id "$RUN_ID"
