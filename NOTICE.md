@@ -4,7 +4,7 @@
 Application source is licensed GPL-3.0-or-later; see LICENSE. No warranty is provided.
 
 ## Kos.Ui / nextkdeAppDemo
-NkMail builds canonical Kos.Ui from the Git submodule at third_party/nextkdeAppDemo, sourced from https://github.com/NextKde/nextkdeAppDemo.git. The current commit-only pin is 998c145f92783f622a61c0ea858e34bce4881981, as recorded in the gitlink and kos-ui.lock.json; no release tag is claimed for that pin. This is an upstream gitlink, not a separately maintained component copy or fork. This component library is GPLv3 licensed; its own LICENSE and NOTICE.md apply and remain in the submodule. An explicit NKMAIL_UI_SOURCE_DIR override is available for local development only. The local KMusic and calendar applications are architectural/interaction references; their repositories are not copied wholesale.
+NkMail builds canonical Kos.Ui from the Git submodule at third_party/nextkdeAppDemo, sourced from https://github.com/NextKde/nextkdeAppDemo.git. The current commit-only pin is 2ba0039b0be6e9326117e51cc94aac0ad99bc69a, as recorded in the gitlink and kos-ui.lock.json; no release tag is claimed for that pin. This is an upstream gitlink, not a separately maintained component copy or fork. This component library is GPLv3 licensed; its own LICENSE and NOTICE.md apply and remain in the submodule. An explicit NKMAIL_UI_SOURCE_DIR override is available for local development only. The local KMusic and calendar applications are architectural/interaction references; their repositories are not copied wholesale.
 
 ## mailio
 Vendored source: https://github.com/karastojko/mailio
