@@ -101,7 +101,7 @@ def api_get(path):
     return data
 
 
-def published_dependency(tag, sha, get=api_get):
+def upstream_dependency(tag, sha, get=api_get):
     if tag is not None:
         ref = get("/git/ref/tags/" + quote(tag, safe=""))
         obj = ref.get("object") if isinstance(ref, dict) else None
@@ -124,6 +124,13 @@ def published_dependency(tag, sha, get=api_get):
     if not isinstance(commit, dict) or commit.get("sha") != sha:
         raise GateError("Upstream UI commit does not exist for the pinned SHA.")
 
+    comparison = get("/compare/" + sha + "...main")
+    if (not isinstance(comparison, dict)
+            or comparison.get("status") not in ("ahead", "identical")
+            or not isinstance(comparison.get("merge_base_commit"), dict)
+            or comparison["merge_base_commit"].get("sha") != sha):
+        raise GateError("Pinned UI commit is not included in canonical upstream main.")
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -131,12 +138,12 @@ def main():
     args = parser.parse_args()
     try:
         tag, sha = local_dependency(args.root)
-        published_dependency(tag, sha)
+        upstream_dependency(tag, sha)
     except (GateError, OSError, subprocess.TimeoutExpired) as exc:
         print(f"UI gate: FAIL: {exc}", file=sys.stderr)
         return 1
     chosen = f"tag {tag}, " if tag is not None else ""
-    print(f"UI gate: PASS: {chosen}sha {sha} (clean canonical submodule, upstream commit exists).")
+    print(f"UI gate: PASS: {chosen}sha {sha} (clean canonical submodule, commit included in upstream main).")
     return 0
 
 

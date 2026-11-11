@@ -1,5 +1,23 @@
 # NkMail local delivery goal
 
+## Flatpak KWin controls and sidebar follow-up · 2026-11-10
+
+- User reported an application-drawn region over KWin-owned traffic lights, folder icon/title alignment, and insufficient hover spacing. Preserve the window contract: publish button geometry to KWin; hide client fallback when the compositor acknowledges ownership.
+- Confirmed released v0.1.0 omits the `Kos.SurfaceShape` module required by NativeWindowControls.qml; its dynamic-load failure leaves client buttons visible. Existing X11 lifecycle checks and mocked takeover tests did not cover this real integration.
+- Prepare 0.1.1 with the canonical module pinned to NextKde/NextKde d7b34a8e8b37a9fb7605333f10d02f7b16e70743, built against the existing shared KDE 6.11 runtime. No upstream source edits or host plugin binaries. Screenshot acceptance must load the real module, plus a dedicated Wayland/KWin takeover check.
+- Work is isolated in codex/flatpak-kwin-controls. Existing uncommitted icon changes in the primary checkout are unrelated and preserved. All builds and execution for this follow-up are VM/CI-only.
+- The existing VM desktop bridge lacks the controls protocol. Built the pinned canonical bridge in the VM and launched it in an isolated nested KWin; no running desktop replacement. Real module loading and compositor takeover now pass for inbox and composer. Missing-module and absent-compositor review checks fail closed. Native full suite passed 11/11 (132.70 s); sidebar capture check passed 3/3. A review-only false negative caused by selecting the hidden composer from the inbox QObject tree was fixed by filtering by QQuickWindow.
+- PR #38 carries the fix. First candidate 7175a54 passed release-gate and Flatpak lifecycle; final candidate 34fb749 includes the corrected per-window review gate. Final 34fb749 passed release-gate/Arch run 42846541027 and Flatpak lifecycle run 42846541152. The exact downloaded bundle passed real KWin v2 takeover checks and stable compositor captures for inbox and composer in the isolated VM; it was then uninstalled with data retained. Bundle SHA-256 dbd3094e0baf91b99220bb679bc086002d9f11bf5c579bbd6c8c2c5527b32739. Publication of v0.1.1 follows protected PR #38 integration; consult its live state and Release before resuming. See docs/progress/2026-11-10-kwin-controls for acceptance evidence.
+
+## Application artwork · 2026-11-10
+
+- Replaced `data/nkmail.svg` with the shared original NextKde icon family: soft
+  blue tile, ivory envelope, fine seam and restrained depth. Qt SVG export and
+  transparent-corner checks passed in the dedicated VM. No host app was launched.
+- This is source artwork only; published v0.1.0 bundles remain unchanged. Catalog
+  PNG synchronization is delivered separately in NextKde/appCatalog. Normal PR
+  release-gate checks still govern main integration.
+
 ## Flatpak and appCatalog integration · 2026-11-09
 
 - Delivery complete on 2026-11-10: stable [NkMail v0.1.0](https://github.com/NextKde/NkMail/releases/tag/v0.1.0) published by [run 42732344261](https://github.com/NextKde/NkMail/actions/runs/42732344261). All 10 GitHub assets match the accepted local artifact hashes/sizes; the tag resolves to accepted source 4ff223d6453af784f310426783f1df6577f7dcc1. The Release is latest, non-draft and non-prerelease.
@@ -749,3 +767,22 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - Asynchronous desktop notification actions retain exact account/endpoint/folder/epoch/UID targets, reject stale targets, restore the reader and wait for pending writes/sends. Account credential restoration resumes body loading and read updates.
 - Tray badge totals locally synced inbox unread counts, updates on read/delete/account removal, caps drawing at 99+ with exact tooltip, and clears at zero. Retain five-minute polling and bounded 50-header receipt.
 - VM full suite passed 11/11 in 134.11s; synthetic tray captures reviewed. Added policy, desktop D-Bus, cross-account navigation and unread-count regressions. Final focused checks passed 4/4 in 11.68s and narrow reader checks passed 3/3 including lifecycle; canonical UI pin gate passed. User explicitly authorized a companion Shell bridge fix; its isolated VM QML regression passes. Existing Release/tag remains unchanged; no host validation or real-mail writes.
+
+## 2026-11-11 cross-application KWin ownership follow-up
+
+### Verified publication and integration
+
+- kos-apps v0.2.3 is published from 0d8ebada1d8e94e3426e005047e2d2329e578b5f. Native main run 42867328985 and signed publishing run 42867329067 both succeeded. The three final signed Release bundles (Calendar, Calculator, Weather) matched their release plans/server digests and each passed a fresh offline Wayland/KWin installation check, then was uninstalled with data retained.
+- NkNotes v0.1.1 is published from 2c92cd529e360c5049f42e734defcc45cf024e81. Main run 42866965018 and draft publisher 42869343997 succeeded. All eight draft asset sizes/hashes matched the main artifact; the exact main app bundle passed offline KWin acceptance before publication. Tag and release target were verified.
+- All four new Flatpaks use runtime/org.kde.Platform/x86_64/6.11. Their canonical native protocol module remains pinned at d7b34a8e8b37a9fb7605333f10d02f7b16e70743. Catalog URLs resolve latest Release plans; catalog signing remains user-owned.
+- ListenFree PR #2 merged as 52c2571e5b8dc463e021da41cd7199c9e123ecba; main run 42867925615 succeeded. This is a source integration, not a Flatpak release.
+- On 2026-11-11 the user explicitly approved merging verified Music PR #9. After rechecking the unchanged head 9c44b6b0128b4edd03f3b9ff96059dafd8054911 and passing PR CI, it was merged normally as 4c6c4d4ca86e4738342b1bd488e64c8e403a06a4. Main Window controls CI 42932700213 completed successfully, including the pinned-component build and takeover/layout/fallback regressions. The authorized merge is complete. Music still has no published Flatpak.
+- The task's owned nested compositor was stopped through nested-stop. Owned previews and temporary app installs were removed; no host apps or reference working trees were modified/launched. Primary NkMail checkout is clean. Local synthetic fixtures and private captures remain under tmp/ and the VM validation task root for recovery.
+
+
+## Upstream-main UI pin policy · 2026-11-11
+
+- User explicitly removed the upstream Release requirement. Deliberately pin a tested full SHA already included in canonical nextkdeAppDemo main; do not follow a floating branch or automatically upgrade.
+- Align contributor instructions, README, testing guide and CI terminology. Strengthen the existing commit-existence check with upstream-main ancestry verification; keep staged-lock/gitlink consistency, clean submodule, canonical URL, optional tag resolution and network-failure checks.
+- Add guard regressions for main head/ancestors, existing commits outside main, malformed ancestry responses and API failure. VM guard regressions passed 36/36 and the live upstream-main check passed for the existing e2592b2742c58c1bd797a8bcfa2a3ae7da4affd8 pin. PR integration and CI remain pending.
+- Current local icon SHAs 998c145 and 2ba0039 were not retrievable from upstream GitHub during this review. This is separate from Release policy: icon work must first be integrated into canonical upstream main. Preserve the concurrently edited original NkMail tree; do not substitute an unrelated main SHA or publish a release.
