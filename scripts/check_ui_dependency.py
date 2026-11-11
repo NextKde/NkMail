@@ -126,7 +126,7 @@ def upstream_dependency(tag, sha, get=api_get):
 
     comparison = get("/compare/" + sha + "...main")
     if (not isinstance(comparison, dict)
-            or comparison.get("status") not in {"ahead", "identical"}
+            or comparison.get("status") not in ("ahead", "identical")
             or not isinstance(comparison.get("merge_base_commit"), dict)
             or comparison["merge_base_commit"].get("sha") != sha):
         raise GateError("Pinned UI commit is not included in canonical upstream main.")

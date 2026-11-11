@@ -180,7 +180,7 @@ class UpstreamGateTests(unittest.TestCase):
 
     def test_main_comparison_requires_pinned_merge_base(self):
         key = "/compare/" + self.sha + "...main"
-        for response in ([], {}, {"status": "ahead"},
+        for response in ([], {}, {"status": []}, {"status": "ahead"},
                          {"status": "ahead", "merge_base_commit": {"sha": "c" * 40}}):
             with self.subTest(response=response):
                 self.responses[key] = response
