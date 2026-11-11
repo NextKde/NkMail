@@ -48,7 +48,7 @@ jobs:
       - name: Test dependency guard
         run: python -m unittest discover -s tests/dependency -v
 
-      - name: Verify published UI dependency
+      - name: Verify pinned UI commit is included in upstream main
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/check_ui_dependency.py

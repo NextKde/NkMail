@@ -150,10 +150,11 @@ class UpstreamGateTests(unittest.TestCase):
             "/git/ref/tags/v0.1.0-rc.1": {"object": {"type": "tag", "sha": self.tag_sha}},
             "/git/tags/" + self.tag_sha: {"object": {"type": "commit", "sha": self.sha}},
             "/commits/" + self.sha: {"sha": self.sha},
+            "/compare/" + self.sha + "...main": {"status": "ahead", "merge_base_commit": {"sha": self.sha}},
         }
 
     def check(self, tag="v0.1.0-rc.1"):
-        gate.published_dependency(tag, self.sha, self.responses.__getitem__)
+        gate.upstream_dependency(tag, self.sha, self.responses.__getitem__)
 
     def test_annotated_tag_and_existing_commit(self):
         self.check()
@@ -163,7 +164,36 @@ class UpstreamGateTests(unittest.TestCase):
         self.check()
 
     def test_sha_only_pin_skips_tag_resolution(self):
-        gate.published_dependency(None, self.sha, lambda key: {"/commits/" + self.sha: {"sha": self.sha}}[key])
+        responses = {key: value for key, value in self.responses.items() if not key.startswith("/git/")}
+        gate.upstream_dependency(None, self.sha, responses.__getitem__)
+
+    def test_pin_at_main_head(self):
+        self.responses["/compare/" + self.sha + "...main"]["status"] = "identical"
+        self.check(tag=None)
+
+    def test_existing_commit_outside_main_is_rejected(self):
+        for status in ("behind", "diverged"):
+            with self.subTest(status=status):
+                self.responses["/compare/" + self.sha + "...main"]["status"] = status
+                with self.assertRaisesRegex(gate.GateError, "not included"):
+                    self.check(tag=None)
+
+    def test_main_comparison_requires_pinned_merge_base(self):
+        key = "/compare/" + self.sha + "...main"
+        for response in ([], {}, {"status": "ahead"},
+                         {"status": "ahead", "merge_base_commit": {"sha": "c" * 40}}):
+            with self.subTest(response=response):
+                self.responses[key] = response
+                with self.assertRaisesRegex(gate.GateError, "not included"):
+                    self.check(tag=None)
+
+    def test_main_verification_failure_cannot_be_skipped(self):
+        def get(key):
+            if key.startswith("/compare/"):
+                raise gate.GateError("HTTP 503")
+            return self.responses[key]
+        with self.assertRaisesRegex(gate.GateError, "503"):
+            gate.upstream_dependency(None, self.sha, get)
 
     def test_wrong_tag_commit(self):
         self.responses["/git/tags/" + self.tag_sha]["object"]["sha"] = "c" * 40
@@ -186,7 +216,7 @@ class UpstreamGateTests(unittest.TestCase):
                 raise gate.GateError("HTTP 404")
             return self.responses[key]
         with self.assertRaisesRegex(gate.GateError, "404"):
-            gate.published_dependency("v0.1.0-rc.1", self.sha, get)
+            gate.upstream_dependency("v0.1.0-rc.1", self.sha, get)
 
     def test_commit_response_must_match_pin(self):
         self.responses["/commits/" + self.sha] = {"sha": "c" * 40}
@@ -204,7 +234,7 @@ class UpstreamGateTests(unittest.TestCase):
                 raise gate.GateError("HTTP 404")
             return self.responses[key]
         with self.assertRaisesRegex(gate.GateError, "404"):
-            gate.published_dependency("v0.1.0-rc.1", self.sha, get)
+            gate.upstream_dependency("v0.1.0-rc.1", self.sha, get)
 
     def test_http_errors_fail_closed(self):
         for code in (404, 403, 429, 500):

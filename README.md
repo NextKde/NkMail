@@ -200,9 +200,10 @@ checkout is updated. Use a fresh build directory for pinned release builds, or p
 `-DNKMAIL_UI_SOURCE_DIR="$PWD/third_party/nextkdeAppDemo"` to explicitly reset the cache.
 Development overrides are not proof of acceptance of the pinned version.
 
-Shared fixes belong in the canonical repository. After a new source release, fetch
-its tag in the submodule, check out that chosen release, run NkMail's regressions, then
-commit the gitlink and version-record updates. Do not use `git submodule update --remote`,
+Shared fixes belong in the canonical repository. Once a chosen commit is included
+in upstream `main`, fetch it in the submodule, check out its exact full SHA, run
+NkMail's regressions, then commit the gitlink and version-record updates. An upstream
+Release or tag is not required. Do not use `git submodule update --remote`,
 follow `main` or automatically select the newest release. Published tags are immutable;
 other applications upgrade on their own schedule.
 
@@ -219,16 +220,15 @@ python3 scripts/check_ui_dependency.py
 `third_party/kos-ui.lock.json` records the pinned full SHA, and may optionally also
 record a `tag`. The guard compares the SHA with the staged gitlink and clean submodule
 HEAD, requires the canonical URL and no tracking branch, and verifies that the pinned
-commit actually exists upstream. If a `tag` is present it must be a concrete version
+commit exists upstream and is included in upstream `main` (the head or an ancestor). If a `tag` is present it must be a concrete version
 such as `v0.1.0-rc.1` and must resolve to the same commit (annotated tags included);
 a GitHub Release is no longer required. Dirty submodules, mismatched commits and
 API/network errors fail the check. The script is read-only and never submits or
 publishes shared changes for you.
 
-For a new shared component, the order is: develop/test upstream → commit and push it
-upstream → check out that commit in NkMail's submodule → update/stage the gitlink and
+For a new shared component, the order is: develop/test upstream → merge the commit into upstream `main` → check out that commit in NkMail's submodule → update/stage the gitlink and
 lock → run the guard → open a PR. Running `git add` in NkMail does **not** commit files
-inside its submodule. For example, after upstream pushes the commit you want to pin:
+inside its submodule. For example, after upstream merges the commit you want to pin:
 
 ```sh
 git -C third_party/nextkdeAppDemo fetch origin
@@ -244,7 +244,8 @@ so you can fix a missing upstream commit before opening the PR. It does not need
 locally installed Git hook, and does not silently repair the dependency.
 
 Every PR to `main` runs the `release-gate` GitHub Actions job: guard regressions,
-release verification, a fresh default-source Release build and all five CTest suites.
+upstream-main membership verification, a fresh default-source Release build and all
+registered CTest suites.
 The main-branch policy requires a PR and that check against the latest base, including
 for administrators, with no force-push/deletion. No second-person approval is required
 for this single-maintainer workflow. Repository administrators can still change the

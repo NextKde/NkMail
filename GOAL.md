@@ -778,3 +778,11 @@ Old unchecked lists and provider statements above are historical evidence, not a
 - ListenFree PR #2 merged as 52c2571e5b8dc463e021da41cd7199c9e123ecba; main run 42867925615 succeeded. This is a source integration, not a Flatpak release.
 - On 2026-11-11 the user explicitly approved merging verified Music PR #9. After rechecking the unchanged head 9c44b6b0128b4edd03f3b9ff96059dafd8054911 and passing PR CI, it was merged normally as 4c6c4d4ca86e4738342b1bd488e64c8e403a06a4. Main Window controls CI 42932700213 completed successfully, including the pinned-component build and takeover/layout/fallback regressions. The authorized merge is complete. Music still has no published Flatpak.
 - The task's owned nested compositor was stopped through nested-stop. Owned previews and temporary app installs were removed; no host apps or reference working trees were modified/launched. Primary NkMail checkout is clean. Local synthetic fixtures and private captures remain under tmp/ and the VM validation task root for recovery.
+
+
+## Upstream-main UI pin policy · 2026-11-11
+
+- User explicitly removed the upstream Release requirement. Deliberately pin a tested full SHA already included in canonical nextkdeAppDemo main; do not follow a floating branch or automatically upgrade.
+- Align contributor instructions, README, testing guide and CI terminology. Strengthen the existing commit-existence check with upstream-main ancestry verification; keep staged-lock/gitlink consistency, clean submodule, canonical URL, optional tag resolution and network-failure checks.
+- Add guard regressions for main head/ancestors, existing commits outside main, malformed ancestry responses and API failure. Validation and PR integration are pending.
+- Current local icon SHAs 998c145 and 2ba0039 were not retrievable from upstream GitHub during this review. This is separate from Release policy: icon work must first be integrated into canonical upstream main. Preserve the concurrently edited original NkMail tree; do not substitute an unrelated main SHA or publish a release.

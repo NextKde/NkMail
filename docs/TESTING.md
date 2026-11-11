@@ -19,23 +19,23 @@ A controller mock or linked boundary replacement is not protocol acceptance. Con
 
 Run `python3 -m unittest discover -s tests/dependency -v` for guard regressions,
 then `python3 scripts/check_ui_dependency.py`, in a Git checkout inside the VM.
-The current guard verifies the staged gitlink, clean submodule, canonical URL and
-published upstream commit; the current lock has a SHA and no release tag. A supplied
-tag must resolve to that SHA. This describes the inherited main-branch guard, not a
-new release-policy change. Do not claim a published Release check for a commit-only
-pin. API/network failures must not be bypassed.
+The guard verifies the staged gitlink, clean submodule, canonical URL and exact
+upstream commit. The pin must be the head or an ancestor of canonical upstream
+`main`; a commit present only on another branch is rejected. The user authorized
+SHA-only upgrades on 2026-11-11: no GitHub Release or tag is required. An optional
+tag must still resolve to the locked SHA. API/network failures must not be bypassed.
 
 Guard tests create temporary Git fixtures under `tmp/`, mock network responses, and
 cover uninitialized submodules, dirty tracked/staged/untracked files, wrong URL or
-tracking branch, lock/gitlink/HEAD mismatches, unpublished releases, annotated and
-lightweight tags, tag mismatches and API failures. They are separate from the existing
-five CTest suites, not additional evidence of mail/provider or GPU compatibility.
+tracking branch, lock/gitlink/HEAD mismatches, commits absent from upstream main, annotated and
+lightweight tags, tag mismatches, malformed ancestry responses and API failures. They are separate from the existing
+CTest suites, not additional evidence of mail/provider or GPU compatibility.
 
 The hosted `release-gate` job runs on all PRs to main and pushes to main, without path
 filters. It uses an ephemeral Arch container on Ubuntu, a SHA-pinned checkout Action,
-read-only token, no repository secrets and no build cache. It verifies the release,
+read-only token, no repository secrets and no build cache. It verifies the pinned commit and upstream-main membership,
 then configures a new Release build with tests enabled, checks that the cached UI
-source is the pinned submodule, requires all five named suites and runs CTest.
+source is the pinned submodule, requires all named suites and runs CTest.
 The container installs current Qt (at least 6.8), CMake (at least 3.30) and OpenSSL
 (at least 3.4, required by the existing expired-certificate fixture). Package versions
 are printed. Arch packages roll forward: a clean build is not a fully locked OS or a
