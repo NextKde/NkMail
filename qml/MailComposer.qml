@@ -1,4 +1,5 @@
 import QtQuick
+import Kos.Icons as Symbols
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
@@ -45,23 +46,20 @@ ApplicationWindow {
         accessibleText: text
         focusPolicy: Qt.TabFocus
     }
-    component ComposerIcon: Image {
+    // Keep the inline component as a host Item: directly deriving it from the
+    // imported QML icon type crashes Qt 6.10's GC during repeated dialog use.
+    component ComposerIcon: Item {
+        id: composerGlyph
         required property string glyph
         property color ink: AppTheme.text
-        width: 16; height: 16
-        sourceSize: Qt.size(32, 32)
-        fillMode: Image.PreserveAspectFit
-        readonly property var paths: ({
-            undo: "M9 14 4 9l5-5 M4 9h10a6 6 0 0 1 0 12h-3",
-            redo: "m15 14 5-5-5-5 M20 9H10a6 6 0 0 0 0 12h3",
-            format: "m2 19 5-14 5 14 M4 14h6 M21 19v-6a3 3 0 0 0-6 0 M21 15h-3a2 2 0 0 0 0 4h3",
-            emoji: "M21 12a9 9 0 1 0-18 0 9 9 0 0 0 18 0 M8 9h.01 M16 9h.01 M8 14a4 4 0 0 0 8 0",
-            link: "m10 13 4-4 M8 15l-1 1a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0 M16 9l1-1a4 4 0 0 1 6 6l-5 5a4 4 0 0 1-6 0",
-            attach: "m21 11-9 9a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8L15 6",
-            recipients: "M15 7a3 3 0 1 0-6 0 3 3 0 0 0 6 0 M5 21v-3a7 7 0 0 1 14 0v3 M19 4a3 3 0 0 1 0 6 M21 14a5 5 0 0 1 2 4",
-            send: "M12 21V3 M5 10l7-7 7 7"
-        })
-        source: "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="' + ink + '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="' + (paths[glyph] || paths.send) + '"/></svg>')
+        implicitWidth: 16
+        implicitHeight: 16
+        Symbols.Icon {
+            anchors.centerIn: parent
+            size: 16
+            name: composerGlyph.glyph === "send" ? "arrow_up" : composerGlyph.glyph
+            color: composerGlyph.ink
+        }
     }
     component HeaderAction: ComposerAction {
         id: headerAction
@@ -113,41 +111,14 @@ ApplicationWindow {
     component ListAction: FormatAction {
         id: listAction
         property bool numbered: false
-        contentItem: Item {
-            Column {
-                anchors.centerIn: parent
-                Repeater {
-                    model: 3
-                    delegate: Item {
-                        required property int index
-                        width: 19; height: 5
-                        Text { width: 7; height: 5; text: listAction.numbered ? String(index + 1) : "•"; font.pixelSize: 7; color: AppTheme.text; verticalAlignment: Text.AlignVCenter }
-                        Rectangle { x: 8; y: 2; width: 11; height: 1; color: AppTheme.text }
-                    }
-                }
-            }
-        }
+        contentItem: Symbols.Icon { name: listAction.numbered ? "list_number" : "list_bullet"; size: 16; color: AppTheme.text }
     }
     component AlignmentAction: FormatAction {
         id: alignmentAction
         required property int paragraphAlignment
         checkable: true
         checked: !!(root.paragraphState.alignment & paragraphAlignment)
-        contentItem: Item {
-            Column {
-                anchors.centerIn: parent; spacing: 3; width: 16
-                Repeater {
-                    model: [16, 10, 16, 12]
-                    delegate: Rectangle {
-                        required property int modelData
-                        width: modelData; height: 1
-                        x: alignmentAction.paragraphAlignment === Qt.AlignHCenter ? (16 - width) / 2
-                            : alignmentAction.paragraphAlignment === Qt.AlignRight ? 16 - width : 0
-                        color: AppTheme.text
-                    }
-                }
-            }
-        }
+        contentItem: Symbols.Icon { name: alignmentAction.paragraphAlignment === Qt.AlignHCenter ? "text_aligncenter" : alignmentAction.paragraphAlignment === Qt.AlignRight ? "text_alignright" : "text_alignleft"; size: 16; color: AppTheme.text }
         onClicked: root.format(() => richEditor.setAlignment(bodyField.textDocument, paragraphAlignment))
     }
     component AddressField: TextField {

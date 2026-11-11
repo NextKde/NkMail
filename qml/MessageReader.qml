@@ -122,7 +122,7 @@ Rectangle {
                             height: 28
                             spacing: 8
                             Text { text: qsTr("Message details"); color: root.ink; font.pixelSize: 15; font.weight: Font.DemiBold; Layout.fillWidth: true }
-                            MailAction { iconOnly: true; text: "×"; font.pixelSize: 20; accessibleText: qsTr("Close message details"); onClicked: root.closeDetailsRequested() }
+                            MailAction { iconOnly: true; iconName: "xmark"; accessibleText: qsTr("Close message details"); onClicked: root.closeDetailsRequested() }
                         }
                         ScrollView {
                             id: detailsScroll

@@ -1,4 +1,5 @@
 import QtQuick
+import Kos.Icons as Symbols
 import QtQuick.Controls
 import QtQuick.Layouts
 import Kos.Ui
@@ -274,8 +275,8 @@ Rectangle {
                             Layout.fillWidth: true
                             spacing: 6
                             Text { text: messageRow.subject || qsTr("(No subject)"); color: messageRow.rowInk; font.pixelSize: 12; font.weight: messageRow.unread ? Font.DemiBold : Font.Normal; Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText }
-                            Text { text: messageRow.flagged ? "★" : ""; color: messageRow.rowAccent; font.pixelSize: 12; visible: messageRow.flagged; Accessible.name: qsTr("Flagged") }
-                            VectorIcon { name: "album"; size: 14; color: messageRow.rowMuted; visible: messageRow.hasAttachments; Accessible.name: qsTr("Has attachment") }
+                            Symbols.Icon { name: messageRow.flagged ? "star_fill" : ""; color: messageRow.rowAccent; size: 12; visible: messageRow.flagged; Accessible.ignored: false; Accessible.name: qsTr("Flagged") }
+                            VectorIcon { name: "paperclip"; size: 14; color: messageRow.rowMuted; visible: messageRow.hasAttachments; Accessible.name: qsTr("Has attachment") }
                         }
                         Text { objectName: "messagePreview"; visible: root.showSummary; text: messageRow.preview; color: messageRow.rowMuted; font.pixelSize: 11; lineHeight: 1.25; Layout.fillWidth: true; Layout.fillHeight: true; wrapMode: Text.NoWrap; maximumLineCount: 1; elide: Text.ElideRight; textFormat: Text.PlainText }
                     }
