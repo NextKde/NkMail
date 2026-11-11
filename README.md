@@ -220,13 +220,16 @@ python3 scripts/check_ui_dependency.py
 `third_party/kos-ui.lock.json` records the pinned full SHA, and may optionally also
 record a `tag`. The guard compares the SHA with the staged gitlink and clean submodule
 HEAD, requires the canonical URL and no tracking branch, and verifies that the pinned
-commit exists upstream and is included in upstream `main` (the head or an ancestor). If a `tag` is present it must be a concrete version
+commit exists upstream and is included in upstream `main` (the head or an ancestor).
+If a `tag` is present it must be a concrete version
 such as `v0.1.0-rc.1` and must resolve to the same commit (annotated tags included);
 a GitHub Release is no longer required. Dirty submodules, mismatched commits and
 API/network errors fail the check. The script is read-only and never submits or
 publishes shared changes for you.
 
-For a new shared component, the order is: develop/test upstream → merge the commit into upstream `main` → check out that commit in NkMail's submodule → update/stage the gitlink and
+For a new shared component, the order is: develop/test upstream → merge the commit
+into upstream `main` → check out that commit in NkMail's submodule → update/stage the
+gitlink and
 lock → run the guard → open a PR. Running `git add` in NkMail does **not** commit files
 inside its submodule. For example, after upstream merges the commit you want to pin:
 

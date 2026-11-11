@@ -27,14 +27,14 @@ tag must still resolve to the locked SHA. API/network failures must not be bypas
 
 Guard tests create temporary Git fixtures under `tmp/`, mock network responses, and
 cover uninitialized submodules, dirty tracked/staged/untracked files, wrong URL or
-tracking branch, lock/gitlink/HEAD mismatches, commits absent from upstream main, annotated and
-lightweight tags, tag mismatches, malformed ancestry responses and API failures. They are separate from the existing
-CTest suites, not additional evidence of mail/provider or GPU compatibility.
+tracking branch, lock/gitlink/HEAD mismatches, commits absent from upstream main,
+annotated and lightweight tags, tag mismatches, malformed ancestry responses and
+API failures. They are separate from the existing CTest suites, not additional evidence of mail/provider or GPU compatibility.
 
 The hosted `release-gate` job runs on all PRs to main and pushes to main, without path
 filters. It uses an ephemeral Arch container on Ubuntu, a SHA-pinned checkout Action,
-read-only token, no repository secrets and no build cache. It verifies the pinned commit and upstream-main membership,
-then configures a new Release build with tests enabled, checks that the cached UI
+read-only token, no repository secrets and no build cache. It verifies the pinned
+commit and upstream-main membership, then configures a new Release build with tests enabled, checks that the cached UI
 source is the pinned submodule, requires all named suites and runs CTest.
 The container installs current Qt (at least 6.8), CMake (at least 3.30) and OpenSSL
 (at least 3.4, required by the existing expired-certificate fixture). Package versions

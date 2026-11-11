@@ -784,5 +784,5 @@ Old unchecked lists and provider statements above are historical evidence, not a
 
 - User explicitly removed the upstream Release requirement. Deliberately pin a tested full SHA already included in canonical nextkdeAppDemo main; do not follow a floating branch or automatically upgrade.
 - Align contributor instructions, README, testing guide and CI terminology. Strengthen the existing commit-existence check with upstream-main ancestry verification; keep staged-lock/gitlink consistency, clean submodule, canonical URL, optional tag resolution and network-failure checks.
-- Add guard regressions for main head/ancestors, existing commits outside main, malformed ancestry responses and API failure. Validation and PR integration are pending.
+- Add guard regressions for main head/ancestors, existing commits outside main, malformed ancestry responses and API failure. VM guard regressions passed 36/36 and the live upstream-main check passed for the existing e2592b2742c58c1bd797a8bcfa2a3ae7da4affd8 pin. PR integration and CI remain pending.
 - Current local icon SHAs 998c145 and 2ba0039 were not retrievable from upstream GitHub during this review. This is separate from Release policy: icon work must first be integrated into canonical upstream main. Preserve the concurrently edited original NkMail tree; do not substitute an unrelated main SHA or publish a release.
